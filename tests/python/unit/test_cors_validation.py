@@ -2,7 +2,11 @@ import importlib.util
 import unittest
 from pathlib import Path
 import os
+import sys
 import tempfile
+import types
+
+from fastapi import APIRouter
 
 
 def _load_main_module():
@@ -11,18 +15,28 @@ def _load_main_module():
 
     old_state_dir = os.environ.get("STATE_DIR")
     os.environ["STATE_DIR"] = tempfile.mkdtemp(prefix="state-")
+    old_api_routes_module = sys.modules.get("api.routes")
+    fake_api_routes_module = types.ModuleType("api.routes")
+    fake_api_routes_module.router = APIRouter()
+    sys.modules["api.routes"] = fake_api_routes_module
 
     spec = importlib.util.spec_from_file_location("api_main_test", main_py)
     assert spec is not None
     assert spec.loader is not None
 
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    try:
+        spec.loader.exec_module(mod)
+    finally:
+        if old_api_routes_module is None:
+            sys.modules.pop("api.routes", None)
+        else:
+            sys.modules["api.routes"] = old_api_routes_module
 
-    if old_state_dir is None:
-        os.environ.pop("STATE_DIR", None)
-    else:
-        os.environ["STATE_DIR"] = old_state_dir
+        if old_state_dir is None:
+            os.environ.pop("STATE_DIR", None)
+        else:
+            os.environ["STATE_DIR"] = old_state_dir
 
     return mod
 
