@@ -206,6 +206,10 @@ export function useWorkspaceServerMetadata({
         });
 
         const patchByAlias: Record<string, Partial<ServerState>> = {};
+        const requirementsFallbackByAlias: Record<
+          string,
+          { server_type?: string; storage_gb?: number; location?: string }
+        > = {};
         await Promise.all(
           aliases.map(async (alias) => {
             const hostVarsPath = hostVarsPathByAlias.get(alias);
@@ -225,9 +229,73 @@ export function useWorkspaceServerMetadata({
             const patch = parseHostVarsServerPatchData(parsed);
             if (Object.keys(patch).length > 0) {
               patchByAlias[alias] = patch;
+              if (
+                typeof patch.requirementServerType === "string" ||
+                typeof patch.requirementStorageGb === "string" ||
+                typeof patch.requirementLocation === "string"
+              ) {
+                const server_type = String(patch.requirementServerType || "").trim();
+                const storageRaw = String(patch.requirementStorageGb || "").trim();
+                const storageParsed = Number(storageRaw);
+                const storage_gb =
+                  storageRaw && Number.isFinite(storageParsed)
+                    ? Math.max(0, Math.floor(storageParsed))
+                    : undefined;
+                const location = String(patch.requirementLocation || "").trim();
+                requirementsFallbackByAlias[alias] = {
+                  ...(server_type ? { server_type } : {}),
+                  ...(typeof storage_gb === "number" ? { storage_gb } : {}),
+                  ...(location ? { location } : {}),
+                };
+              }
             }
           })
         );
+
+        let requirementsByAlias: Record<string, any> = {};
+        try {
+          const reqRes = await fetch(
+            `${baseUrl}/api/workspaces/${workspaceId}/server-requirements`,
+            { cache: "no-store" }
+          );
+          if (reqRes.ok) {
+            const reqData = await reqRes.json();
+            const byAlias = reqData?.requirements_by_alias;
+            if (byAlias && typeof byAlias === "object" && !Array.isArray(byAlias)) {
+              requirementsByAlias = byAlias as Record<string, any>;
+            }
+          }
+        } catch {
+          // ignore requirements hydration errors
+        }
+
+        const aliasesNeedingMigration: Array<{ alias: string; requirements: Record<string, any> }> = [];
+        Object.entries(requirementsFallbackByAlias).forEach(([alias, req]) => {
+          const existing = requirementsByAlias?.[alias];
+          const hasDb =
+            existing && typeof existing === "object" && Object.keys(existing).length > 0;
+          const hasFallback = Object.keys(req || {}).length > 0;
+          if (!hasDb && hasFallback) {
+            aliasesNeedingMigration.push({ alias, requirements: req as Record<string, any> });
+          }
+        });
+
+        Object.keys(requirementsByAlias || {}).forEach((alias) => {
+          const req = requirementsByAlias[alias];
+          if (!req || typeof req !== "object" || Array.isArray(req)) return;
+          const patch: Partial<ServerState> = {};
+          if (Object.prototype.hasOwnProperty.call(req, "server_type")) {
+            patch.requirementServerType = String(req.server_type ?? "").trim();
+          }
+          if (Object.prototype.hasOwnProperty.call(req, "storage_gb")) {
+            patch.requirementStorageGb = String(req.storage_gb ?? "").trim();
+          }
+          if (Object.prototype.hasOwnProperty.call(req, "location")) {
+            patch.requirementLocation = String(req.location ?? "").trim();
+          }
+          if (Object.keys(patch).length === 0) return;
+          patchByAlias[alias] = { ...(patchByAlias[alias] || {}), ...patch };
+        });
 
         if (cancelled || Object.keys(patchByAlias).length === 0) return;
         setServers((prev) => {
@@ -253,6 +321,27 @@ export function useWorkspaceServerMetadata({
           });
           return changed ? normalizePersistedDeviceMeta(next) : prev;
         });
+
+        if (!cancelled && aliasesNeedingMigration.length > 0) {
+          void Promise.all(
+            aliasesNeedingMigration.map(async ({ alias, requirements }) => {
+              try {
+                await fetch(
+                  `${baseUrl}/api/workspaces/${workspaceId}/servers/${encodeURIComponent(
+                    alias
+                  )}/requirements`,
+                  {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ requirements }),
+                  }
+                );
+              } catch {
+                // ignore best-effort migration failures
+              }
+            })
+          );
+        }
       } catch {
         // ignore hydration failures and keep current in-memory state
       }

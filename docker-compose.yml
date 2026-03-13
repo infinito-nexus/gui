@@ -1,6 +1,33 @@
-version: "3.9"
-
 services:
+  # ---------------------------------------------------------
+  # Database (PostgreSQL)
+  # ---------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: ${POSTGRES_CONTAINER_NAME:-infinito-deployer-db}
+
+    env_file:
+      - .env
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-infinito_deployer}
+      POSTGRES_USER: ${POSTGRES_USER:-infinito}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infinito}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+    restart: ${RESTART_POLICY}
+
   # ---------------------------------------------------------
   # Catalog generator (writes roles/list.json into STATE_DIR)
   # ---------------------------------------------------------
@@ -78,6 +105,11 @@ services:
       APP_PORT: ${API_APP_PORT}
 
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-infinito_deployer}
+      POSTGRES_USER: ${POSTGRES_USER:-infinito}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infinito}
 
       ROLE_CATALOG_LIST_JSON: ${ROLE_CATALOG_LIST_JSON}
       ROLE_CATALOG_CATEGORIES_YML: ${ROLE_CATALOG_CATEGORIES_YML}
@@ -102,6 +134,8 @@ services:
       - "${API_PORT}:${API_APP_PORT}"
 
     depends_on:
+      db:
+        condition: service_healthy
       catalog:
         condition: service_started
 
@@ -148,6 +182,16 @@ services:
       api:
         condition: service_healthy
 
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          node -e "const os=require('os'); const host=os.hostname(); require('http').get({host,port:3000,path:'/'}, (r) => process.exit(r.statusCode >= 200 && r.statusCode < 500 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
     restart: ${RESTART_POLICY}
 
   # ---------------------------------------------------------
@@ -163,6 +207,15 @@ services:
 
     ports:
       - "${TEST_ARCH_SSH_PORT:-2224}:22"
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - '[ "$$(cat /proc/1/comm 2>/dev/null)" = "sshd" ]'
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
     restart: ${RESTART_POLICY}
 
@@ -180,6 +233,15 @@ services:
     ports:
       - "${TEST_SSH_PASSWORD_PORT:-2222}:22"
 
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - '[ "$$(cat /proc/1/comm 2>/dev/null)" = "sshd" ]'
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
     restart: ${RESTART_POLICY}
 
   ssh-key:
@@ -193,6 +255,15 @@ services:
     ports:
       - "${TEST_SSH_KEY_PORT:-2223}:22"
 
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - '[ "$$(cat /proc/1/comm 2>/dev/null)" = "sshd" ]'
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
     restart: ${RESTART_POLICY}
 
 networks:
@@ -201,3 +272,4 @@ networks:
 
 volumes:
   infinito_repo:
+  postgres_data:

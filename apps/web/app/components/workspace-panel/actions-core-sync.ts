@@ -276,16 +276,6 @@ export function createWorkspacePanelSyncActions(ctx: any) {
     const user = credentials.user?.trim() || "";
     const description = credentials.description?.trim() || "";
     const primaryDomain = credentials.primaryDomain?.trim() || "";
-    const requirementServerType = String(credentials.requirementServerType || "").trim().toLowerCase();
-    const requirementStorageGbRaw = String(credentials.requirementStorageGb || "").trim();
-    const requirementStorageGbParsed = Number(requirementStorageGbRaw);
-    const requirementStorageGb =
-      requirementStorageGbRaw &&
-      Number.isFinite(requirementStorageGbParsed) &&
-      requirementStorageGbParsed >= 0
-        ? String(Math.floor(requirementStorageGbParsed))
-        : "";
-    const requirementLocation = String(credentials.requirementLocation || "").trim();
     const color = normalizeDeviceColor(credentials.color) || "";
     const logoEmoji = normalizeDeviceEmoji(credentials.logoEmoji) || "";
     const targetPath = hostVarsPath || (activeAlias ? `host_vars/${sanitizeAliasFilename(activeAlias)}.yml` : null);
@@ -296,9 +286,6 @@ export function createWorkspacePanelSyncActions(ctx: any) {
       !user &&
       !description &&
       !primaryDomain &&
-      !requirementServerType &&
-      !requirementStorageGb &&
-      !requirementLocation &&
       !color &&
       !logoEmoji
     ) {
@@ -340,47 +327,20 @@ export function createWorkspacePanelSyncActions(ctx: any) {
         delete data.DOMAIN_PRIMARY;
         changed = true;
       }
-      const requirementsNode =
-        data.server_requirements &&
-        typeof data.server_requirements === "object" &&
-        !Array.isArray(data.server_requirements)
-          ? { ...data.server_requirements }
-          : {};
-      let requirementsChanged = false;
-      if (requirementServerType) {
-        if (requirementsNode.server_type !== requirementServerType) {
-          requirementsNode.server_type = requirementServerType;
-          requirementsChanged = true;
-        }
-      } else if (Object.prototype.hasOwnProperty.call(requirementsNode, "server_type")) {
-        delete requirementsNode.server_type;
-        requirementsChanged = true;
+      if (Object.prototype.hasOwnProperty.call(data, "server_requirements")) {
+        delete data.server_requirements;
+        changed = true;
       }
-      if (requirementStorageGb) {
-        const storageValue = Number(requirementStorageGb);
-        if (requirementsNode.storage_gb !== storageValue) {
-          requirementsNode.storage_gb = storageValue;
-          requirementsChanged = true;
-        }
-      } else if (Object.prototype.hasOwnProperty.call(requirementsNode, "storage_gb")) {
-        delete requirementsNode.storage_gb;
-        requirementsChanged = true;
+      if (Object.prototype.hasOwnProperty.call(data, "server_type")) {
+        delete data.server_type;
+        changed = true;
       }
-      if (requirementLocation) {
-        if (requirementsNode.location !== requirementLocation) {
-          requirementsNode.location = requirementLocation;
-          requirementsChanged = true;
-        }
-      } else if (Object.prototype.hasOwnProperty.call(requirementsNode, "location")) {
-        delete requirementsNode.location;
-        requirementsChanged = true;
+      if (Object.prototype.hasOwnProperty.call(data, "storage_gb")) {
+        delete data.storage_gb;
+        changed = true;
       }
-      if (requirementsChanged) {
-        if (Object.keys(requirementsNode).length > 0) {
-          data.server_requirements = requirementsNode;
-        } else if (Object.prototype.hasOwnProperty.call(data, "server_requirements")) {
-          delete data.server_requirements;
-        }
+      if (Object.prototype.hasOwnProperty.call(data, "location")) {
+        delete data.location;
         changed = true;
       }
       if (color && data.color !== color) {
@@ -461,6 +421,45 @@ export function createWorkspacePanelSyncActions(ctx: any) {
     }
   };
 
+  const syncServerRequirementsFromCredentials = async () => {
+    if (!workspaceId) return;
+    if (!activeAlias) return;
+    const alias = String(activeAlias || "").trim();
+    if (!alias) return;
+
+    const requirementServerType = String(credentials.requirementServerType || "")
+      .trim()
+      .toLowerCase();
+    const requirementStorageGbRaw = String(credentials.requirementStorageGb || "").trim();
+    const requirementStorageGbParsed = Number(requirementStorageGbRaw);
+    const requirementStorageGb =
+      requirementStorageGbRaw &&
+      Number.isFinite(requirementStorageGbParsed) &&
+      requirementStorageGbParsed >= 0
+        ? Math.floor(requirementStorageGbParsed)
+        : null;
+    const requirementLocation = String(credentials.requirementLocation || "").trim();
+
+    const requirements: Record<string, any> = {};
+    if (requirementServerType) requirements.server_type = requirementServerType;
+    if (requirementStorageGb != null) requirements.storage_gb = requirementStorageGb;
+    if (requirementLocation) requirements.location = requirementLocation;
+
+    const url = `${baseUrl}/api/workspaces/${workspaceId}/servers/${encodeURIComponent(
+      alias
+    )}/requirements`;
+    try {
+      const method = Object.keys(requirements).length === 0 ? "DELETE" : "PUT";
+      await fetch(url, {
+        method,
+        headers: method === "PUT" ? { "Content-Type": "application/json" } : undefined,
+        body: method === "PUT" ? JSON.stringify({ requirements }) : undefined,
+      });
+    } catch {
+      // ignore requirements sync errors
+    }
+  };
+
   return {
     generateInventory,
     resolveTargetRoles,
@@ -470,5 +469,6 @@ export function createWorkspacePanelSyncActions(ctx: any) {
     syncSelectionFromInventory,
     syncHostVarsFromCredentials,
     syncCredentialsFromHostVars,
+    syncServerRequirementsFromCredentials,
   };
 }

@@ -40,6 +40,7 @@ type UseWorkspacePanelSyncEffectsParams = {
   refreshFiles: (workspaceId: string) => Promise<void>;
   syncHostVarsFromCredentials: (editorDirty: boolean) => Promise<void>;
   syncCredentialsFromHostVars: (editorDirty: boolean) => Promise<void>;
+  syncServerRequirementsFromCredentials: () => Promise<void>;
   setActivePath: Dispatch<SetStateAction<string | null>>;
   setEditorValue: Dispatch<SetStateAction<string>>;
   setEditorDirty: Dispatch<SetStateAction<boolean>>;
@@ -86,6 +87,7 @@ export function useWorkspacePanelSyncEffects({
   refreshFiles,
   syncHostVarsFromCredentials,
   syncCredentialsFromHostVars,
+  syncServerRequirementsFromCredentials,
   setActivePath,
   setEditorValue,
   setEditorDirty,
@@ -243,6 +245,15 @@ export function useWorkspacePanelSyncEffects({
         if (inventoryReady) {
           await renameAliasInInventory(from, to);
         }
+        try {
+          await fetch(`${baseUrl}/api/workspaces/${workspaceId}/servers/rename`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ from_alias: from, to_alias: to }),
+          });
+        } catch {
+          // ignore requirements rename errors
+        }
         const fromSafe = sanitizeAliasFilename(from);
         const toSafe = sanitizeAliasFilename(to);
 
@@ -305,6 +316,16 @@ export function useWorkspacePanelSyncEffects({
       try {
         if (inventoryReady) {
           await removeAliasFromInventory(alias);
+        }
+        try {
+          await fetch(
+            `${baseUrl}/api/workspaces/${workspaceId}/servers/${encodeURIComponent(
+              alias
+            )}/requirements`,
+            { method: "DELETE" }
+          );
+        } catch {
+          // ignore requirements delete errors
         }
         await refreshFiles(workspaceId);
       } catch (err: any) {
@@ -369,6 +390,16 @@ export function useWorkspacePanelSyncEffects({
         if (inventoryReady) {
           await removeAliasFromInventory(alias);
         }
+        try {
+          await fetch(
+            `${baseUrl}/api/workspaces/${workspaceId}/servers/${encodeURIComponent(
+              alias
+            )}/requirements`,
+            { method: "DELETE" }
+          );
+        } catch {
+          // ignore requirements cleanup errors
+        }
         const safeAlias = sanitizeAliasFilename(alias);
         await deleteFileIfExists(`host_vars/${safeAlias}.yml`);
         await deleteFileIfExists(`secrets/ssh_keys/${safeAlias}`);
@@ -411,6 +442,7 @@ export function useWorkspacePanelSyncEffects({
 
     hostVarsSyncTimerRef.current = window.setTimeout(() => {
       void syncHostVarsFromCredentials(editorDirty);
+      void syncServerRequirementsFromCredentials();
     }, 1400);
 
     return () => {
@@ -422,6 +454,9 @@ export function useWorkspacePanelSyncEffects({
     workspaceId,
     credentials.description,
     credentials.primaryDomain,
+    credentials.requirementServerType,
+    credentials.requirementStorageGb,
+    credentials.requirementLocation,
     credentials.host,
     credentials.port,
     credentials.user,
@@ -431,6 +466,7 @@ export function useWorkspacePanelSyncEffects({
     activePath,
     editorDirty,
     syncHostVarsFromCredentials,
+    syncServerRequirementsFromCredentials,
     hostVarsSyncTimerRef,
   ]);
 

@@ -248,6 +248,7 @@ export default function WorkspacePanel({
     syncSelectionFromInventory,
     syncHostVarsFromCredentials,
     syncCredentialsFromHostVars,
+    syncServerRequirementsFromCredentials,
     generateCredentials,
     resetVaultPassword,
     handleVaultPromptSubmit,
@@ -297,7 +298,7 @@ export default function WorkspacePanel({
     onAliasCleanupsHandled, selectionTouched, files, canGenerate, mergeRolesByAlias,
     generateInventory, syncInventoryWithSelection, syncSelectionFromInventory,
     renameAliasInInventory, removeAliasFromInventory, renameWorkspaceFile, refreshFiles,
-    syncHostVarsFromCredentials, syncCredentialsFromHostVars, setActivePath,
+    syncHostVarsFromCredentials, syncCredentialsFromHostVars, syncServerRequirementsFromCredentials, setActivePath,
     setEditorValue, setEditorDirty, setInventorySyncError, inventorySeededRef,
     initialRolesSyncDoneRef, autoSyncRef, deleteSyncRef, hostVarsSyncTimerRef,
   });

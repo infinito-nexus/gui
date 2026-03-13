@@ -55,6 +55,29 @@ make setup
 * `INFINITO_REPO_HOST_PATH` must point to your local Infinito.Nexus path
 * `CORS_ALLOW_ORIGINS` should include the Web UI URL
 * `NEXT_PUBLIC_API_BASE_URL` must point to the API endpoint
+* `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` configure the PostgreSQL service used for server requirements
+
+### Requirements Database Initialization
+
+Start only PostgreSQL:
+```bash
+make db-up
+```
+
+Wait until PostgreSQL is ready:
+```bash
+make db-wait
+```
+
+Initialize requirements tables (idempotent):
+```bash
+make requirements-init
+```
+
+Open a SQL shell in PostgreSQL:
+```bash
+make db-psql
+```
 
 ### Job Runner (Container per Deployment)
 
@@ -89,6 +112,11 @@ make up
 make logs
 ```
 
+Only database logs:
+```bash
+make db-logs
+```
+
 Refresh catalog (invokable apps only) and restart API:
 ```bash
 make refresh-catalog
@@ -109,6 +137,11 @@ Stop stack:
 
 ```bash
 make down
+```
+
+Stop only PostgreSQL:
+```bash
+make db-stop
 ```
 
 ### URLs After Startup

@@ -257,6 +257,7 @@ export function createWorkspacePanelCoreActions(ctx: any) {
     syncSelectionFromInventory,
     syncHostVarsFromCredentials,
     syncCredentialsFromHostVars,
+    syncServerRequirementsFromCredentials,
   } = createWorkspacePanelSyncActions({
     baseUrl,
     workspaceId,
@@ -327,5 +328,6 @@ export function createWorkspacePanelCoreActions(ctx: any) {
     syncSelectionFromInventory,
     syncHostVarsFromCredentials,
     syncCredentialsFromHostVars,
+    syncServerRequirementsFromCredentials,
   };
 }

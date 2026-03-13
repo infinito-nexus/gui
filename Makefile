@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog test-arch test-env-up test-env-down web-sync venv install test clean example-workspace-zip
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init test-arch test-env-up test-env-down web-sync venv install test clean example-workspace-zip
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -47,6 +47,27 @@ restart: down up
 
 ps:
 	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" ps
+
+db-up:
+	@echo "→ Starting Postgres (db)"
+	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d db
+
+db-stop:
+	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" stop db
+
+db-logs:
+	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f --tail=200 db
+
+db-wait:
+	@echo "→ Waiting for Postgres to become ready"
+	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T db sh -lc 'for i in $$(seq 1 60); do pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" >/dev/null 2>&1 && echo "✔ Postgres is ready." && exit 0; sleep 1; done; echo "✖ Postgres not ready after 60s"; exit 1'
+
+db-psql:
+	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec db sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+requirements-init: db-up db-wait
+	@echo "→ Ensuring requirements tables exist"
+	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" run --rm --no-deps --build api python -c 'from services.server_requirements import WorkspaceServerRequirementsService; WorkspaceServerRequirementsService().list_requirements("bootstrap"); print("✔ requirements schema ready")'
 
 refresh-catalog:
 	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --force-recreate catalog
