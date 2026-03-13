@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from services.job_runner.secrets import mask_secrets
-from .workspace_context import WORKSPACE_META_FILENAME
+from .workspace_context import WORKSPACE_META_FILENAME, _safe_resolve
 from .workspace_service_history_restore import WorkspaceServiceHistoryRestoreMixin
 
 _HISTORY_USER_NAME = "Infinito Workspace"
@@ -68,9 +68,13 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
                 timeout=timeout,
             )
         except FileNotFoundError as exc:
-            raise HTTPException(status_code=500, detail="git binary not available") from exc
+            raise HTTPException(
+                status_code=500, detail="git binary not available"
+            ) from exc
         except subprocess.TimeoutExpired as exc:
-            raise HTTPException(status_code=500, detail="git command timed out") from exc
+            raise HTTPException(
+                status_code=500, detail="git command timed out"
+            ) from exc
 
         if check and result.returncode != 0:
             stderr = (
@@ -87,7 +91,9 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
         if not ignore_path.exists():
             ignore_path.write_text("", encoding="utf-8")
         else:
-            existing = ignore_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            existing = ignore_path.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
             normalized = [line.strip() for line in existing if line.strip()]
             legacy_variants = [
                 [
@@ -120,10 +126,14 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
         exclude_path.parent.mkdir(parents=True, exist_ok=True)
         existing: list[str] = []
         if exclude_path.is_file():
-            existing = exclude_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            existing = exclude_path.read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
 
         existing_set = {line.strip() for line in existing}
-        additions = [line for line in required_lines if line.strip() not in existing_set]
+        additions = [
+            line for line in required_lines if line.strip() not in existing_set
+        ]
         if not additions:
             return
 
@@ -170,7 +180,12 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
     def _history_tracked_paths(self, root: Path) -> list[str]:
         result = self._run_git(
             root,
-            ["diff", "--cached", "--name-only", f"--diff-filter={_TRACKED_DIFF_FILTER}"],
+            [
+                "diff",
+                "--cached",
+                "--name-only",
+                f"--diff-filter={_TRACKED_DIFF_FILTER}",
+            ],
             check=False,
         )
         if result.returncode != 0:
@@ -283,7 +298,9 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
                 ),
             )
 
-    def _format_commit_message(self, message: str, metadata: dict[str, str] | None) -> str:
+    def _format_commit_message(
+        self, message: str, metadata: dict[str, str] | None
+    ) -> str:
         summary = (message or "").strip()
         if not summary:
             summary = "context: workspace update"
@@ -312,18 +329,24 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
         try:
             self._validate_no_plaintext_secrets(root)
             full_message = self._format_commit_message(message, metadata)
-            self._run_git(root, ["commit", "--quiet", "-m", full_message, "--no-gpg-sign"])
+            self._run_git(
+                root, ["commit", "--quiet", "-m", full_message, "--no-gpg-sign"]
+            )
         except Exception:
             self._history_unstage_all(root)
             raise
 
         sha = str(self._run_git(root, ["rev-parse", "HEAD"]).stdout).strip()
         tracked_status = str(
-            self._run_git(root, ["status", "--porcelain", "--untracked-files=no"]).stdout
+            self._run_git(
+                root, ["status", "--porcelain", "--untracked-files=no"]
+            ).stdout
             or ""
         ).strip()
         if tracked_status:
-            raise HTTPException(status_code=500, detail="workspace history index not clean")
+            raise HTTPException(
+                status_code=500, detail="workspace history index not clean"
+            )
         return sha
 
     def commit_workspace_history(
@@ -449,7 +472,13 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
 
         info = self._run_git(
             root,
-            ["show", "-s", "--date=iso-strict", "--pretty=format:%H%x1f%cI%x1f%s", resolved],
+            [
+                "show",
+                "-s",
+                "--date=iso-strict",
+                "--pretty=format:%H%x1f%cI%x1f%s",
+                resolved,
+            ],
         )
         parts = str(info.stdout or "").split("\x1f", 2)
         if len(parts) != 3:
@@ -491,7 +520,13 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
                 raise HTTPException(status_code=500, detail="failed to compute diff")
             file_changes = self._parse_name_status_lines(str(files_result.stdout or ""))
         else:
-            diff_args = ["show", "--no-color", "--unified=3", "--pretty=format:", resolved]
+            diff_args = [
+                "show",
+                "--no-color",
+                "--unified=3",
+                "--pretty=format:",
+                resolved,
+            ]
             if normalized_path:
                 diff_args.extend(["--", normalized_path])
             diff_result = self._run_git(root, diff_args, check=False)

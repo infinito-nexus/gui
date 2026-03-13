@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from functools import lru_cache
 from pathlib import Path
 
@@ -108,7 +109,9 @@ def list_history(
         limit=limit,
         offset=offset,
     )
-    return WorkspaceHistoryListOut(commits=[WorkspaceHistoryEntryOut(**item) for item in commits])
+    return WorkspaceHistoryListOut(
+        commits=[WorkspaceHistoryEntryOut(**item) for item in commits]
+    )
 
 
 @router.get("/{workspace_id}/history/{sha}", response_model=WorkspaceHistoryEntryOut)
@@ -123,7 +126,9 @@ def get_history_commit(
     return WorkspaceHistoryEntryOut(**data)
 
 
-@router.get("/{workspace_id}/history/{sha}/diff", response_model=WorkspaceHistoryDiffOut)
+@router.get(
+    "/{workspace_id}/history/{sha}/diff", response_model=WorkspaceHistoryDiffOut
+)
 def get_history_diff(
     workspace_id: str,
     sha: str,
@@ -245,7 +250,9 @@ def create_dir(workspace_id: str, path: str, request: Request) -> WorkspaceDirCr
 @router.delete(
     "/{workspace_id}/files/{path:path}", response_model=WorkspaceFileDeleteOut
 )
-def delete_file(workspace_id: str, path: str, request: Request) -> WorkspaceFileDeleteOut:
+def delete_file(
+    workspace_id: str, path: str, request: Request
+) -> WorkspaceFileDeleteOut:
     _require_workspace(request, workspace_id)
     _svc().delete_file(workspace_id, path)
     return WorkspaceFileDeleteOut(ok=True)
@@ -470,4 +477,4 @@ async def upload_zip(
     return WorkspaceUploadOut(ok=True, files=_svc().list_files(workspace_id), **summary)
 
 
-from . import workspaces_management_routes as _workspaces_management_routes  # noqa: F401
+importlib.import_module(".workspaces_management_routes", __package__)
