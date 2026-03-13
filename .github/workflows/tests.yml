@@ -1,17 +1,10 @@
 name: Tests (unittest via make)
 
 on:
-  push:
-    branches: ["**"]
-  pull_request:
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: tests-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   max-lines:
@@ -84,3 +77,40 @@ jobs:
         run: |
           set -euo pipefail
           npm run typecheck
+
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Install Playwright browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+
+      - name: Run role dashboard scope/animation regression e2e
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e -- role_dashboard_scope_row_mode.spec.ts

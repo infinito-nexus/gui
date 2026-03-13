@@ -17,6 +17,8 @@ import {
   type ReleaseTrack,
   type DeployTargetFilter,
 } from "./dashboard-filters";
+import type { BundleOptionalListColumnKey } from "./BundleGridView";
+import type { OptionalListColumnKey } from "./RoleListView";
 import { VIEW_MODES, type Bundle, type Role, type ViewMode } from "./types";
 
 type UseRoleDashboardBootstrapParams = {
@@ -34,12 +36,16 @@ type UseRoleDashboardBootstrapParams = {
   setShowSelectedOnly: Dispatch<SetStateAction<boolean>>;
   setViewMode: Dispatch<SetStateAction<ViewMode>>;
   setRowsOverride: Dispatch<SetStateAction<number | null>>;
-  setListForcedOpenColumns: (values: string[]) => void;
-  setListForcedClosedColumns: (values: string[]) => void;
-  setBundleListForcedOpenColumns: (values: string[]) => void;
-  setBundleListForcedClosedColumns: (values: string[]) => void;
-  optionalListColumns: readonly string[];
-  bundleOptionalListColumns: readonly string[];
+  setListForcedOpenColumns: Dispatch<SetStateAction<OptionalListColumnKey[]>>;
+  setListForcedClosedColumns: Dispatch<SetStateAction<OptionalListColumnKey[]>>;
+  setBundleListForcedOpenColumns: Dispatch<
+    SetStateAction<BundleOptionalListColumnKey[]>
+  >;
+  setBundleListForcedClosedColumns: Dispatch<
+    SetStateAction<BundleOptionalListColumnKey[]>
+  >;
+  optionalListColumns: readonly OptionalListColumnKey[];
+  bundleOptionalListColumns: readonly BundleOptionalListColumnKey[];
   querySyncReadyRef: MutableRefObject<boolean>;
   activeVideo: { url: string; title: string } | null;
   setActiveVideo: Dispatch<SetStateAction<{ url: string; title: string } | null>>;
@@ -69,10 +75,10 @@ type UseRoleDashboardBootstrapParams = {
   showSelectedOnly: boolean;
   viewMode: ViewMode;
   rowsOverride: number | null;
-  listForcedOpenColumns: string[];
-  listForcedClosedColumns: string[];
-  bundleListForcedOpenColumns: string[];
-  bundleListForcedClosedColumns: string[];
+  listForcedOpenColumns: OptionalListColumnKey[];
+  listForcedClosedColumns: OptionalListColumnKey[];
+  bundleListForcedOpenColumns: BundleOptionalListColumnKey[];
+  bundleListForcedClosedColumns: BundleOptionalListColumnKey[];
   editingRole: Role | null;
   setEditingRole: Dispatch<SetStateAction<Role | null>>;
 };
@@ -135,6 +141,7 @@ export function useRoleDashboardBootstrap({
   setEditingRole,
 }: UseRoleDashboardBootstrapParams) {
   useEffect(() => {
+    if (querySyncReadyRef.current) return;
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
 

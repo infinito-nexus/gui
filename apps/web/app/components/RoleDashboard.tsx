@@ -132,14 +132,10 @@ export default function RoleDashboard({
     setShowSelectedOnly,
     setViewMode,
     setRowsOverride,
-    setListForcedOpenColumns: (values) =>
-      setListForcedOpenColumns(values as OptionalListColumnKey[]),
-    setListForcedClosedColumns: (values) =>
-      setListForcedClosedColumns(values as OptionalListColumnKey[]),
-    setBundleListForcedOpenColumns: (values) =>
-      setBundleListForcedOpenColumns(values as BundleOptionalListColumnKey[]),
-    setBundleListForcedClosedColumns: (values) =>
-      setBundleListForcedClosedColumns(values as BundleOptionalListColumnKey[]),
+    setListForcedOpenColumns,
+    setListForcedClosedColumns,
+    setBundleListForcedOpenColumns,
+    setBundleListForcedClosedColumns,
     optionalListColumns: OPTIONAL_LIST_COLUMNS,
     bundleOptionalListColumns: BUNDLE_OPTIONAL_LIST_COLUMNS,
     querySyncReadyRef,
