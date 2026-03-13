@@ -38,4 +38,3 @@ class WorkspaceServerAliasRenameOut(BaseModel):
 class WorkspaceServerAliasDeleteOut(BaseModel):
     ok: bool = True
     deleted: bool
-

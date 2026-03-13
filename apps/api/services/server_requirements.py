@@ -19,7 +19,12 @@ def _trim(value: Optional[str]) -> str:
 
 
 def _postgres_dsn_from_env() -> Optional[str]:
-    for key in ("REQUIREMENTS_DATABASE_URL", "DATABASE_URL", "POSTGRES_DSN", "POSTGRES_URL"):
+    for key in (
+        "REQUIREMENTS_DATABASE_URL",
+        "DATABASE_URL",
+        "POSTGRES_DSN",
+        "POSTGRES_URL",
+    ):
         raw = _trim(os.getenv(key))
         if raw:
             return raw
@@ -193,11 +198,15 @@ class WorkspaceServerRequirementsService:
         if not alias_key:
             raise HTTPException(status_code=400, detail="alias is required")
         if not isinstance(requirements, dict):
-            raise HTTPException(status_code=400, detail="requirements must be an object")
+            raise HTTPException(
+                status_code=400, detail="requirements must be an object"
+            )
         with psycopg.connect(dsn) as conn:
             self._ensure_schema(conn)
             server_id = self._get_or_create_server_id(conn, workspace_id, alias_key)
-            payload_json = json.dumps(requirements, separators=(",", ":"), ensure_ascii=False)
+            payload_json = json.dumps(
+                requirements, separators=(",", ":"), ensure_ascii=False
+            )
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -256,4 +265,3 @@ class WorkspaceServerRequirementsService:
                 deleted = int(cur.rowcount or 0)
             conn.commit()
         return deleted > 0
-

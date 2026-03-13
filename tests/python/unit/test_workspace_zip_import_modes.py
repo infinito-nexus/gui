@@ -65,7 +65,9 @@ class TestWorkspaceZipImportModes(unittest.TestCase):
             default_mode="override",
         )
 
-        self.assertEqual(service.read_file(workspace_id, "group_vars/all.yml"), "value: new\n")
+        self.assertEqual(
+            service.read_file(workspace_id, "group_vars/all.yml"), "value: new\n"
+        )
         self.assertEqual(summary["overridden_files"], 1)
         self.assertEqual(summary["merged_files"], 0)
         self.assertEqual(summary["skipped_files"], 0)

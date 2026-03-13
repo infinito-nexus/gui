@@ -39,7 +39,9 @@ class UserCreateIn(BaseModel):
     roles: List[str] = Field(default_factory=list)
     enabled: bool = True
 
-    @field_validator("workspace_id", "server_id", "username", "firstname", "lastname", "email")
+    @field_validator(
+        "workspace_id", "server_id", "username", "firstname", "lastname", "email"
+    )
     @classmethod
     def _strip_fields(cls, value: str) -> str:
         return value.strip()

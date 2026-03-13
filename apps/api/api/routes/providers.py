@@ -67,7 +67,10 @@ def list_provider_offers(
 
     filtered = []
     for offer in offers:
-        if wanted_provider and str(offer.get("provider") or "").lower() != wanted_provider:
+        if (
+            wanted_provider
+            and str(offer.get("provider") or "").lower() != wanted_provider
+        ):
             continue
         if wanted_type and str(offer.get("product_type") or "").lower() != wanted_type:
             continue
@@ -78,12 +81,17 @@ def list_provider_offers(
         if ram_min is not None and float(offer.get("ram_gb") or 0) < float(ram_min):
             continue
         storage = offer.get("storage") or {}
-        if storage_min is not None and float(storage.get("gb") or 0) < float(storage_min):
+        if storage_min is not None and float(storage.get("gb") or 0) < float(
+            storage_min
+        ):
             continue
         if wanted_storage and str(storage.get("type") or "").lower() != wanted_storage:
             continue
         pricing = offer.get("pricing") or {}
-        if wanted_currency and str(pricing.get("currency") or "").upper() != wanted_currency:
+        if (
+            wanted_currency
+            and str(pricing.get("currency") or "").upper() != wanted_currency
+        ):
             continue
         price_value = float(pricing.get("monthly_total") or 0)
         if price_min is not None and price_value < float(price_min):
@@ -91,7 +99,10 @@ def list_provider_offers(
         if price_max is not None and price_value > float(price_max):
             continue
         network = offer.get("network") or {}
-        if ipv4_included is not None and bool(network.get("ipv4_included")) != ipv4_included:
+        if (
+            ipv4_included is not None
+            and bool(network.get("ipv4_included")) != ipv4_included
+        ):
             continue
         if backups is not None and bool(network.get("backups")) != backups:
             continue
@@ -107,14 +118,18 @@ def list_provider_offers(
 
 
 @router.post("/order/server", response_model=ProviderOrderServerOut)
-def order_server(payload: ProviderOrderServerIn, request: Request) -> ProviderOrderServerOut:
+def order_server(
+    payload: ProviderOrderServerIn, request: Request
+) -> ProviderOrderServerOut:
     if not payload.confirm:
         raise HTTPException(
             status_code=400,
             detail="explicit confirmation required before provisioning",
         )
     ensure_workspace_access(request, payload.workspace_id, _workspaces())
-    offer = _providers().find_offer(offer_id=payload.offer_id, provider=payload.provider)
+    offer = _providers().find_offer(
+        offer_id=payload.offer_id, provider=payload.provider
+    )
     result = _providers().order_server(
         workspace_service=_workspaces(),
         workspace_id=payload.workspace_id,

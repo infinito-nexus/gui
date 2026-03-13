@@ -33,7 +33,10 @@ def _require_workspace(request: Request, workspace_id: str) -> None:
     ensure_workspace_access(request, workspace_id, _workspaces())
 
 
-@router.get("/{workspace_id}/server-requirements", response_model=WorkspaceServerRequirementsListOut)
+@router.get(
+    "/{workspace_id}/server-requirements",
+    response_model=WorkspaceServerRequirementsListOut,
+)
 def list_server_requirements(
     workspace_id: str, request: Request
 ) -> WorkspaceServerRequirementsListOut:
@@ -98,4 +101,3 @@ def delete_server_alias(
     _require_workspace(request, workspace_id)
     deleted = _svc().delete_alias(workspace_id, alias)
     return WorkspaceServerAliasDeleteOut(deleted=deleted)
-

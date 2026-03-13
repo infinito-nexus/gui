@@ -219,7 +219,9 @@ def _nexus_repo_path() -> Path:
 
 
 @lru_cache(maxsize=8)
-def _load_nexus_types_from_group_names(repo_root: str) -> Callable[[List[str]], List[str]]:
+def _load_nexus_types_from_group_names(
+    repo_root: str,
+) -> Callable[[List[str]], List[str]]:
     repo_path = Path(repo_root)
     invokable_py = repo_path / "module_utils" / "invokable.py"
     if not invokable_py.is_file():

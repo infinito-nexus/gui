@@ -248,9 +248,11 @@ class WorkspaceServiceArtifactsMixin:
         default_mode: str,
         per_file_mode: dict[str, str] | None,
     ) -> str:
-        mode = str(
-            (per_file_mode or {}).get(rel_path) or default_mode or "override"
-        ).strip().lower()
+        mode = (
+            str((per_file_mode or {}).get(rel_path) or default_mode or "override")
+            .strip()
+            .lower()
+        )
         return mode if mode in _ZIP_IMPORT_MODES else "override"
 
     def _merge_mappings_inplace(
@@ -315,9 +317,7 @@ class WorkspaceServiceArtifactsMixin:
 
             merged = copy.deepcopy(existing_loaded)
             self._merge_mappings_inplace(merged, incoming_loaded)
-            content = json.dumps(
-                merged, ensure_ascii=False, indent=2, sort_keys=False
-            )
+            content = json.dumps(merged, ensure_ascii=False, indent=2, sort_keys=False)
             if not content.endswith("\n"):
                 content = f"{content}\n"
             return content.encode("utf-8")

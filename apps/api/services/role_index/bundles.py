@@ -144,7 +144,9 @@ def load_bundle_inventories() -> List[BundleInventory]:
         if not isinstance(bundle_map, dict):
             bundle_map = {}
 
-        title = str(bundle_map.get("title") or "").strip() or slug.replace("-", " ").title()
+        title = (
+            str(bundle_map.get("title") or "").strip() or slug.replace("-", " ").title()
+        )
         description = str(bundle_map.get("description") or "").strip()
         logo_map = bundle_map.get("logo")
         logo_class = (

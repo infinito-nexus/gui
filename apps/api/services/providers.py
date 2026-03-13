@@ -262,7 +262,9 @@ class ProviderCatalogService:
             raise HTTPException(status_code=400, detail="domain too long")
 
         labels = value.split(".")
-        if len(labels) < 2 or not all(_DOMAIN_LABEL_RE.match(label) for label in labels):
+        if len(labels) < 2 or not all(
+            _DOMAIN_LABEL_RE.match(label) for label in labels
+        ):
             raise HTTPException(status_code=400, detail="invalid domain format")
         if len(labels[-1]) < 2:
             raise HTTPException(status_code=400, detail="invalid top-level domain")

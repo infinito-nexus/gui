@@ -86,7 +86,9 @@ def change_password(
 
 
 @router.put("/{username}/roles", response_model=UserActionOut)
-def update_roles(username: str, payload: UserRolesIn, request: Request) -> UserActionOut:
+def update_roles(
+    username: str, payload: UserRolesIn, request: Request
+) -> UserActionOut:
     ensure_workspace_access(request, payload.workspace_id, _workspaces())
     _users().update_roles(
         payload.workspace_id,

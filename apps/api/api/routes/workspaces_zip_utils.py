@@ -29,7 +29,9 @@ def parse_upload_modes(
             ) from exc
 
         if not isinstance(loaded, dict):
-            raise HTTPException(status_code=400, detail="per_file_mode_json must be an object")
+            raise HTTPException(
+                status_code=400, detail="per_file_mode_json must be an object"
+            )
 
         for key, value in loaded.items():
             path = str(key or "").strip()

@@ -38,8 +38,7 @@ def list_roles(
     deploy_target: Optional[str] = Query(
         default=None,
         description=(
-            "Comma-separated deployment targets. "
-            "Allowed: universal,server,workstation"
+            "Comma-separated deployment targets. Allowed: universal,server,workstation"
         ),
     ),
     category: Optional[str] = Query(

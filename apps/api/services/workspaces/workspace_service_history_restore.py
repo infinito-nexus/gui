@@ -12,7 +12,11 @@ import yaml
 from fastapi import HTTPException
 
 from services.job_runner.util import safe_mkdir
-from .workspace_context import WORKSPACE_META_FILENAME, _WorkspaceYamlLoader, _safe_resolve
+from .workspace_context import (
+    WORKSPACE_META_FILENAME,
+    _WorkspaceYamlLoader,
+    _safe_resolve,
+)
 
 
 class WorkspaceServiceHistoryRestoreMixin:
@@ -30,8 +34,12 @@ class WorkspaceServiceHistoryRestoreMixin:
                 else str(result.stderr or "")
             ).strip()
             if "did not match any files" in stderr.lower():
-                raise HTTPException(status_code=404, detail="path not found in history commit")
-            raise HTTPException(status_code=500, detail=stderr or "failed to export history")
+                raise HTTPException(
+                    status_code=404, detail="path not found in history commit"
+                )
+            raise HTTPException(
+                status_code=500, detail=stderr or "failed to export history"
+            )
 
         payload = result.stdout if isinstance(result.stdout, bytes) else b""
         if not payload:
@@ -41,7 +49,10 @@ class WorkspaceServiceHistoryRestoreMixin:
             for member in archive.getmembers():
                 target = destination / member.name
                 resolved = target.resolve()
-                if destination.resolve() not in resolved.parents and resolved != destination.resolve():
+                if (
+                    destination.resolve() not in resolved.parents
+                    and resolved != destination.resolve()
+                ):
                     raise HTTPException(status_code=400, detail="invalid archive path")
             archive.extractall(destination)
 
@@ -142,9 +153,13 @@ class WorkspaceServiceHistoryRestoreMixin:
         had_destination = destination.exists()
         backup_payload = backup_dir / "payload"
         try:
-            self._export_history_snapshot(root, resolved, snapshot_dir, path=normalized_path)
+            self._export_history_snapshot(
+                root, resolved, snapshot_dir, path=normalized_path
+            )
             if not source.exists():
-                raise HTTPException(status_code=404, detail="path not found in history commit")
+                raise HTTPException(
+                    status_code=404, detail="path not found in history commit"
+                )
             self._validate_snapshot_files(snapshot_dir)
 
             if had_destination:

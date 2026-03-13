@@ -60,11 +60,7 @@ class UsersService:
             role_key = str(role_id or "").strip()
             if not role_key:
                 continue
-            hosts = (
-                role_node.get("hosts", {})
-                if isinstance(role_node, dict)
-                else {}
-            )
+            hosts = role_node.get("hosts", {}) if isinstance(role_node, dict) else {}
             aliases = []
             if isinstance(hosts, dict):
                 for alias in hosts.keys():
@@ -279,7 +275,9 @@ class UsersService:
         self._save_users(root, server_id, users)
         return {"ok": True}
 
-    def delete_user(self, workspace_id: str, server_id: str, *, username: str) -> Dict[str, Any]:
+    def delete_user(
+        self, workspace_id: str, server_id: str, *, username: str
+    ) -> Dict[str, Any]:
         root = self._ensure_server_eligible(workspace_id, server_id)
         user_name = str(username or "").strip()
         users = self._load_users(root, server_id)
