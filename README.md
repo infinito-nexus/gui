@@ -1,150 +1,89 @@
-### Vision Summary — *Infinito Deployer* (WIP)
+# Infinito Deployer 🚀
 
-**Infinito Deployer** is a web-based deployment dashboard that transforms the **Infinito.Nexus role ecosystem** into a **guided, observable, and repeatable deployment experience**.
-
-When a user opens the dashboard, they are immediately presented with a **catalog of deployable applications**, displayed as **clean, visual tiles**. Each tile represents an Ansible role and clearly communicates its **maturity level** (pre-alpha, alpha, beta, stable), **supported deployment targets** (universal, server, workstation), and **identity** via an automatically resolved logo (derived from role metadata or a smart fallback).
-
-From this catalog, users can **filter, search, and select applications** without needing to understand the underlying Ansible structure. Once selected, they configure **where and how** the deployment should run:
-
-* target host (localhost, IP address, or domain),
-* user and authentication method (password or SSH key),
-* and the workspace inventory files (inventory.yml, host_vars, group_vars).
-
-Before execution, the system **uses the workspace inventory** that is visible and editable in the UI. This makes the process transparent and auditable rather than implicit or opaque.
-
-When deployment starts, the platform executes **the same CLI and Ansible commands** used by experienced operators, but exposes them through a **live, Docker-like web terminal**. Users can observe each step in real time, cancel safely, and trust that secrets are masked and never leaked.
-
-At its core, Infinito Deployer does **not replace** Infinito.Nexus—it **orchestrates it**:
-
-* the CLI remains the single source of truth,
-* inventories remain reproducible,
-* deployments remain deterministic.
-
-The result is a bridge between **infrastructure-as-code discipline** and **human-friendly operations**:
-a single interface where complex, multi-role deployments become **discoverable, explainable, and safely executable**—for experts and non-experts alike.
+**🖥️ Deploy terminal. 🛒 App store. ♾️ Infinito.Nexus — made accessible.**
 
 ---
 
-## Local Operation with Docker Compose
+## What is Infinito Deployer? 📌
+
+**Infinito Deployer** extends the [Infinito.Nexus](https://github.com/kevinveenbirkenbach/infinito-nexus) core infrastructure platform with a **web-based deploy terminal and application store**. It transforms the Infinito.Nexus role ecosystem into a **guided, observable, and repeatable deployment experience** — no CLI expertise required.
+
+> This repository implements the feature tracked at [infinito-nexus/core#124](https://github.com/infinito-nexus/core/issues/124).
+
+| 📚 | 🔗 |
+|---|---|
+| 🌐 Core Platform | [![Infinito.Nexus](https://img.shields.io/badge/Infinito.Nexus-Core-000000?labelColor=004B8D&style=flat)](https://infinito.nexus) |
+| 🐛 Issue Tracker | [![GitHub Issues](https://img.shields.io/badge/Issues-GitHub-000000?logo=github&labelColor=004B8D&style=flat)](https://github.com/kevinveenbirkenbach/infinito-deployer/issues) |
+| 🔧 Professional Setup | [![CyberMaster.Space](https://img.shields.io/badge/CyberMaster-%2ESpace-000000?labelColor=004B8D&style=flat)](https://cybermaster.space) |
+| ☕️ Support Us | [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20me%20a%20Coffee-Funding-yellow?logo=buymeacoffee)](https://buymeacoffee.com/kevinveenbirkenbach) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue?logo=paypal)](https://s.veen.world/paypaldonate) |
+
+---
+
+## Key Features 🎯
+
+- **App Store** 🛒
+  Browse and select deployable Infinito.Nexus applications as clean, visual tiles with maturity and target metadata.
+
+- **Live Deploy Terminal** 🖥️
+  Watch each deployment step in real time via a Docker-like web terminal. Cancel safely at any time. Secrets are always masked.
+
+- **Workspace Management** 📂
+  Manage inventory files (inventory.yml, host_vars, group_vars) directly in the UI — transparent and auditable.
+
+- **Flexible Authentication** 🔑
+  Deploy to any target via password or SSH key. Supports localhost, IP, or domain targets.
+
+- **PostgreSQL-Backed State** 🗄️
+  Requirements and workspace state are persisted in a local Postgres database for reliability across restarts.
+
+- **Non-Destructive** ✅
+  The CLI and Ansible remain the single source of truth. The deployer orchestrates — it never replaces the core tooling.
+
+---
+
+## Get Started 🚀
 
 ### Prerequisites
 
-* Docker Engine
-* Docker Compose v2 (`docker compose`)
-* A local clone of **Infinito.Nexus** (required for `roles/`)
+- Docker Engine and Docker Compose v2
 
-### One-Time Setup
-
-1. Clone this repository.
-2. Check out Infinito.Nexus into `./infinito-nexus`
-   (or adjust the path later in `.env`).
-3. Start the stack:
+### Quick Setup
 
 ```bash
+git clone https://github.com/kevinveenbirkenbach/infinito-deployer
+cd infinito-deployer
 make setup
 ```
 
-`make setup` performs the following steps:
+After startup:
 
-* creates `.env` from `env.example` (if it does not exist),
-* ensures the `./state` directory exists,
-* starts `docker compose` (including image builds).
+- **Web UI:** http://localhost:3000
+- **API Health:** http://localhost:8000/health
 
-### Important `.env` Variables
+The default stack seeds the required Infinito.Nexus content from the configured image. A separate local checkout is only needed for custom job runner mounts.
 
-* `INFINITO_REPO_HOST_PATH` must point to your local Infinito.Nexus path
-* `CORS_ALLOW_ORIGINS` should include the Web UI URL
-* `NEXT_PUBLIC_API_BASE_URL` must point to the API endpoint
-* `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` configure the PostgreSQL service used for server requirements
+The SPOT for local runtime setup, environment variables, database initialization, job runner configuration, and SSH test targets is the [Setup Guide](docs/setup.md).
 
-### Requirements Database Initialization
+---
 
-Start only PostgreSQL:
-```bash
-make db-up
-```
+## Guides 📚
 
-Wait until PostgreSQL is ready:
-```bash
-make db-wait
-```
+- [Setup Guide](docs/setup.md) — full local setup, environment variables, and operational commands.
+- [Makefile Reference](docs/contributing/tools/makefile.md) — all `make` targets explained.
+- [Development Setup](docs/contributing/environment/setup.md) — contributor environment bootstrap.
 
-Initialize requirements tables (idempotent):
-```bash
-make requirements-init
-```
+## Contributing 🔨
 
-Open a SQL shell in PostgreSQL:
-```bash
-make db-psql
-```
+For the full development setup, contribution workflow, testing, and coding standards, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-### Job Runner (Container per Deployment)
+## Security 🛡️
 
-Deployments run in a dedicated container per job.
+For security reporting and disclosure, see [SECURITY.md](SECURITY.md).
 
-1. Ensure `STATE_HOST_PATH` is an **absolute path** (Docker needs host paths).
-2. Keep the Docker socket mount enabled for the API container in `docker-compose.yml`.
+## License 📜
 
-Note: the container runner requires Docker socket access in the API container.
-For stronger isolation, consider moving the job runner into a separate service
-that owns the Docker socket.
+All rights reserved by Kevin Veen-Birkenbach — see [LICENSE](LICENSE) for details.
 
-Optional (for custom runner images):
-* Set `JOB_RUNNER_IMAGE` (defaults to `INFINITO_NEXUS_IMAGE` if unset).
-* If your runner image does not include the repo, mount it via `JOB_RUNNER_REPO_HOST_PATH` (absolute path).
-* If the API container cannot find `docker`, set `JOB_RUNNER_DOCKER_BIN` (e.g. `docker.io`).
+## Support and Contact 💼
 
-Example:
-
-```
-JOB_RUNNER_IMAGE=ghcr.io/kevinveenbirkenbach/infinito-arch
-STATE_HOST_PATH=/absolute/path/to/state
-```
-
-### Start / Stop / Logs
-
-```bash
-make up
-```
-
-```bash
-make logs
-```
-
-Only database logs:
-```bash
-make db-logs
-```
-
-Refresh catalog (invokable apps only) and restart API:
-```bash
-make refresh-catalog
-```
-
-Run an Arch Linux test target (SSH) via compose profile:
-```bash
-COMPOSE_PROFILES=test make up
-```
-Use these credentials in the UI:
-- Host: `test-arch` (from the API container)
-- User: `deploy`
-- Auth: password `deploy`
-
-From the host, SSH is available on `localhost:2222` (override with `TEST_ARCH_SSH_PORT`).
-
-Stop stack:
-
-```bash
-make down
-```
-
-Stop only PostgreSQL:
-```bash
-make db-stop
-```
-
-### URLs After Startup
-
-* Web UI: [http://localhost:3000](http://localhost:3000)
-* API Health: [http://localhost:8000/health](http://localhost:8000/health)
+For help, bug reports, and professional setup, see [SUPPORT.md](SUPPORT.md).
