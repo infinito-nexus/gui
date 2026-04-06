@@ -39,13 +39,14 @@ Users can configure a full inventory including credentials before deployment.
 
 ---
 
-## Milestone 3 – Live Deployment ✅
+## Milestone 3 – Live Deployment 🟡
 
 Deployment runs from the UI with live log streaming and cancellation.
 
 **Requirements**
 
 - [006-deploy-server-selection-and-layout.md](006-deploy-server-selection-and-layout.md) – Server selection table, `--limit` behaviour, terminal layout
+- [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md) – E2E Playwright test: deploy web-app-dashboard to a fresh local SSH container using the locally mounted infinito-nexus
 
 **Acceptance Criteria**
 
@@ -55,6 +56,7 @@ Deployment runs from the UI with live log streaming and cancellation.
 - [x] Server selection is tabular; deployed servers are marked and non-selectable
 - [x] `--limit` is omitted when all selectable servers are selected
 - [x] Terminal uses all remaining space; no rounded corners
+- [ ] E2E test: full deploy flow of `web-app-dashboard` to a fresh local SSH container passes headless in CI (see [014](014-e2e-dashboard-deploy.md))
 
 ---
 
