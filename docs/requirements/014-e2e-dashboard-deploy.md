@@ -2,76 +2,159 @@
 
 ## User Story
 
-As a developer, I want an end-to-end Playwright test that verifies a user can set up and deploy `web-app-dashboard` to a fresh local SSH target using the latest locally mounted infinito-nexus so that every CI run proves the full deploy flow works against a real container.
+As a developer, I want a headless Playwright end-to-end test that drives the real deployer UI against the local Docker Compose test stack and verifies that `web-app-dashboard` can be deployed to the local `ssh-password` target using the intended infinito source for the current mode so that every CI run proves the full deploy flow against a real SSH-accessible container.
 
-## Image Strategy
+## Test Mode
 
-| Context | Job runner image |
-|---------|-----------------|
-| **Local development** | Built from the local `Dockerfile` (or `docker compose build`) so the latest local code is tested. |
-| **CI/CD** | Uses the default image configured via `INFINITO_NEXUS_IMAGE` (e.g. `ghcr.io/kevinveenbirkenbach/infinito-debian:latest`); no local build required. |
+- This requirement covers the **anonymous workspace flow** only.
+- Persistent workspace listing, the authenticated "New workspace" button, and reload persistence are already covered by [007-optional-auth-persistent-workspaces.md](007-optional-auth-persistent-workspaces.md).
+- In anonymous mode, the UI MUST auto-create a fresh workspace on first load.
+- "Fresh state" therefore MUST mean:
+  - a clean browser context,
+  - no visible persistent workspace list or switcher,
+  - a newly assigned workspace ID in the Inventory panel after the page bootstraps.
 
-The `Makefile` or compose profile MUST make this distinction explicit (e.g. via a `make test-local` vs. `make test` target, or an env flag `BUILD_LOCAL=1`).
+## Local Target Contract
+
+- The deployment target for this requirement MUST be the `ssh-password` service from the Docker Compose `test` profile.
+- Because connection checks and deployment execution run from containers inside the Compose network, the canonical target values for the happy path MUST be:
+  - Host: `ssh-password`
+  - Port: `22`
+  - SSH user: `deploy`
+  - Authentication: password
+  - Password: `deploy`
+- The host-side port mapping `127.0.0.1:${TEST_SSH_PASSWORD_PORT:-2222}` is a debugging convenience for humans and MUST NOT be used as the canonical host/port inside the UI or API for this test.
+- If the final deployed dashboard is asserted from the host browser, the test profile MUST expose a dedicated HTTP port for the deployed target via an explicit env variable.
+- If the final deployed dashboard is not exposed to the host, the test harness MUST perform the final HTTP 200 assertion from a process attached to the same Docker network as the deployed target.
+
+## Source and Image Strategy
+
+### Local development
+
+- Local execution MUST use the local `./infinito-nexus` checkout as the role source for both:
+  - catalog generation,
+  - containerized deployment jobs.
+- Local execution MUST use a locally built job-runner image from the relevant `Dockerfile`, not only a prebuilt registry image.
+- The local helper command MUST resolve any repo path that needs to be absolute for containerized jobs automatically. Manual `.env` editing MUST NOT be required.
+- Local execution MUST fail fast with a clear error if `./infinito-nexus` is missing or empty.
+
+### CI/CD
+
+- CI execution MUST use the default image configured via `INFINITO_NEXUS_IMAGE`.
+- CI execution MUST NOT depend on a host-mounted local checkout.
+- CI execution MUST NOT require manual environment mutation.
+
+### Invocation
+
+- The repository MUST expose explicit entry points for:
+  - local dashboard E2E execution,
+  - CI dashboard E2E execution.
+- The exact command names are implementation-defined, but they MUST be documented and wired into CI.
+
+## Test Harness Contract
+
+- The happy-path Playwright test MUST exercise the real frontend, API, workspace storage, job runner, SSE log stream, and SSH target.
+- The happy-path test MUST NOT stub or mock these local deployer endpoints:
+  - `/api/roles`
+  - `/api/workspaces`
+  - `/api/workspaces/{workspace_id}/generate-inventory`
+  - `/api/workspaces/{workspace_id}/test-connection`
+  - `/api/workspaces/{workspace_id}/credentials`
+  - `/api/deployments`
+  - `/api/deployments/{job_id}/logs`
+- The test harness MAY use non-browser helpers to:
+  - start and stop the Compose stack,
+  - wait for health checks,
+  - run the final network-local HTTP assertion when the deployed app is not host-exposed,
+  - collect traces, logs, or artifacts on failure.
+- The test MUST run headless in CI.
+- The test MUST NOT require any real external network calls for its happy path.
 
 ## Scenario
 
-The test runs against a **fresh workspace** and a **fresh SSH target container** (profile `test`).
-The deployer stack uses the locally mounted infinito-nexus repository (`INFINITO_REPO_HOST_PATH=./infinito-nexus`) as the role source — no external role download occurs.
-Any bug or code-quality issue discovered while implementing or running this test MUST be fixed and the affected code MUST be brought in line with the project coding rules (see [docs/contributing/code/](../contributing/code/)) before the criterion is marked done.
+The test runs against:
+
+- a clean browser context,
+- an anonymous session,
+- a fresh auto-created workspace,
+- a fresh `docker compose --profile test up -d` stack,
+- the `ssh-password` local target,
+- the configured infinito source for the current mode.
+
+Any bug or code-quality issue discovered while implementing or running this test MUST be fixed before this requirement is marked done.
 
 ### Step-by-step click-through
 
-1. **Open the deployer UI** at `http://localhost:3000` (or the configured port).
-2. **Verify the start page** shows no existing workspaces (fresh state).
-3. **Create a new workspace** via the "New Workspace" button; confirm a workspace ID is assigned and the workspace is selected.
-4. **Navigate to the Store** (Software tab).
-5. **Search for `dashboard`** in the search field and confirm the `web-app-dashboard` tile is visible.
-6. **Select `web-app-dashboard`** by clicking its tile; confirm the tile is highlighted as selected.
-7. **Navigate to Devices** (Server tab).
-8. **Add a new server** with the following values:
-   - Host: `127.0.0.1`
-   - Port: `2222` (the `ssh-password` test container port, configurable via `TEST_SSH_PASSWORD_PORT`)
-   - SSH user: `root`
-   - Authentication: password (value: the fixed test-container password)
-9. **Click "Test connection"** on the new server row; confirm ping and SSH both show success.
-10. **Navigate to Workspace / Files**.
-11. **Click "Generate Inventory"**; confirm the button is active and `inventory.yml` appears in the file browser.
-12. **Enter the vault password** in the credentials dialog when prompted; confirm the dialog requires the password twice on first creation.
-13. **Click "Generate Credentials"** for `web-app-dashboard`; confirm the file browser updates and no secrets appear in the SSE stream.
-14. **Navigate to Deploy**.
-15. **Confirm the server row** for `127.0.0.1` is listed and selectable (not already deployed).
-16. **Click "Start deployment"**; confirm the terminal becomes active and log lines begin streaming.
-17. **Wait for the deployment to complete**; confirm the final status shows success (no error lines, exit code 0).
-18. **Open `http://localhost` (or the configured app port)** in the browser; confirm the dashboard is reachable and returns HTTP 200.
+1. Start the deployer stack and the `test` profile; wait until all required services are healthy before the browser test begins.
+2. Open the deployer UI at `http://127.0.0.1:3000` or the configured web port in a clean browser context.
+3. Verify the anonymous start state:
+   - no persistent workspace list or workspace switcher is visible,
+   - a new workspace ID is assigned automatically in the Inventory section.
+4. Navigate to **Software**.
+5. Search for `dashboard` and confirm the `web-app-dashboard` tile is visible.
+6. Select `web-app-dashboard` and confirm the role becomes selected in the UI.
+7. Navigate to **Hardware**.
+8. Switch from **Customer** mode to **Expert** mode and confirm the expert-mode warning dialog.
+9. Add a new server and enter the canonical target values from the Local Target Contract.
+10. Commit the connection fields and credentials; confirm the UI reports successful connectivity.
+11. If the success details are shown in a detail view instead of inline, confirm both `Ping` and `SSH` report success there.
+12. Navigate to **Inventory**.
+13. Wait for inventory creation to complete; confirm `inventory.yml` appears and at least one matching `host_vars/<alias>.yml` file exists.
+14. Open `Credentials` -> `App credentials`.
+15. Choose the generate action for the selected app.
+16. On the first vault creation for the workspace, confirm the credentials-vault dialog requires the master password twice before continuing.
+17. Finish credential generation and confirm the file browser updates while no secrets appear in the visible UI.
+18. Navigate to **Setup**.
+19. Confirm the `ssh-password` target row is listed, not already deployed, and selectable.
+20. Start the deployment using the deploy action on the Setup screen.
+21. Confirm the live terminal/log view becomes active and starts receiving log lines within 3 seconds.
+22. Wait until the deployment finishes successfully; confirm success status and exit code `0`.
+23. Perform the final dashboard reachability check:
+   - use the host-exposed HTTP endpoint when the test profile publishes one, or
+   - use the network-local test harness path otherwise.
+24. Confirm the deployed dashboard responds with HTTP `200`.
 
 ## Acceptance Criteria
 
-### Environment & Image
+### Environment and Source
 
-- [ ] Locally, the job runner image is built from the local `Dockerfile` (e.g. via `make test-local` or `BUILD_LOCAL=1 make test`).
-- [ ] In CI/CD, the default image (`INFINITO_NEXUS_IMAGE`) is used without a local build step.
-- [ ] The distinction between local and CI image is explicit in the `Makefile` or compose configuration; no manual env editing is required.
-- [ ] Test stack starts with `docker compose --profile test up -d` and all test containers are healthy before the test begins.
-- [ ] The deployer uses the locally mounted infinito-nexus (`INFINITO_REPO_HOST_PATH=./infinito-nexus`) as the role source; no external role download occurs.
-
-### Test Flow
-
-- [ ] A fresh workspace is created at the start of the test; no prior workspace state is present.
-- [ ] The `web-app-dashboard` role tile is findable via the store search.
-- [ ] Selecting the role highlights the tile and the role appears in the deployment selection.
-- [ ] The `ssh-password` test container accepts the connection (ping OK, SSH OK) after credentials are entered.
-- [ ] "Generate Inventory" creates `inventory.yml` and at least one `host_vars/` file in the workspace file browser.
-- [ ] "Generate Credentials" completes without exposing secrets in the UI, SSE stream, or browser console.
-- [ ] The deployment start triggers the job runner and log lines appear in the terminal within 3 seconds.
-- [ ] The deployment completes with exit code 0 and the terminal shows a success status.
-- [ ] No plaintext passwords, vault passwords, or SSH credentials appear in the log stream or browser network tab.
-- [ ] After deployment, `http://localhost` (or the configured port) returns HTTP 200.
-- [ ] The entire test flow runs headless in CI with no real external network calls (all targets are local containers).
-- [ ] The test is idempotent: re-running it after deleting the workspace produces the same result.
+- [ ] Local execution uses the local `./infinito-nexus` checkout as the role source for both catalog generation and deployment jobs.
+- [ ] Local execution uses a locally built job-runner image instead of only a registry image.
+- [ ] Local execution resolves required absolute host paths automatically; no manual `.env` editing is required.
+- [ ] Local execution fails fast with a clear error when `./infinito-nexus` is missing or empty.
+- [ ] CI execution uses `INFINITO_NEXUS_IMAGE` without depending on a host-mounted local checkout.
+- [ ] The repository exposes explicit local and CI entry points for this dashboard E2E flow.
+- [ ] The test stack starts with `docker compose --profile test up -d` and all required test containers are healthy before the browser flow begins.
 - [ ] Test containers are torn down after the test run.
 
-### Code Quality
+### Harness Rules
 
-- [ ] All bugs and errors discovered while implementing or running this test are fixed before the criterion is marked done.
-- [ ] All modified or newly written code conforms to the project coding rules (see [docs/contributing/code/](../contributing/code/)).
-- [ ] No linting errors, type errors, or test warnings remain in the affected code paths.
+- [ ] The happy-path Playwright test uses the real local API, workspace store, job runner, SSE log stream, and SSH target instead of mocked happy-path responses.
+- [ ] The happy-path test does not stub the core deployer endpoints involved in roles, workspaces, inventory creation, connection testing, credentials, deployment creation, or deployment logs.
+- [ ] The entire flow runs headless in CI with no real external network calls.
+- [ ] The test harness may use non-browser helpers only for stack orchestration, health waiting, final network-local HTTP assertion, and artifact capture.
+
+### Workspace and UI Flow
+
+- [ ] A clean anonymous browser session starts with no visible persistent workspace list and an auto-created fresh workspace ID.
+- [ ] The `web-app-dashboard` role tile is findable via the Software search.
+- [ ] Selecting `web-app-dashboard` visibly marks it as selected in the UI.
+- [ ] The Hardware flow explicitly switches to Expert mode before manual SSH details are entered.
+- [ ] The `ssh-password` test container accepts the canonical connection values `ssh-password:22` with `deploy/deploy`.
+- [ ] Successful connectivity is visible in the UI, and where detailed connection output is shown it reports both `Ping` OK and `SSH` OK.
+- [ ] Inventory creation completes and produces `inventory.yml` plus at least one matching `host_vars/<alias>.yml` file in the workspace.
+- [ ] App credentials are generated through the Inventory `Credentials` -> `App credentials` flow.
+- [ ] On first vault creation, the master-password dialog requires the password twice before credential generation proceeds.
+- [ ] Credential generation completes without exposing plaintext secrets in the visible UI, browser console, browser network payloads, or SSE stream.
+- [ ] The Setup screen lists the target row as selectable and not already deployed before deployment starts.
+- [ ] Starting deployment activates the live terminal/log view and emits log lines within 3 seconds.
+- [ ] The deployment completes with exit code `0` and a visible success state.
+- [ ] The final deployed dashboard responds with HTTP `200` via the deterministic endpoint defined by the test stack or harness.
+- [ ] Re-running the test from a fresh anonymous browser context and fresh workspace state produces the same successful result.
+
+### Security and Quality
+
+- [ ] No plaintext SSH passwords, vault passwords, private keys, or generated credentials appear in logs, SSE events, browser console output, or browser network payloads.
+- [ ] All bugs or warnings discovered while implementing this flow are fixed before the requirement is marked done.
+- [ ] All modified or newly written code conforms to the project coding rules.
+- [ ] No lint errors, type errors, or test warnings remain in the affected code paths.
