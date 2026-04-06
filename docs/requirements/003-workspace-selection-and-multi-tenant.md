@@ -1,58 +1,28 @@
-# Workspace Selection & Multi-Tenant Workspaces
+# 003 - Workspace Selection & Multi-Tenant Workspaces
 
-## Goal
+## User Story
 
-Allow selecting workspaces via URL, support multiple workspaces per user, and clearly separate inventories per workspace. Logged-out users see the default interface, while logged-in users see a workspace overview on the start page.
+As a user, I want to manage multiple isolated workspaces and select them via URL so that I can keep separate inventories for different projects while logged-in users get a persistent workspace overview.
 
----
+## Acceptance Criteria
 
-## 1. Core Model
-
-* [x] A user can have **multiple workspaces**.
-* [x] Each workspace has **exactly one inventory**.
-* [x] Each inventory can manage **multiple servers**.
-
-**Acceptance Criteria**
-
-* [x] Workspaces and inventories are strictly scoped (no cross-workspace leakage).
-* [x] Inventory operations affect only the selected workspace.
-
----
-
-## 2. URL-Based Workspace Selection
-
-* [x] Support selecting a workspace via URL (e.g., route or query).
-* [x] Unknown/invalid workspace in URL should show a clear error or fallback.
-
-**Acceptance Criteria**
-
-* [x] Navigating directly to a workspace URL loads that workspace context.
-* [x] Invalid workspace identifiers are handled gracefully.
-
----
-
-## 3. Logged-Out Behavior
-
-* [x] Non‑logged users see the **default interface** (current behavior).
-* [x] No workspace switching or user-specific data should be visible.
-
-**Acceptance Criteria**
-
-* [x] Logged-out users can use the app without workspace selection.
-* [x] No user workspace data is exposed when not authenticated.
-
----
-
-## 4. Logged-In Start Page
-
-* [x] Logged‑in users see a **workspace overview** on the start page.
-* [x] Overview lists all workspaces and allows selecting one.
-* [x] In the header, **below the right logo**, show the **current workspace** with a dropdown of all user workspaces.
-  * [x] Dropdown allows switching workspaces.
-  * [x] When logged out, **nothing is shown** in that spot.
-
-**Acceptance Criteria**
-
-* [x] Start page changes based on auth state.
-* [x] User can select a workspace from the overview and is routed accordingly.
-* [x] Workspace dropdown appears only for authenticated users and switches context.
+- [x] A user can have multiple workspaces.
+- [x] Each workspace has exactly one inventory.
+- [x] Each inventory can manage multiple servers.
+- [x] Workspaces and inventories are strictly scoped (no cross-workspace leakage).
+- [x] Inventory operations affect only the selected workspace.
+- [x] Selecting a workspace via URL (e.g. route or query parameter) is supported.
+- [x] Navigating directly to a workspace URL loads that workspace context.
+- [x] An unknown or invalid workspace identifier in the URL shows a clear error or fallback.
+- [x] Non-logged-in users see the default interface (current behaviour unchanged).
+- [x] No workspace switching or user-specific data is visible to logged-out users.
+- [x] Logged-out users can use the app without workspace selection.
+- [x] No user workspace data is exposed when not authenticated.
+- [x] Logged-in users see a workspace overview on the start page.
+- [x] The workspace overview lists all workspaces and allows selecting one.
+- [x] Selecting a workspace from the overview routes the user to that workspace context.
+- [x] In the header, below the right logo, the current workspace is shown with a dropdown of all user workspaces.
+- [x] The workspace dropdown allows switching workspaces.
+- [x] When logged out, nothing is shown in the workspace header slot.
+- [x] The start page content changes based on authentication state.
+- [x] The workspace dropdown appears only for authenticated users.

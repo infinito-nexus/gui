@@ -1,264 +1,52 @@
-# Users – LDAP-Based User Management (Post-Setup Requirement)
-
-## Goal
-
-Introduce a new top-level section **“Users”** that appears **after Setup** and allows managing users on servers that include the **Keycloak role**, via LDAP (OpenLDAP backend).
-
-User management includes:
-
-* Creating users
-* Changing passwords
-* Assigning roles
-* Deleting users
-
-All operations are executed remotely via:
-
-* SSH connection to the server
-* LDAP operations against the configured OpenLDAP directory
-
-This section is only available **after a successful setup/deployment**, because it requires:
-
-* An active server
-* Running LDAP service
-* Valid SSH connectivity
-* Correct inventory state
-
----
-
-# 1. UI Integration
-
-## 1.1 Navigation Placement
-
-After the **Setup** section, introduce a new item:
-
-* Users
-
-It appears in the main navigation only if:
-
-* At least one server is present
-* AND at least one server has the role `web-app-keycloak`
-* AND setup has completed successfully
-
----
-
-## 1.2 Activation State
-
-The **Users** section MUST be:
-
-* Visible but **greyed out (disabled)** if:
-
-  * No active setup has been completed
-  * OR no SSH connectivity is verified
-* Fully enabled only if:
-
-  * Deployment completed
-  * SSH connectivity validated
-  * LDAP service reachable
-
-Tooltip when disabled:
-
-> “User management requires an active deployed server with Keycloak and LDAP.”
-
-**Acceptance Criteria**
-
-* Users section is disabled before setup.
-* It becomes enabled automatically after successful deployment.
-* UI clearly indicates why it is disabled.
-
----
-
-# 2. Scope of Management
-
-Users are managed via LDAP on servers that:
-
-* Include the `web-app-keycloak` role
-* Include or depend on `docker-ldap` or equivalent LDAP backend
-
-The system MUST:
-
-* Detect eligible servers automatically
-* Allow switching between servers if multiple exist
-
----
-
-# 3. Functional Capabilities
-
-## 3.1 List Users
-
-* Query LDAP directory
-* Display:
-
-  * username
-  * firstname
-  * lastname
-  * email
-  * roles/groups
-  * enabled/disabled state
-
-**Acceptance Criteria**
-
-* List loads within <2 seconds
-* No plaintext passwords are ever returned
-
----
-
-## 3.2 Create User
-
-Fields:
-
-* username
-* firstname
-* lastname
-* email
-* password
-* roles (multi-select)
-
-On submit:
-
-* Connect via SSH
-* Execute LDAP create operation
-* Apply password securely
-* Assign group memberships
-
-**Acceptance Criteria**
-
-* Password never logged or streamed
-* Validation prevents duplicate usernames
-* Errors returned clearly
-
----
-
-## 3.3 Change Password
-
-* Requires explicit confirmation
-* Double-entry password input
-* Executes LDAP password modify
-
-**Acceptance Criteria**
-
-* Password never visible in logs
-* Operation requires SSH connectivity
-* Failure states clearly reported
-
----
-
-## 3.4 Assign / Modify Roles
-
-* Roles derived from LDAP groups
-* Multi-select group assignment
-* Updates `memberOf` associations
-
-**Acceptance Criteria**
-
-* Role changes reflect immediately in LDAP
-* No UI reload required to see update
-
----
-
-## 3.5 Delete User
-
-* Confirmation dialog required
-* Removes LDAP entry
-* Optionally:
-
-  * Preserve home directory (configurable future feature)
-
-**Acceptance Criteria**
-
-* Deletion irreversible
-* UI updates immediately after success
-
----
-
-# 4. Technical Execution Model
-
-All user actions MUST:
-
-1. Use SSH to connect to server
-2. Execute LDAP commands locally
-3. Never expose LDAP credentials in UI or logs
-
-Possible execution pattern:
-
-* ldapadd
-* ldapmodify
-* ldapdelete
-* ldapsearch
-
-LDAP context parameters derived from:
-
-* Inventory
-* LDAP configuration variables
-* Role defaults
-
----
-
-# 5. Security Requirements
-
-* No LDAP bind password ever returned to UI
-* No plaintext password logged
-* All actions require:
-
-  * Active SSH connectivity
-  * Valid credentials
-* CSRF protection required for all write operations
-* Strict server scoping (no cross-server leakage)
-
----
-
-# 6. Inventory & Role Dependency
-
-The Users section MUST only activate if:
-
-* `web-app-keycloak` exists in applications
-* LDAP backend is present or dependency resolved
-
-If Keycloak removed from inventory:
-
-* Users section automatically disabled
-
----
-
-# 7. Backend API
-
-Endpoints:
-
-* GET /api/users?server_id=...
-* POST /api/users
-* PUT /api/users/{username}/password
-* PUT /api/users/{username}/roles
-* DELETE /api/users/{username}
-
-All endpoints:
-
-* Validate server eligibility
-* Verify SSH connectivity
-* Mask sensitive data
-
----
-
-# 8. UI Tests (Playwright – Required)
-
-* Users section disabled before setup
-* Enabled after successful deployment
-* Create user flow works (mocked)
-* Password change does not expose password in DOM
-* Delete requires confirmation
-* Role assignment updates UI state
-
----
-
-# 9. Acceptance Criteria (Global)
-
-* Users item appears only when valid
-* Disabled state clearly explained
-* No LDAP secrets leaked
-* Works across multiple eligible servers
-* ZIP export/import does not include user credentials
-* Fully compatible with current inventory structure
-
----
-
-# Status
-
-🟩 Done
+# 009 - Users – LDAP-Based User Management (Post-Setup)
+
+## User Story
+
+As an administrator, I want a "Users" section that becomes available after a successful deployment so that I can create, modify, and delete LDAP users on Keycloak-enabled servers directly from the UI via SSH without direct server access.
+
+## Acceptance Criteria
+
+- [x] A new top-level "Users" navigation item is introduced after the Setup section.
+- [x] The Users item appears in the main navigation only when: at least one server is present, at least one server has the role `web-app-keycloak`, and setup has completed successfully.
+- [x] The Users section is visible but greyed out (disabled) when no active setup has been completed or SSH connectivity is not verified.
+- [x] The Users section is fully enabled only when: deployment completed, SSH connectivity validated, and LDAP service is reachable.
+- [x] A tooltip is shown when disabled: "User management requires an active deployed server with Keycloak and LDAP."
+- [x] The Users section becomes enabled automatically after a successful deployment.
+- [x] The Users section disables automatically when `web-app-keycloak` is removed from the inventory.
+- [x] Users are managed via LDAP on servers that include `web-app-keycloak` and `docker-ldap` (or equivalent LDAP backend).
+- [x] The system detects eligible servers automatically.
+- [x] When multiple eligible servers exist, switching between them is supported.
+- [x] The user list is loaded by querying the LDAP directory via SSH and displays: username, firstname, lastname, email, roles/groups, enabled/disabled state.
+- [x] The user list loads within 2 seconds.
+- [x] No plaintext passwords are ever returned in the user list.
+- [x] Creating a user requires: username, firstname, lastname, email, password, roles (multi-select).
+- [x] On create: connect via SSH, execute LDAP create operation, apply password securely, assign group memberships.
+- [x] Password is never logged or streamed during user creation.
+- [x] Duplicate usernames are prevented with clear validation.
+- [x] Errors during create are returned and displayed clearly.
+- [x] Changing a password requires double-entry confirmation and executes LDAP password modify via SSH.
+- [x] Password is never visible in logs during a password change.
+- [x] Failure states for password change are clearly reported.
+- [x] Roles are derived from LDAP groups; multi-select group assignment updates `memberOf` associations.
+- [x] Role changes reflect immediately in LDAP without requiring a UI reload.
+- [x] Deleting a user requires a confirmation dialog, removes the LDAP entry, and updates the UI immediately.
+- [x] All user operations use SSH to connect to the server and execute LDAP commands locally (ldapadd, ldapmodify, ldapdelete, ldapsearch).
+- [x] LDAP context parameters (bind DN, base DN, etc.) are derived from inventory, LDAP config variables, and role defaults.
+- [x] No LDAP bind password is ever returned to or visible in the UI.
+- [x] No plaintext password is logged for any operation.
+- [x] All write operations are CSRF-protected.
+- [x] Strict server scoping is enforced; no cross-server data leakage is possible.
+- [x] `GET /api/users?server_id=...` is implemented.
+- [x] `POST /api/users` is implemented.
+- [x] `PUT /api/users/{username}/password` is implemented.
+- [x] `PUT /api/users/{username}/roles` is implemented.
+- [x] `DELETE /api/users/{username}` is implemented.
+- [x] All endpoints validate server eligibility, verify SSH connectivity, and mask sensitive data.
+- [x] ZIP export/import does not include user credentials.
+- [x] The Users section is fully compatible with the current inventory structure.
+- [x] Playwright test: Users section is disabled before setup.
+- [x] Playwright test: Users section is enabled after successful deployment.
+- [x] Playwright test: Create user flow works (mocked SSH/LDAP).
+- [x] Playwright test: Password change does not expose the password in the DOM.
+- [x] Playwright test: Delete requires confirmation.
+- [x] Playwright test: Role assignment updates UI state.
