@@ -10,3 +10,4 @@ node_modules/
 state/
 examples/workspace-import.zip
 .codex
+*.lock
