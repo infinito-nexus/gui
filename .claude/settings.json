@@ -4,7 +4,6 @@
       "Read",
       "Edit",
       "Write",
-
       "Bash(git status*)",
       "Bash(git log*)",
       "Bash(git diff*)",
@@ -14,24 +13,22 @@
       "Bash(git fetch*)",
       "Bash(git stash*)",
       "Bash(git -C:*)",
-
       "Bash(make*)",
       "Bash(act*)",
-
       "Bash(python3*)",
       "Bash(python*)",
       "Bash(pip show*)",
       "Bash(pip list*)",
       "Bash(pip install*)",
       "Bash(pytest*)",
-
       "Bash(node*)",
       "Bash(npm*)",
       "Bash(npx*)",
-
+      "Bash(docker run*)",
       "Bash(docker pull*)",
       "Bash(docker build*)",
       "Bash(docker images*)",
+      "Bash(docker info*)",
       "Bash(docker ps*)",
       "Bash(docker inspect*)",
       "Bash(docker logs*)",
@@ -41,7 +38,6 @@
       "Bash(docker rmi*)",
       "Bash(docker compose*)",
       "Bash(docker exec*)",
-
       "Bash(grep*)",
       "Bash(find*)",
       "Bash(ls*)",
@@ -56,7 +52,6 @@
       "Bash(mv*)",
       "Bash(jq*)",
       "Bash(rmdir*)",
-
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
@@ -71,24 +66,22 @@
       "WebFetch(domain:infinito.example)",
       "WebFetch(domain:docs.infinito.nexus)",
       "WebFetch(domain:s.infinito.nexus)",
-      "WebFetch(domain:cybermaster.space)"
+      "WebFetch(domain:cybermaster.space)",
+      "Bash(INFINITO_*=* make *)",
+      "Bash(tee /tmp/*.log)"
     ],
-
-    "ask": [
-      "Bash(git commit*)",
-      "Bash(git push*)",
-      "Bash(docker run*)",
-      "Bash(curl*)"
-    ],
-
     "deny": [
       "Bash(git push --force*)",
       "Bash(git reset --hard*)",
       "Bash(rm -rf*)",
       "Bash(sudo*)"
+    ],
+    "ask": [
+      "Bash(git commit*)",
+      "Bash(git push*)",
+      "Bash(curl*)"
     ]
   },
-
   "sandbox": {
     "filesystem": {
       "allowWrite": [
