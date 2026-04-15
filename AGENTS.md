@@ -12,6 +12,15 @@ If agent instructions change during a conversation, the agent MAY not pick up th
 
 > "Re-read AGENTS.md and apply all updated instructions."
 
+## Make Invocations — Trailing Variables Only
+
+When overriding Make variables, agents MUST append `VAR=value` pairs **after** the target, never as shell env-var prefixes before `make`. This keeps invocations matchable against the `Bash(make*)` permission pattern and avoids interactive prompts.
+
+- ✅ `make e2e-dashboard-local INFINITO_NEXUS_SRC_DIR=... INFINITO_E2E_KEEP_STACK=1`
+- ❌ `INFINITO_E2E_KEEP_STACK=1 make e2e-dashboard-local INFINITO_NEXUS_SRC_DIR=...`
+
+Trailing `VAR=value` arguments are Make-native overrides and apply to the make invocation only. Use them for all environment-dependent parameters.
+
 ## For Humans
 
 Human contributors working alongside AI agents MUST read [agents.md](docs/contributing/tools/agents.md).

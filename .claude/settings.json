@@ -41,6 +41,7 @@
       "Bash(docker exec*)",
       "Bash(sleep*)",
       "Bash(grep*)",
+      "Bash(sed -n *.log)",
       "Bash(find*)",
       "Bash(ls*)",
       "Bash(cat*)",
