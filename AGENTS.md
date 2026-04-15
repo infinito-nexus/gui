@@ -23,4 +23,4 @@ Trailing `VAR=value` arguments are Make-native overrides and apply to the make i
 
 ## For Humans
 
-Human contributors working alongside AI agents MUST read [agents.md](docs/contributing/tools/agents.md).
+Human contributors working alongside AI agents MUST read [common.md](docs/contributing/tools/agents/common.md) and the agent permission model in [security.md](docs/contributing/tools/agents/security.md).

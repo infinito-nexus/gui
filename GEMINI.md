@@ -10,4 +10,4 @@ This file extends [AGENTS.md](AGENTS.md) with Gemini-specific additions. You MUS
 
 ## Documentation
 
-See [geminicli.com](https://geminicli.com/docs/cli/gemini-md/) for further information. For human contributor guidance on working with agents, see [agents.md](docs/contributing/tools/agents.md).
+See [geminicli.com](https://geminicli.com/docs/cli/gemini-md/) for further information. For human contributor guidance on working with agents, see [common.md](docs/contributing/tools/agents/common.md); for the permission model used by this repo, see [security.md](docs/contributing/tools/agents/security.md).

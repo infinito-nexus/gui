@@ -48,4 +48,4 @@ Make treats trailing `VAR=value` arguments as variable overrides (equivalent to 
 
 ## Documentation
 
-See [code.claude.com](https://code.claude.com/docs/en/overview) for further information. For human contributor guidance on working with agents, see [agents.md](docs/contributing/tools/agents.md).
+See [code.claude.com](https://code.claude.com/docs/en/overview) for further information. For human contributor guidance on working with agents, see [common.md](docs/contributing/tools/agents/common.md); for the permission model used by this repo, see [security.md](docs/contributing/tools/agents/security.md).

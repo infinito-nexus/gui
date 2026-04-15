@@ -71,7 +71,10 @@
       "WebFetch(domain:s.infinito.nexus)",
       "WebFetch(domain:cybermaster.space)",
       "Bash(tee /tmp/*.log)",
-      "Bash(chmod +x *.sh)"
+      "Bash(chmod +x *.sh)",
+      "Bash(netstat*)",
+      "Bash(fuser*)",
+      "Bash(pkill*)"
     ],
     "deny": [
       "Bash(git push --force*)",
