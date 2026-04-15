@@ -30,12 +30,21 @@ All stack/container orchestration MUST go through `make` targets, never raw `doc
 | Start full test stack (profile=test, all services, `--build`) | `make test-env-up` |
 | Stop test stack | `make test-env-down` |
 | Start minimal test subset (`api db catalog web`) | `make test-up` |
-| Override images for test stack | `INFINITO_NEXUS_IMAGE=... JOB_RUNNER_IMAGE=... make test-up` |
-| Override service subset | `TEST_UP_SERVICES="api db" make test-up` |
+| Override images for test stack | `make test-up INFINITO_NEXUS_IMAGE=... JOB_RUNNER_IMAGE=...` |
+| Override service subset | `make test-up TEST_UP_SERVICES="api db"` |
 | Inspect / logs / ps | `make logs`, `make ps` |
 | Open shell in service | `docker compose exec <service> bash` (allowed) |
 
 If no target fits, **add a new Makefile target** rather than running `docker compose ...` ad hoc.
+
+### Make Variable Overrides — Append, Don't Prefix
+
+When overriding Make variables, pass them **after** the target, not as shell env-var prefixes before `make`:
+
+- ✅ `make test-up INFINITO_NEXUS_IMAGE=foo:bar` — matches `Bash(make*)`, no prompt
+- ❌ `INFINITO_NEXUS_IMAGE=foo:bar make test-up` — shell env-prefix, does NOT match `Bash(make*)`, triggers prompt
+
+Make treats trailing `VAR=value` arguments as variable overrides (equivalent to `export`, but scoped to the make invocation). Always use the trailing form so permission patterns match cleanly.
 
 ## Documentation
 

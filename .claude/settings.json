@@ -69,8 +69,8 @@
       "WebFetch(domain:docs.infinito.nexus)",
       "WebFetch(domain:s.infinito.nexus)",
       "WebFetch(domain:cybermaster.space)",
-      "Bash(INFINITO_*=* make *)",
-      "Bash(tee /tmp/*.log)"
+      "Bash(tee /tmp/*.log)",
+      "Bash(chmod +x *.sh)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -82,6 +82,9 @@
       "Bash(git commit*)",
       "Bash(git push*)",
       "Bash(curl*)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   },
   "sandbox": {
