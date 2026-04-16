@@ -48,6 +48,11 @@ Patterns use shell-style wildcards: `*` matches any substring. Matching is again
 | `Bash(fuser*)` | Port/file user lookup; can kill with `-k` | Medium — `-k` terminates processes. |
 | `Bash(pkill*)` | Kill processes by name pattern | High — can kill any non-root user process; wide-ranging wildcards are easy to mistype. |
 | `Bash(unzip -l examples/workspace-import.zip)` | List contents of the bundled example workspace archive | Low — scoped to a single file and list-only (no extraction). |
+| `Bash(bash scripts/*.sh)` / `./scripts/*.sh` | Execute repo-owned shell scripts (`check-max-lines.sh`, `e2e/dashboard/run.sh`, …) | Medium — scripts may mutate local filesystem, start containers, or orchestrate Compose; trust surface = scripts in `scripts/`. |
+| `Bash(python3 -m unittest*)` | Run Python unittest discovery/suites | Medium — executes test code. Anchored at the front so env-var prefixes don't match (see `STATE_DIR=*` pattern below). |
+| `Bash(STATE_DIR=*python3 -m unittest*)` | Unittest invocation with leading `STATE_DIR=` override | Medium — narrow env-prefix form kept separate so an unanchored `*python3*` wildcard isn't needed; other env prefixes still trigger an `ask`. |
+| `Bash(unset *)` | Clear environment variables | Low — only unsets vars in the current shell; cannot touch disk or remote state. |
+| `Bash(./node_modules/.bin/playwright test*)` | Run Playwright e2e tests via the local binary | Medium — executes browser automation code; scope = repo-local Playwright install (`apps/web/node_modules`). |
 | `WebSearch` | Web search via Claude tooling | Low–Medium — content is fetched for context. |
 | `WebFetch(domain:github.com)` / `raw.githubusercontent.com` / `api.github.com` | GitHub web/API + raw content | Low — read-only sources. |
 | `WebFetch(domain:docs.docker.com)` / `docs.python.org` / `pypi.org` / `nodejs.org` / `playwright.dev` / `fastapi.tiangolo.com` | Upstream framework/runtime docs | Low — read-only reference material. |

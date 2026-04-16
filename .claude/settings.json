@@ -77,7 +77,13 @@
       "Bash(netstat*)",
       "Bash(fuser*)",
       "Bash(pkill*)",
-      "Bash(unzip -l examples/workspace-import.zip)"
+      "Bash(unzip -l examples/workspace-import.zip)",
+      "Bash(bash scripts/*.sh)",
+      "Bash(./scripts/*.sh)",
+      "Bash(python3 -m unittest*)",
+      "Bash(STATE_DIR=*python3 -m unittest*)",
+      "Bash(unset *)",
+      "Bash(./node_modules/.bin/playwright test*)"
     ],
     "deny": [
       "Bash(git push --force*)",
