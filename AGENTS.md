@@ -12,6 +12,13 @@ If agent instructions change during a conversation, the agent MAY not pick up th
 
 > "Re-read AGENTS.md and apply all updated instructions."
 
+## Scope and Cross-Repo Edits
+
+- You MUST confine all file modifications to the current repository (the one containing this `AGENTS.md`).
+- Other repositories visible in the environment (e.g. sibling checkouts listed as "Additional working directories") are READ-ONLY for reference and inspection.
+- If a task appears to require changes in another repository, you MUST stop and ask the user for explicit confirmation before editing, committing, or pushing there.
+- This rule overrides any sandbox `allowWrite` entry that would otherwise permit cross-repo writes.
+
 ## Make Invocations — Trailing Variables Only
 
 When overriding Make variables, agents MUST append `VAR=value` pairs **after** the target, never as shell env-var prefixes before `make`. This keeps invocations matchable against the `Bash(make*)` permission pattern and avoids interactive prompts.
