@@ -19,6 +19,12 @@ If agent instructions change during a conversation, the agent MAY not pick up th
 - If a task appears to require changes in another repository, you MUST stop and ask the user for explicit confirmation before editing, committing, or pushing there.
 - This rule overrides any sandbox `allowWrite` entry that would otherwise permit cross-repo writes.
 
+## Infinito Nexus Core Image — Source of Truth
+
+- The SPOT for the Infinito Nexus core image code is <https://s.infinito.nexus/code>. You MUST consult this URL whenever you need to analyze or reference core image behavior.
+- You MUST NOT use any local Infinito Nexus checkout (e.g. sibling `infinito-nexus/` directories) for analysis unless the user explicitly instructs you to.
+- Reason: local checkouts may contain in-progress, experimental, or otherwise unfinished code that does not reflect the released core image. Treating them as authoritative can lead to wrong conclusions.
+
 ## Make Invocations — Trailing Variables Only
 
 When overriding Make variables, agents MUST append `VAR=value` pairs **after** the target, never as shell env-var prefixes before `make`. This keeps invocations matchable against the `Bash(make*)` permission pattern and avoids interactive prompts.
