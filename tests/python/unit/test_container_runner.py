@@ -134,24 +134,37 @@ class TestContainerRunner(unittest.TestCase):
             )
             self.assertTrue(
                 any(
-                    "ln -sf /workspace/baudolo-seed /usr/local/bin/baudolo-seed"
-                    in part
+                    "ln -sf /workspace/baudolo-seed /usr/local/bin/baudolo-seed" in part
                     for part in cmd
                 )
             )
             self.assertTrue(
-                any('runtime_python="${PYTHON:-/opt/venvs/infinito/bin/python}"' in part for part in cmd)
+                any(
+                    'runtime_python="${PYTHON:-/opt/venvs/infinito/bin/python}"' in part
+                    for part in cmd
+                )
             )
             self.assertTrue(
-                any('runtime_bin_dir="$(dirname "${runtime_python}")"' in part for part in cmd)
+                any(
+                    'runtime_bin_dir="$(dirname "${runtime_python}")"' in part
+                    for part in cmd
+                )
             )
             self.assertTrue(
-                any('export PATH=/workspace:"${runtime_bin_dir}":$PATH' in part for part in cmd)
+                any(
+                    'export PATH=/workspace:"${runtime_bin_dir}":$PATH' in part
+                    for part in cmd
+                )
             )
-            self.assertFalse(any('cp -a' in part for part in cmd))
+            self.assertFalse(any("cp -a" in part for part in cmd))
             self.assertTrue(
-                any('data["ansible_become_password"] = password' in part for part in cmd)
+                any(
+                    'data["ansible_become_password"] = password' in part for part in cmd
+                )
             )
             self.assertTrue(
-                any('export ANSIBLE_VAULT_PASSWORD_FILE="${runtime_vault_file}"' in part for part in cmd)
+                any(
+                    'export ANSIBLE_VAULT_PASSWORD_FILE="${runtime_vault_file}"' in part
+                    for part in cmd
+                )
             )

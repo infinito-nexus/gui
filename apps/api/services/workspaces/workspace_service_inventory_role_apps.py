@@ -157,7 +157,9 @@ class WorkspaceServiceInventoryRoleAppsMixin:
             applications[normalized_role_id] = section
             if imported_paths > 0:
                 try:
-                    atomic_write_text(host_vars_path, _dump_yaml_mapping(host_vars_data))
+                    atomic_write_text(
+                        host_vars_path, _dump_yaml_mapping(host_vars_data)
+                    )
                 except Exception as exc:
                     raise HTTPException(
                         status_code=500,

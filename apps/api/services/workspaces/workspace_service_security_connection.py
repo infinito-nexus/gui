@@ -65,9 +65,7 @@ def run_connection_test(
             client.connect(**connect_kwargs, password=password or "")
         else:
             if not private_key:
-                raise HTTPException(
-                    status_code=400, detail="private key is required"
-                )
+                raise HTTPException(status_code=400, detail="private key is required")
 
             key_obj = None
             key_buffer = StringIO(private_key)

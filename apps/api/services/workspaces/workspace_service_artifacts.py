@@ -382,7 +382,10 @@ class WorkspaceServiceArtifactsMixin:
 
                     target = root / rel_path
                     resolved = target.resolve()
-                    if resolved == root_resolved or root_resolved not in resolved.parents:
+                    if (
+                        resolved == root_resolved
+                        or root_resolved not in resolved.parents
+                    ):
                         continue
 
                     safe_mkdir(resolved.parent)

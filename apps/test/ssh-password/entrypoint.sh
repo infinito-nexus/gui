@@ -26,7 +26,7 @@ if [ -z "${ETH0_IP}" ]; then
   exit 1
 fi
 
-cat > /etc/dnsmasq.conf <<EOF
+cat >/etc/dnsmasq.conf <<EOF
 # Rendered by entrypoint.sh for DinD infinito.localhost resolution.
 interface=eth0
 bind-interfaces
@@ -40,7 +40,7 @@ EOF
 # Ensure docker.service waits for dnsmasq.service so inner containers
 # spawned during early deploy can resolve infinito.localhost.
 install -d -m 0755 /etc/systemd/system/docker.service.d
-cat > /etc/systemd/system/docker.service.d/dns-dep.conf <<'EOF'
+cat >/etc/systemd/system/docker.service.d/dns-dep.conf <<'EOF'
 [Unit]
 After=dnsmasq.service
 Wants=dnsmasq.service

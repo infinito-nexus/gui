@@ -12,7 +12,30 @@ authors = [{ name = "Kevin Veen-Birkenbach", email = "kevin@veen.world" }]
 license = { text = "All rights reserved by Kevin Veen-Birkenbach" }
 urls = { Homepage = "https://github.com/kevinveenbirkenbach/infinito-deployer" }
 
-dependencies = []
+dependencies = [
+    "fastapi>=0.110",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.0",
+    "PyYAML>=6.0",
+    "ansible>=9.0.0",
+    "ruamel.yaml>=0.17",
+    "bcrypt>=4.0.0",
+    "paramiko>=3.4.0",
+    "pykeepass>=4.0.6",
+    "pycryptodomex>=3.20.0",
+    "psycopg[binary]>=3.2.0",
+    "httpx>=0.27",
+]
 
-# Intentionally no setuptools package discovery:
-# This repo is a monorepo; apps are containerized and not meant to be installed via pip.
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+]
+
+# This repo is a monorepo; apps are containerized. The root package itself
+# ships no Python modules — only dependency metadata for the dev venv.
+[tool.setuptools]
+py-modules = []
+
+[tool.ruff.lint]
+external = ["WPS"]

@@ -33,7 +33,9 @@ class TestInfinitoNexusVersions(unittest.TestCase):
 
         records = versions.list_infinito_nexus_versions(force_refresh=True)
 
-        self.assertEqual([record.value for record in records], ["latest", "5.2.0", "5.1.0"])
+        self.assertEqual(
+            [record.value for record in records], ["latest", "5.2.0", "5.1.0"]
+        )
         self.assertEqual(records[1].git_tag, "v5.2.0")
         self.assertEqual(records[1].image_tag, "v5.2.0")
         self.assertEqual(records[2].image_tag, "v5.1.0")

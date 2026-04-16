@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init test-arch test-env-up test-env-down test-up web-sync venv install test clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init test-arch test-env-up test-env-down test-up web-sync venv install test clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci lint lint-python lint-shell autoformat autoformat-python autoformat-shell
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -9,6 +9,7 @@ ENV_FILE       ?= .env
 VENV_DIR       ?= .venv
 PYTHON         := $(VENV_DIR)/bin/python
 PIP            := $(VENV_DIR)/bin/pip
+RUFF           := $(VENV_DIR)/bin/ruff
 
 # Make tests import the app packages
 export PYTHONPATH := $(PWD)/apps/api
@@ -104,7 +105,7 @@ venv:
 	@$(PIP) install -U pip setuptools wheel
 
 install: venv
-	@$(PIP) install -r requirements.txt
+	@$(PIP) install '.[dev]'
 
 test: dirs install
 	@echo "→ Running Python unit tests"
@@ -133,3 +134,47 @@ e2e-dashboard-local:
 
 e2e-dashboard-ci:
 	@./scripts/e2e/dashboard/run.sh ci
+
+# Lint = check-only, fails on any issue or formatting drift.
+# Autoformat = applies autofix and reformatting in place.
+# Both operate on tracked sources only (git ls-files respects .gitignore).
+lint: lint-python lint-shell
+
+lint-python:
+	@echo "→ ruff check"
+	@$(RUFF) check .
+	@echo "→ ruff format --check"
+	@$(RUFF) format --check .
+
+lint-shell:
+	@echo "→ shellcheck (tracked *.sh)"
+	@files=$$(git ls-files '*.sh'); \
+	if [ -n "$$files" ]; then \
+		shellcheck -x $$files; \
+	else \
+		echo "→ (no tracked *.sh files)"; \
+	fi
+	@if command -v shfmt >/dev/null 2>&1; then \
+		echo "→ shfmt --diff (tracked *.sh)"; \
+		files=$$(git ls-files '*.sh'); \
+		if [ -n "$$files" ]; then shfmt -i 2 -ci -d $$files; fi; \
+	else \
+		echo "→ (shfmt not installed, skipping format check)"; \
+	fi
+
+autoformat: autoformat-python autoformat-shell
+
+autoformat-python:
+	@echo "→ ruff check --fix"
+	@$(RUFF) check . --fix
+	@echo "→ ruff format"
+	@$(RUFF) format .
+
+autoformat-shell:
+	@if command -v shfmt >/dev/null 2>&1; then \
+		echo "→ shfmt -w (tracked *.sh)"; \
+		files=$$(git ls-files '*.sh'); \
+		if [ -n "$$files" ]; then shfmt -i 2 -ci -w $$files; fi; \
+	else \
+		echo "→ (shfmt not installed, skipping)"; \
+	fi

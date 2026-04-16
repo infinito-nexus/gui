@@ -53,6 +53,10 @@ Patterns use shell-style wildcards: `*` matches any substring. Matching is again
 | `Bash(STATE_DIR=*python3 -m unittest*)` | Unittest invocation with leading `STATE_DIR=` override | Medium — narrow env-prefix form kept separate so an unanchored `*python3*` wildcard isn't needed; other env prefixes still trigger an `ask`. |
 | `Bash(unset *)` | Clear environment variables | Low — only unsets vars in the current shell; cannot touch disk or remote state. |
 | `Bash(./node_modules/.bin/playwright test*)` | Run Playwright e2e tests via the local binary | Medium — executes browser automation code; scope = repo-local Playwright install (`apps/web/node_modules`). |
+| `Bash(ruff*)` | Python linter/formatter (`ruff check`, `ruff format`) | Medium — autofix/reformat mode rewrites `.py` files inside `allowWrite`. No network, no code execution beyond Ruff itself. |
+| `Bash(shfmt*)` | Shell script formatter | Medium — `-w` rewrites `.sh` files inside `allowWrite`; diff/list modes are read-only. |
+| `Bash(.venv/bin/*)` | Run any executable from the repo-local virtualenv (`.venv/bin/ruff`, `pip`, `python`, …) | High — venv-local binaries can execute arbitrary Python; scope = whatever `pip install '.[dev]'` put into `.venv`. Prefer narrower patterns for one-off tools. |
+| `Bash(echo*)` | Print arguments to stdout | Low — no side effects. |
 | `WebSearch` | Web search via Claude tooling | Low–Medium — content is fetched for context. |
 | `WebFetch(domain:github.com)` / `raw.githubusercontent.com` / `api.github.com` | GitHub web/API + raw content | Low — read-only sources. |
 | `WebFetch(domain:docs.docker.com)` / `docs.python.org` / `pypi.org` / `nodejs.org` / `playwright.dev` / `fastapi.tiangolo.com` | Upstream framework/runtime docs | Low — read-only reference material. |

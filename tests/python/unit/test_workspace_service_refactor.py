@@ -121,7 +121,9 @@ class TestWorkspaceServiceRefactor(unittest.TestCase):
         self.assertIn("$ANSIBLE_VAULT;1.1;AES256\n", updated)
         self.assertIn("device: {}", inventory)
 
-    def test_workspace_write_lock_serializes_same_workspace_across_threads(self) -> None:
+    def test_workspace_write_lock_serializes_same_workspace_across_threads(
+        self,
+    ) -> None:
         service = WorkspaceService()
         acquired = threading.Event()
 
@@ -216,7 +218,9 @@ class TestWorkspaceServiceRefactor(unittest.TestCase):
         ).is_file(),
         "requires a real infinito-nexus checkout at INFINITO_REPO_PATH",
     )
-    def test_concurrent_inventory_and_connection_updates_do_not_leave_git_lock(self) -> None:
+    def test_concurrent_inventory_and_connection_updates_do_not_leave_git_lock(
+        self,
+    ) -> None:
         service = WorkspaceService()
         created = service.create(owner_id="user-1")
         workspace_id = str(created["workspace_id"])
@@ -262,7 +266,9 @@ class TestWorkspaceServiceRefactor(unittest.TestCase):
         root = service.ensure(workspace_id)
         self.assertFalse((root / ".git" / "index.lock").exists())
         self.assertEqual(
-            service.read_file(workspace_id, "host_vars/device.yml").count("ansible_host:"),
+            service.read_file(workspace_id, "host_vars/device.yml").count(
+                "ansible_host:"
+            ),
             1,
         )
 

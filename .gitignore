@@ -11,3 +11,4 @@ state/
 examples/workspace-import.zip
 .codex
 *.lock
+*.egg-info

@@ -55,7 +55,9 @@ class TestJobRunnerShims(unittest.TestCase):
         time.sleep(0.05)
 
     @patch("services.job_runner.service.build_inventory_preview")
-    def test_controller_baudolo_seed_shim_updates_semicolon_csv(self, m_preview) -> None:
+    def test_controller_baudolo_seed_shim_updates_semicolon_csv(
+        self, m_preview
+    ) -> None:
         m_preview.return_value = (
             "all:\n  hosts:\n    localhost:\n      vars: {}\n",
             [],

@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .util import atomic_write_text
 
-BAUDOLO_SEED_SHIM = '''#!/usr/bin/env python3
+BAUDOLO_SEED_SHIM = """#!/usr/bin/env python3
 import csv
 import os
 import re
@@ -102,10 +102,10 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-'''
+"""
 
 
-INFINITO_SHIM = '''#!/usr/bin/env bash
+INFINITO_SHIM = """#!/usr/bin/env bash
 set -euo pipefail
 
 repo_root="${JOB_RUNNER_REPO_DIR:-${PYTHONPATH%%:*}}"
@@ -123,7 +123,7 @@ if command -v python3 >/dev/null 2>&1; then
 fi
 
 exec python -m cli.__main__ "$@"
-'''
+"""
 
 
 def write_controller_shims(dest_root: Path) -> None:

@@ -1,5 +1,6 @@
 # Committing
 
+- You MUST run `make autoformat` before every commit, then stage every file that it modified, so commits never contain formatting drift. Apply this even for markdown/reStructuredText-only commits (ruff/shfmt will simply no-op on those paths).
 - You MUST run `make test` as the standard combined validation from [Testing and Validation](../../contributing/testing/common.md) before every commit whenever the staged change includes at least one file that is not `.md` or `.rst`, unless you are explicitly instructed not to.
 - If that validation fails, you MUST run `make clean` and rerun it.
 - You MUST skip the standard validation only for markdown/reStructuredText-only changes unless you are explicitly instructed to run it.

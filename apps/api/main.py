@@ -53,8 +53,14 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def _trace_requests(request: Request, call_next):
         import time as _time
+
         path = request.url.path
-        tracked = "/credentials" in path or "/test-connection" in path or "/connection" in path or "/primary-domain" in path
+        tracked = (
+            "/credentials" in path
+            or "/test-connection" in path
+            or "/connection" in path
+            or "/primary-domain" in path
+        )
         t0 = _time.monotonic()
         if tracked:
             print(f"TRACE: IN {request.method} {path}", file=sys.stderr, flush=True)
@@ -63,7 +69,11 @@ def create_app() -> FastAPI:
         except Exception as exc:
             if tracked:
                 dt = _time.monotonic() - t0
-                print(f"TRACE: ERR {request.method} {path} dt={dt:.2f}s {exc!r}", file=sys.stderr, flush=True)
+                print(
+                    f"TRACE: ERR {request.method} {path} dt={dt:.2f}s {exc!r}",
+                    file=sys.stderr,
+                    flush=True,
+                )
             raise
         if tracked:
             dt = _time.monotonic() - t0

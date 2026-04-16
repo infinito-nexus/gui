@@ -158,7 +158,9 @@ def _github_headers() -> dict[str, str]:
         "Accept": "application/vnd.github+json",
         "User-Agent": "infinito-deployer",
     }
-    token = (os.getenv("INFINITO_NEXUS_GITHUB_TOKEN") or os.getenv("GH_TOKEN") or "").strip()
+    token = (
+        os.getenv("INFINITO_NEXUS_GITHUB_TOKEN") or os.getenv("GH_TOKEN") or ""
+    ).strip()
     if token:
         headers["Authorization"] = f"Bearer {token}"
     return headers
@@ -183,7 +185,11 @@ def _fetch_package_tags() -> list[str]:
             for item in payload:
                 if not isinstance(item, dict):
                     continue
-                metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+                metadata = (
+                    item.get("metadata")
+                    if isinstance(item.get("metadata"), dict)
+                    else {}
+                )
                 container = (
                     metadata.get("container")
                     if isinstance(metadata.get("container"), dict)
@@ -231,7 +237,9 @@ def _build_records(tags: Iterable[str]) -> list[InfinitoNexusVersionRecord]:
             commit_sha=None,
         )
 
-    ordered = sorted(deduped.values(), key=lambda record: _sort_key(record.value), reverse=True)
+    ordered = sorted(
+        deduped.values(), key=lambda record: _sort_key(record.value), reverse=True
+    )
     latest_image_tag = "latest"
     if not latest_available and ordered:
         latest_image_tag = ordered[0].image_tag
@@ -247,7 +255,9 @@ def _build_records(tags: Iterable[str]) -> list[InfinitoNexusVersionRecord]:
     ]
 
 
-def list_infinito_nexus_versions(*, force_refresh: bool = False) -> list[InfinitoNexusVersionRecord]:
+def list_infinito_nexus_versions(
+    *, force_refresh: bool = False
+) -> list[InfinitoNexusVersionRecord]:
     now = time.time()
     ttl = _cache_ttl_seconds()
     cached = None

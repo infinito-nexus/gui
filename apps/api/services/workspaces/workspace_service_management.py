@@ -268,9 +268,7 @@ class WorkspaceServiceManagementMixin:
             if destination.exists():
                 raise HTTPException(status_code=409, detail="target already exists")
             if not destination.parent.exists():
-                raise HTTPException(
-                    status_code=400, detail="target directory missing"
-                )
+                raise HTTPException(status_code=400, detail="target directory missing")
 
             try:
                 source.rename(destination)
@@ -300,6 +298,4 @@ class WorkspaceServiceManagementMixin:
                 raise HTTPException(
                     status_code=500, detail=f"failed to delete file: {exc}"
                 ) from exc
-            self._history_commit(
-                root, f"delete: {target.relative_to(root).as_posix()}"
-            )
+            self._history_commit(root, f"delete: {target.relative_to(root).as_posix()}")

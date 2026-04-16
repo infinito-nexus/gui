@@ -102,8 +102,8 @@ render_env_file() {
   ldapsm_shim_host="$(resolve_dir "${SCRIPT_DIR}")/controller-ldapsm-shim.sh"
   chmod +x "${ldapsm_shim_host}" || true
 
-  cat "${ENV_SOURCE}" > "${target_file}"
-  cat >> "${target_file}" <<EOF
+  cat "${ENV_SOURCE}" >"${target_file}"
+  cat >>"${target_file}" <<EOF
 STATE_HOST_PATH=$(resolve_dir "${STATE_DIR}")
 JOB_RUNNER_REPO_DIR=/opt/src/infinito
 JOB_RUNNER_WORKDIR=/workspace

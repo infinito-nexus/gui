@@ -2,7 +2,6 @@ import os
 import time
 import json
 import shlex
-import csv
 import subprocess
 import unittest
 from tempfile import TemporaryDirectory
@@ -247,7 +246,7 @@ class TestJobRunnerService(unittest.TestCase):
 
         old_extra_args = os.environ.get("JOB_RUNNER_ANSIBLE_ARGS")
         os.environ["JOB_RUNNER_ANSIBLE_ARGS"] = (
-            "-e '{\"TLS_ENABLED\": false, \"TLS_MODE\": \"letsencrypt\"}' "
+            '-e \'{"TLS_ENABLED": false, "TLS_MODE": "letsencrypt"}\' '
             "-e SYS_SVC_SSHD_PASSWORD_AUTHENTICATION=true"
         )
         self.addCleanup(
@@ -281,8 +280,6 @@ class TestJobRunnerService(unittest.TestCase):
             "all:\n  hosts:\n    localhost:\n      vars: {}\n",
             [],
         )
-
-        import subprocess
 
         started = {"proc": None, "log_fh": None}
 
@@ -357,7 +354,9 @@ class TestJobRunnerService(unittest.TestCase):
             self.assertNotIn(secret, vars_yaml)
 
     def test_create_requires_master_password_for_vaulted_workspace(self) -> None:
-        host_vars_dir = Path(self._tmp.name) / "workspaces" / self.workspace_id / "host_vars"
+        host_vars_dir = (
+            Path(self._tmp.name) / "workspaces" / self.workspace_id / "host_vars"
+        )
         host_vars_dir.mkdir(parents=True, exist_ok=True)
         (host_vars_dir / "device.yml").write_text(
             "applications:\n"
@@ -388,7 +387,9 @@ class TestJobRunnerService(unittest.TestCase):
         m_build_container_command,
         m_vault_password,
     ) -> None:
-        host_vars_dir = Path(self._tmp.name) / "workspaces" / self.workspace_id / "host_vars"
+        host_vars_dir = (
+            Path(self._tmp.name) / "workspaces" / self.workspace_id / "host_vars"
+        )
         host_vars_dir.mkdir(parents=True, exist_ok=True)
         (host_vars_dir / "device.yml").write_text(
             "applications:\n"
@@ -445,7 +446,8 @@ class TestJobRunnerService(unittest.TestCase):
 
         self.assertTrue(m_build_container_command.called)
         runtime_env = m_build_container_command.call_args.kwargs["runtime_env"]
-        self.assertEqual(runtime_env["INFINITO_RUNTIME_VAULT_PASSWORD"], "derived-vault-pass")
+        self.assertEqual(
+            runtime_env["INFINITO_RUNTIME_VAULT_PASSWORD"], "derived-vault-pass"
+        )
 
         self._wait_for_terminal(svc, job.job_id)
-
