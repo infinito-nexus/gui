@@ -1,28 +1,12 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
-import YAML from "yaml";
+import { useCallback, useMemo, useRef, useState } from "react";
 import DeploymentWorkspaceServerSwitcher from "../DeploymentWorkspaceServerSwitcher";
-import { sanitizeAliasFilename } from "../workspace-panel/utils";
-import {
-  createServerPlaceholder,
-  normalizePersistedDeviceMeta,
-  parseHostVarsServerPatchData,
-} from "../../lib/device_meta";
-import {
-  normalizeDeviceColor,
-  normalizeDeviceEmoji,
-  pickUniqueDeviceColor,
-  pickUniqueDeviceEmoji,
-} from "../deployment-credentials/device-visuals";
 import type {
   ConnectionResult,
   ServerState,
 } from "../deployment-credentials/types";
 import DeploymentWorkspaceTemplate from "./DeploymentWorkspaceTemplate";
 import {
-  PANEL_KEY_TO_QUERY,
-  PANEL_QUERY_TO_KEY,
   type AliasRename,
   type DeploymentWorkspaceProps,
   type DomainFilterKind,
@@ -34,14 +18,10 @@ import {
 import {
   DEFAULT_PRIMARY_DOMAIN,
   createDefaultDomainEntries,
-  normalizeDomainName,
 } from "./domain-utils";
-import {
-  encodeWorkspacePath,
-  parseApiError,
-} from "./helpers";
 import { type AccountTabKey } from "./panels/AccountPanel";
 import { useWorkspaceDomainLogic } from "./useWorkspaceDomainLogic";
+
 import { useWorkspaceServerSelectionActions } from "./useWorkspaceServerSelectionActions";
 import { useWorkspaceDeploymentRuntime } from "./useWorkspaceDeploymentRuntime";
 import { useWorkspaceRoleAppConfig } from "./useWorkspaceRoleAppConfig";
@@ -49,7 +29,7 @@ import { useWorkspaceSelectionDerived } from "./useWorkspaceSelectionDerived";
 import { buildDeploymentWorkspacePanels } from "./deploymentWorkspacePanels";
 import { useWorkspaceServerMetadata } from "./useWorkspaceServerMetadata";
 import { useDeploymentWorkspaceEffects } from "./useDeploymentWorkspaceEffects";
-const DEFAULT_DEVICE_ALIAS = "device";
+import { useInfinitoNexusVersion } from "./useInfinitoNexusVersion";
 export default function DeploymentWorkspace({
   baseUrl,
   onJobCreated,
@@ -96,17 +76,6 @@ export default function DeploymentWorkspace({
   const [inventoryReady, setInventoryReady] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
-  const [infinitoNexusVersion, setInfinitoNexusVersion] = useState("latest");
-  const [infinitoNexusVersionOptions, setInfinitoNexusVersionOptions] = useState<
-    Array<{ value: string; label: string }>
-  >([{ value: "latest", label: "latest" }]);
-  const [infinitoNexusVersionLoading, setInfinitoNexusVersionLoading] =
-    useState(false);
-  const [infinitoNexusVersionSaving, setInfinitoNexusVersionSaving] =
-    useState(false);
-  const [infinitoNexusVersionError, setInfinitoNexusVersionError] = useState<
-    string | null
-  >(null);
   const [liveJobId, setLiveJobId] = useState("");
   const [connectRequestKey, setConnectRequestKey] = useState(0);
   const [cancelRequestKey, setCancelRequestKey] = useState(0);
@@ -301,140 +270,13 @@ export default function DeploymentWorkspace({
     setSelectedPlansByAlias,
     setSelectionTouched,
   });
-  useEffect(() => {
-    let cancelled = false;
-    const loadVersions = async () => {
-      setInfinitoNexusVersionLoading(true);
-      setInfinitoNexusVersionError(null);
-      try {
-        const res = await fetch(`${baseUrl}/api/infinito-nexus/versions`, {
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          throw new Error(await parseApiError(res));
-        }
-        const data = await res.json();
-        const nextOptions: Array<{ value: string; label: string }> = Array.isArray(
-          data?.versions
-        )
-          ? data.versions
-              .map((entry: any) => ({
-                value: String(entry?.value || "").trim(),
-                label: String(entry?.label || entry?.value || "").trim(),
-              }))
-              .filter(
-                (entry: { value: string; label: string }) =>
-                  entry.value.length > 0 && entry.label.length > 0
-              )
-          : [];
-        const normalized =
-          nextOptions.length > 0
-            ? nextOptions
-            : [{ value: "latest", label: "latest" }];
-        if (cancelled) return;
-        setInfinitoNexusVersionOptions(normalized);
-        setInfinitoNexusVersion((prev) =>
-          normalized.some((entry: { value: string }) => entry.value === prev)
-            ? prev
-            : String(data?.default_version || "latest").trim() || "latest"
-        );
-      } catch (err: any) {
-        if (cancelled) return;
-        setInfinitoNexusVersionOptions([{ value: "latest", label: "latest" }]);
-        setInfinitoNexusVersion((prev) => prev || "latest");
-        setInfinitoNexusVersionError(
-          err?.message ?? "Failed to load Infinito.Nexus versions."
-        );
-      } finally {
-        if (!cancelled) {
-          setInfinitoNexusVersionLoading(false);
-        }
-      }
-    };
-    void loadVersions();
-    return () => {
-      cancelled = true;
-    };
-  }, [baseUrl]);
-  useEffect(() => {
-    if (!workspaceId) {
-      setInfinitoNexusVersion("latest");
-      setInfinitoNexusVersionError(null);
-      return;
-    }
-    let cancelled = false;
-    const loadWorkspaceVersion = async () => {
-      setInfinitoNexusVersionSaving(true);
-      setInfinitoNexusVersionError(null);
-      try {
-        const res = await fetch(
-          `${baseUrl}/api/workspaces/${workspaceId}/runtime-settings`,
-          { cache: "no-store" }
-        );
-        if (!res.ok) {
-          throw new Error(await parseApiError(res));
-        }
-        const data = await res.json();
-        const nextValue =
-          String(data?.infinito_nexus_version || "").trim() || "latest";
-        if (!cancelled) {
-          setInfinitoNexusVersion(nextValue);
-        }
-      } catch (err: any) {
-        if (!cancelled) {
-          setInfinitoNexusVersion("latest");
-          setInfinitoNexusVersionError(
-            err?.message ?? "Failed to load Infinito.Nexus version."
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setInfinitoNexusVersionSaving(false);
-        }
-      }
-    };
-    void loadWorkspaceVersion();
-    return () => {
-      cancelled = true;
-    };
-  }, [baseUrl, workspaceId]);
-  const handleInfinitoNexusVersionChange = useCallback(
-    async (value: string) => {
-      const normalized = String(value || "").trim() || "latest";
-      const previous = infinitoNexusVersion;
-      setInfinitoNexusVersion(normalized);
-      setInfinitoNexusVersionError(null);
-      if (!workspaceId) return;
-      setInfinitoNexusVersionSaving(true);
-      try {
-        const res = await fetch(
-          `${baseUrl}/api/workspaces/${workspaceId}/runtime-settings`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ infinito_nexus_version: normalized }),
-          }
-        );
-        if (!res.ok) {
-          throw new Error(await parseApiError(res));
-        }
-        const data = await res.json();
-        setInfinitoNexusVersion(
-          String(data?.infinito_nexus_version || "").trim() || normalized
-        );
-      } catch (err: any) {
-        setInfinitoNexusVersion(previous);
-        setInfinitoNexusVersionError(
-          err?.message ?? "Failed to save Infinito.Nexus version."
-        );
-      } finally {
-        setInfinitoNexusVersionSaving(false);
-      }
-    },
-    [baseUrl, infinitoNexusVersion, workspaceId]
-  );
-  const infinitoNexusVersionBusy =
-    infinitoNexusVersionLoading || infinitoNexusVersionSaving;
+  const {
+    infinitoNexusVersion,
+    infinitoNexusVersionOptions,
+    infinitoNexusVersionBusy,
+    infinitoNexusVersionError,
+    handleInfinitoNexusVersionChange,
+  } = useInfinitoNexusVersion({ baseUrl, workspaceId });
   const {
     deploymentPlan,
     deploymentErrors,

@@ -116,12 +116,12 @@ test("scope toggle and row animation controls stay stable across rerenders", asy
   await expect(page.getByRole("button", { name: "Skip backward" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Stop animation" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Skip forward" })).toBeVisible();
-  await expect(page.getByText("Community Hub", { exact: true })).toBeVisible();
+  await expect(page.getByText("Community Hub", { exact: true }).first()).toBeVisible();
 
   await scopeToggle.click();
   await expect(scopeToggle).toContainText("Apps");
   await expect(page.getByRole("textbox", { name: "Search roles" })).toBeVisible();
-  await expect(page.getByText("Calendar App", { exact: true })).toBeVisible();
+  await expect(page.getByText("Calendar App", { exact: true }).first()).toBeVisible();
   await expect
     .poll(() => new URL(page.url()).searchParams.get("sw_scope"))
     .toBe("apps");
@@ -138,9 +138,10 @@ test("scope toggle and row animation controls stay stable across rerenders", asy
   await page.getByRole("button", { name: "Start animation" }).click();
   await expect(page.getByRole("button", { name: "Stop animation" })).toBeVisible();
 
+  await page.getByRole("textbox", { name: "Search roles" }).fill("");
   await scopeToggle.click();
   await expect(scopeToggle).toContainText("Bundles");
-  await expect(page.getByText("Community Hub", { exact: true })).toBeVisible();
+  await expect(page.getByText("Community Hub", { exact: true }).first()).toBeVisible();
   await expect
     .poll(() => new URL(page.url()).searchParams.get("sw_scope"))
     .toBe("bundles");

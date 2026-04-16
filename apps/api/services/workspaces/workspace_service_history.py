@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -11,17 +10,14 @@ from fastapi import HTTPException
 from services.job_runner.secrets import mask_secrets
 from .workspace_context import WORKSPACE_META_FILENAME, _safe_resolve
 from .workspace_service_history_restore import WorkspaceServiceHistoryRestoreMixin
+from .workspace_service_history_secrets import (
+    contains_plaintext_secret,
+    is_binary_path,
+)
 
 _HISTORY_USER_NAME = "Infinito Workspace"
 _HISTORY_USER_EMAIL = "workspace@infinito.local"
 _TRACKED_DIFF_FILTER = "AM"
-_SECRET_KEY_RE = re.compile(
-    r"(?i)(password|passwd|passphrase|secret|token|private_key|api[_-]?key|access[_-]?key)"
-)
-_YAML_ASSIGN_RE = re.compile(r"^\s*([A-Za-z0-9_.-]+)\s*:\s*(.*?)\s*$")
-_ENV_ASSIGN_RE = re.compile(r"^\s*([A-Za-z0-9_.-]+)\s*=\s*(.*?)\s*$")
-_VAULT_BLOCK_START_RE = re.compile(r"^\s*[A-Za-z0-9_.-]+\s*:\s*!vault\s*\|")
-_BLOCK_SCALAR_RE = re.compile(r"^[>|][+-]?$")
 
 
 def _env_flag(name: str, default: bool) -> bool:
@@ -196,86 +192,10 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
             if str(line).strip()
         ]
 
-    def _is_binary_path(self, path: str) -> bool:
-        lowered = path.lower()
-        return lowered.endswith(
-            (
-                ".kdbx",
-                ".png",
-                ".jpg",
-                ".jpeg",
-                ".gif",
-                ".svg",
-                ".ico",
-                ".woff",
-                ".woff2",
-                ".ttf",
-                ".otf",
-                ".zip",
-                ".gz",
-                ".bz2",
-                ".xz",
-                ".bin",
-            )
-        )
-
-    def _contains_plaintext_secret(self, text: str) -> tuple[bool, int | None]:
-        in_vault_block = False
-        vault_block_indent = 0
-        for line_number, line in enumerate(text.splitlines(), start=1):
-            stripped = line.strip()
-            if in_vault_block:
-                if not stripped:
-                    continue
-                current_indent = len(line) - len(line.lstrip(" "))
-                if current_indent > vault_block_indent:
-                    continue
-                in_vault_block = False
-
-            if _VAULT_BLOCK_START_RE.match(line):
-                in_vault_block = True
-                vault_block_indent = len(line) - len(line.lstrip(" "))
-                continue
-
-            if not stripped or stripped.startswith("#"):
-                continue
-
-            yaml_match = _YAML_ASSIGN_RE.match(line)
-            if yaml_match:
-                key = yaml_match.group(1).strip()
-                value = yaml_match.group(2).strip()
-                if _SECRET_KEY_RE.search(key):
-                    if not value:
-                        return True, line_number
-                    if value.startswith(("!vault", "$ANSIBLE_VAULT;", "{{")):
-                        continue
-                    if value.startswith(('"{{', "'{{")):
-                        continue
-                    if _BLOCK_SCALAR_RE.match(value):
-                        return True, line_number
-                    if value.lower() in {"null", "~"}:
-                        continue
-                    return True, line_number
-
-            env_match = _ENV_ASSIGN_RE.match(line)
-            if env_match:
-                key = env_match.group(1).strip()
-                value = env_match.group(2).strip()
-                if _SECRET_KEY_RE.search(key):
-                    if not value:
-                        continue
-                    if value.startswith(("{{", "$ANSIBLE_VAULT;")):
-                        continue
-                    if value.startswith(('"{{', "'{{")):
-                        continue
-                    return True, line_number
-
-        return False, None
-
     def _validate_no_plaintext_secrets(self, root: Path) -> None:
         violations: list[str] = []
         for rel_path in self._history_tracked_paths(root):
-            if self._is_binary_path(rel_path):
+            if is_binary_path(rel_path):
                 continue
             path = root / rel_path
             if not path.is_file():
@@ -284,7 +204,7 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
                 content = path.read_text(encoding="utf-8", errors="replace")
             except Exception:
                 continue
-            has_secret, line_number = self._contains_plaintext_secret(content)
+            has_secret, line_number = contains_plaintext_secret(content)
             if not has_secret:
                 continue
             if line_number is None:

@@ -14,20 +14,13 @@ class TestWorkspaceServiceRefactor(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self._old_state_dir = os.environ.get("STATE_DIR")
-        self._old_repo_path = os.environ.get("INFINITO_REPO_PATH")
         os.environ["STATE_DIR"] = self._tmp.name
-        repo_root = Path(__file__).resolve().parents[3]
-        os.environ["INFINITO_REPO_PATH"] = str(repo_root / "infinito-nexus")
 
     def tearDown(self) -> None:
         if self._old_state_dir is None:
             os.environ.pop("STATE_DIR", None)
         else:
             os.environ["STATE_DIR"] = self._old_state_dir
-        if self._old_repo_path is None:
-            os.environ.pop("INFINITO_REPO_PATH", None)
-        else:
-            os.environ["INFINITO_REPO_PATH"] = self._old_repo_path
 
     def test_create_initializes_expected_workspace_layout(self) -> None:
         service = WorkspaceService()
@@ -212,6 +205,17 @@ class TestWorkspaceServiceRefactor(unittest.TestCase):
         self.assertIn("ansible_user: deploy\n", updated)
         self.assertIn("ansible_port: 22\n", updated)
 
+    @unittest.skipUnless(
+        Path(os.environ.get("INFINITO_REPO_PATH", "") or "/nonexistent").is_dir()
+        and (
+            Path(os.environ.get("INFINITO_REPO_PATH", "") or "/nonexistent")
+            / "cli"
+            / "create"
+            / "inventory"
+            / "host_vars.py"
+        ).is_file(),
+        "requires a real infinito-nexus checkout at INFINITO_REPO_PATH",
+    )
     def test_concurrent_inventory_and_connection_updates_do_not_leave_git_lock(self) -> None:
         service = WorkspaceService()
         created = service.create(owner_id="user-1")

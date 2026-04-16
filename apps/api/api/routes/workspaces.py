@@ -20,11 +20,6 @@ from api.schemas.workspace import (
     WorkspaceFileRenameIn,
     WorkspaceFileRenameOut,
     WorkspaceFileWriteIn,
-    WorkspaceHistoryDiffOut,
-    WorkspaceHistoryEntryOut,
-    WorkspaceHistoryListOut,
-    WorkspaceHistoryRestoreFileIn,
-    WorkspaceHistoryRestoreOut,
     WorkspaceKeyPassphraseIn,
     WorkspaceMasterPasswordIn,
     WorkspaceRoleAppConfigImportOut,
@@ -121,84 +116,6 @@ def write_file(
     _require_workspace(request, workspace_id)
     _svc().write_file(workspace_id, path, payload.content)
     return WorkspaceFileOut(path=path, content=payload.content)
-
-
-@router.get("/{workspace_id}/history", response_model=WorkspaceHistoryListOut)
-def list_history(
-    workspace_id: str,
-    request: Request,
-    path: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
-) -> WorkspaceHistoryListOut:
-    _require_workspace(request, workspace_id)
-    commits = _svc().list_history(
-        workspace_id,
-        path=path,
-        limit=limit,
-        offset=offset,
-    )
-    return WorkspaceHistoryListOut(
-        commits=[WorkspaceHistoryEntryOut(**item) for item in commits]
-    )
-
-
-@router.get("/{workspace_id}/history/{sha}", response_model=WorkspaceHistoryEntryOut)
-def get_history_commit(
-    workspace_id: str,
-    sha: str,
-    request: Request,
-    path: str | None = None,
-) -> WorkspaceHistoryEntryOut:
-    _require_workspace(request, workspace_id)
-    data = _svc().get_history_commit(workspace_id, sha, path=path)
-    return WorkspaceHistoryEntryOut(**data)
-
-
-@router.get(
-    "/{workspace_id}/history/{sha}/diff", response_model=WorkspaceHistoryDiffOut
-)
-def get_history_diff(
-    workspace_id: str,
-    sha: str,
-    request: Request,
-    path: str | None = None,
-    against_current: bool = False,
-) -> WorkspaceHistoryDiffOut:
-    _require_workspace(request, workspace_id)
-    data = _svc().get_history_diff(
-        workspace_id,
-        sha,
-        path=path,
-        against_current=against_current,
-    )
-    return WorkspaceHistoryDiffOut(**data)
-
-
-@router.post(
-    "/{workspace_id}/history/{sha}/restore", response_model=WorkspaceHistoryRestoreOut
-)
-def restore_history_workspace(
-    workspace_id: str, sha: str, request: Request
-) -> WorkspaceHistoryRestoreOut:
-    _require_workspace(request, workspace_id)
-    data = _svc().restore_history_workspace(workspace_id, sha)
-    return WorkspaceHistoryRestoreOut(**data)
-
-
-@router.post(
-    "/{workspace_id}/history/{sha}/restore-file",
-    response_model=WorkspaceHistoryRestoreOut,
-)
-def restore_history_file(
-    workspace_id: str,
-    sha: str,
-    payload: WorkspaceHistoryRestoreFileIn,
-    request: Request,
-) -> WorkspaceHistoryRestoreOut:
-    _require_workspace(request, workspace_id)
-    data = _svc().restore_history_path(workspace_id, sha, payload.path)
-    return WorkspaceHistoryRestoreOut(**data)
 
 
 @router.get(
@@ -527,4 +444,5 @@ async def upload_zip(
     return WorkspaceUploadOut(ok=True, files=_svc().list_files(workspace_id), **summary)
 
 
+importlib.import_module(".workspaces_history_routes", __package__)
 importlib.import_module(".workspaces_management_routes", __package__)

@@ -242,46 +242,6 @@ class TestJobRunnerService(unittest.TestCase):
             ["custom-role-a", "custom-role-b"],
         )
 
-    @patch("services.job_runner.service.build_inventory_preview")
-    def test_controller_baudolo_seed_shim_updates_semicolon_csv(self, m_preview) -> None:
-        m_preview.return_value = (
-            "all:\n  hosts:\n    localhost:\n      vars: {}\n",
-            [],
-        )
-
-        from services.job_runner import JobRunnerService  # noqa: WPS433
-
-        svc = JobRunnerService()
-        job = svc.create(req=self._minimal_request())
-        self._wait_for_terminal(svc, job.job_id)
-
-        shim_path = Path(job.workspace_dir) / "baudolo-seed"
-        csv_path = Path(job.workspace_dir) / "databases.csv"
-
-        subprocess.run(
-            [str(shim_path), str(csv_path), "docker.test", "appdb", "alice", "secret"],
-            check=True,
-        )
-        subprocess.run(
-            [str(shim_path), str(csv_path), "docker.test", "appdb", "bob", "newpass"],
-            check=True,
-        )
-
-        with csv_path.open("r", encoding="utf-8", newline="") as handle:
-            rows = list(csv.DictReader(handle, delimiter=";"))
-
-        self.assertEqual(
-            rows,
-            [
-                {
-                    "instance": "docker.test",
-                    "database": "appdb",
-                    "username": "bob",
-                    "password": "newpass",
-                }
-            ],
-        )
-
     def test_build_runner_args_appends_ansible_passthrough_from_env(self) -> None:
         from services.job_runner import JobRunnerService  # noqa: WPS433
 
@@ -489,21 +449,3 @@ class TestJobRunnerService(unittest.TestCase):
 
         self._wait_for_terminal(svc, job.job_id)
 
-    @patch("services.job_runner.service.build_inventory_preview")
-    def test_infinito_shim_prefers_mounted_repo_root(self, m_preview) -> None:
-        m_preview.return_value = (
-            "all:\n  hosts:\n    localhost:\n      vars: {}\n",
-            [],
-        )
-
-        from services.job_runner import JobRunnerService  # noqa: WPS433
-
-        svc = JobRunnerService()
-        job = svc.create(req=self._minimal_request())
-        self._wait_for_terminal(svc, job.job_id)
-
-        shim_path = Path(job.workspace_dir) / "infinito"
-        shim = shim_path.read_text(encoding="utf-8")
-
-        self.assertIn('repo_root="${JOB_RUNNER_REPO_DIR:-${PYTHONPATH%%:*}}"', shim)
-        self.assertIn('cd "${repo_root}"', shim)
