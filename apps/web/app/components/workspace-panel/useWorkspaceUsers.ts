@@ -16,7 +16,7 @@ import {
   parseStringList,
   parseUsersFromCsv,
   syncPricingUsersStorage,
-  toYamlUserEntry,
+  toYamlUsersMap,
   userToForm,
   usersToCsv,
   type WorkspaceUser,
@@ -106,7 +106,7 @@ export function useWorkspaceUsers({
 
   const exportUsersYaml = (users: WorkspaceUser[] = usersDraft) => {
     const yamlExport = YAML.stringify({
-      users: users.map((user) => toYamlUserEntry(user)),
+      users: toYamlUsersMap(users),
     });
     downloadUsersExport("users.yml", yamlExport, "application/x-yaml");
   };
@@ -428,7 +428,7 @@ export function useWorkspaceUsers({
     }
 
     const nextDoc = isRecord(usersDoc) ? { ...usersDoc } : {};
-    nextDoc.users = uniqueUsers.map((entry) => toYamlUserEntry(entry));
+    nextDoc.users = toYamlUsersMap(uniqueUsers);
     const content = YAML.stringify(nextDoc);
 
     setUsersSaving(true);

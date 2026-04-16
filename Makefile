@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init test-arch test-env-up test-env-down web-sync venv install test clean example-workspace-zip
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init test-arch test-env-up test-env-down test-up web-sync venv install test clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -92,6 +92,13 @@ test-env-up:
 test-env-down:
 	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down
 
+# Start the minimal test stack (api db catalog web) under the test profile.
+# Pass image overrides via env, e.g.:
+#   INFINITO_NEXUS_IMAGE=infinito-debian:latest JOB_RUNNER_IMAGE=infinito-debian:latest make test-up
+TEST_UP_SERVICES ?= api db catalog web
+test-up:
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d $(TEST_UP_SERVICES)
+
 venv:
 	@test -d "$(VENV_DIR)" || python -m venv "$(VENV_DIR)"
 	@$(PIP) install -U pip setuptools wheel
@@ -120,3 +127,9 @@ example-workspace-zip:
 	@rm -f "$(EXAMPLE_WORKSPACE_ZIP)"
 	@cd "$(EXAMPLE_WORKSPACE_DIR)" && zip -rq "$(abspath $(EXAMPLE_WORKSPACE_ZIP))" .
 	@echo "✔ Created $(EXAMPLE_WORKSPACE_ZIP)"
+
+e2e-dashboard-local:
+	@INFINITO_NEXUS_SRC_DIR="$(INFINITO_NEXUS_SRC_DIR)" ./scripts/e2e/dashboard/run.sh local
+
+e2e-dashboard-ci:
+	@./scripts/e2e/dashboard/run.sh ci

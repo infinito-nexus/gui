@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict
 
@@ -18,7 +19,8 @@ def safe_mkdir(path: Path) -> None:
 
 
 def atomic_write_text(path: Path, text: str) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    safe_mkdir(path.parent)
+    tmp = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
     tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 

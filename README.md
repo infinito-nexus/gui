@@ -62,13 +62,13 @@ After startup:
 
 The default stack seeds the required Infinito.Nexus content from the configured image. A separate local checkout is only needed for custom job runner mounts.
 
-The SPOT for local runtime setup, environment variables, database initialization, job runner configuration, and SSH test targets is the [Setup Guide](docs/setup.md).
+The SPOT for local runtime setup, environment variables, database initialization, job runner configuration, and SSH test targets is the [Setup Guide](docs/contributing/testing/local.md).
 
 ---
 
 ## Guides 📚
 
-- [Setup Guide](docs/setup.md) — full local setup, environment variables, and operational commands.
+- [Setup Guide](docs/contributing/testing/local.md) — full local setup, environment variables, and operational commands.
 - [Makefile Reference](docs/contributing/tools/makefile.md) — all `make` targets explained.
 - [Development Setup](docs/contributing/environment/setup.md) — contributor environment bootstrap.
 

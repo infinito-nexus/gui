@@ -111,6 +111,7 @@ export default function DeploymentWorkspaceTemplate({
                 id={`tab-${panel.key}`}
                 aria-controls={`panel-${panel.key}`}
                 aria-selected={isActive}
+                data-panel-key={panel.key}
                 className={`${styles.tabButton} ${
                   isActive ? styles.tabButtonActive : ""
                 } ${isDisabled ? styles.tabButtonDisabled : ""}`}
@@ -138,6 +139,7 @@ export default function DeploymentWorkspaceTemplate({
                 role="tabpanel"
                 aria-labelledby={`tab-${panel.key}`}
                 aria-hidden={!isActive}
+                data-panel-key={panel.key}
                 className={`${styles.tabPanel} ${isActive ? styles.tabPanelActive : ""}`}
               >
                 {panel.content}

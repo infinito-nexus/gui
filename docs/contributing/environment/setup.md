@@ -1,6 +1,6 @@
 # Development Environment Setup
 
-Use the repository's real setup flow. [makefile.md](../tools/makefile.md) is the SPOT for contributor-facing `make` targets, and [Testing and Validation](../flow/testing.md) is the SPOT for validation requirements.
+Use the repository's real setup flow. [makefile.md](../tools/makefile.md) is the SPOT for contributor-facing `make` targets, and [Testing and Validation](../testing/common.md) is the SPOT for validation requirements.
 
 ## Prerequisites
 
@@ -33,7 +33,7 @@ make setup
 
 The repository includes a small SSH test stack for testing deployment flows:
 
-- See [Test.md](../../../Test.md) for credentials and usage.
+- See [Local Setup](../testing/local.md#ssh-test-environment) for credentials and usage.
 - Start with `make test-env-up`, stop with `make test-env-down`.
 
 ## Full Development Flow
@@ -41,6 +41,6 @@ The repository includes a small SSH test stack for testing deployment flows:
 | Step | Command | Purpose |
 |---|---|---|
 | 1 | `make setup` | Bootstrap the environment and start the stack. |
-| 2 | `make test` | Run the combined validation when [Testing and Validation](../flow/testing.md) requires it. |
+| 2 | `make test` | Run the combined validation when [Testing and Validation](../testing/common.md) requires it. |
 | 3 | `make logs` | Follow live service output. |
 | 4 | `make down` | Stop the stack when done. |

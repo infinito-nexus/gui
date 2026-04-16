@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import unittest
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -141,6 +142,26 @@ class TestWorkspaceHistoryService(unittest.TestCase):
 
         self.assertEqual(ctx.exception.status_code, 500)
         self.assertEqual(service.read_file(workspace_id, path), "state: new\n")
+
+    def test_run_git_marks_workspace_as_safe_directory(self) -> None:
+        service, workspace_id = self._new_workspace()
+        root = service.ensure(workspace_id)
+
+        with patch(
+            "services.workspaces.workspace_service_history.subprocess.run"
+        ) as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout="",
+                stderr="",
+            )
+
+            service._run_git(root, ["status"], check=False)
+
+        command = mock_run.call_args.args[0]
+        self.assertEqual(command[:4], ["git", "-c", f"safe.directory={root}", "-C"])
+        self.assertEqual(command[4], str(root))
 
 
 if __name__ == "__main__":

@@ -263,6 +263,16 @@ export function toYamlUserEntry(user: WorkspaceUser): Record<string, unknown> {
   return entry;
 }
 
+export function toYamlUsersMap(
+  users: WorkspaceUser[]
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  users.forEach((user) => {
+    out[user.username] = toYamlUserEntry(user);
+  });
+  return out;
+}
+
 function escapeCsvCell(value: unknown): string {
   const text = String(value ?? "");
   if (/[",\n]/.test(text)) {

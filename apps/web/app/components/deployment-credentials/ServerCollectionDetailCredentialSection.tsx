@@ -90,9 +90,9 @@ export function ServerCollectionDetailCredentialSection({
                 password: event.target.value,
               })
             }
-            onBlur={() =>
+            onBlur={(event) =>
               emitCredentialBlur(
-                detailServer,
+                { ...detailServer, password: event.currentTarget.value },
                 "password",
                 passwordConfirmDrafts[detailServer.alias] ?? ""
               )
@@ -206,7 +206,12 @@ export function ServerCollectionDetailCredentialSection({
                     privateKey: event.target.value,
                   })
                 }
-                onBlur={() => emitCredentialBlur(detailServer, "privateKey")}
+                onBlur={(event) =>
+                  emitCredentialBlur(
+                    { ...detailServer, privateKey: event.currentTarget.value },
+                    "privateKey"
+                  )
+                }
                 placeholder="Paste SSH private key"
                 rows={6}
                 autoComplete="off"
@@ -243,7 +248,12 @@ export function ServerCollectionDetailCredentialSection({
                   keyPassphrase: event.target.value,
                 })
               }
-              onBlur={() => emitCredentialBlur(detailServer, "keyPassphrase")}
+              onBlur={(event) =>
+                emitCredentialBlur(
+                  { ...detailServer, keyPassphrase: event.currentTarget.value },
+                  "keyPassphrase"
+                )
+              }
               placeholder="Optional key passphrase"
               autoComplete="off"
               className={styles.fieldInput}

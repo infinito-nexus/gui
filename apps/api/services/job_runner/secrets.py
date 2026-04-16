@@ -59,6 +59,8 @@ def _looks_like_token(value: str) -> bool:
 def collect_secrets(req: DeploymentRequest) -> List[str]:
     secrets: List[str] = []
 
+    if req.master_password:
+        secrets.append(req.master_password)
     if req.auth.password:
         secrets.append(req.auth.password)
     if req.auth.private_key:

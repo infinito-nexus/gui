@@ -381,6 +381,12 @@ test("users overview can add and persist a user to group_vars/all.yml", async ({
     page.getByText("Saved 1 user(s) to group_vars/all.yml.", { exact: true })
   ).toBeVisible();
   await expect.poll(() => state.fileContents["group_vars/all.yml"]).toContain(
+    "users:\n  alice:"
+  );
+  await expect.poll(() => state.fileContents["group_vars/all.yml"]).toContain(
     "username: alice"
+  );
+  await expect.poll(() => state.fileContents["group_vars/all.yml"]).not.toContain(
+    "- username: alice"
   );
 });

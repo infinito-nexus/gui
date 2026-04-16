@@ -31,4 +31,5 @@ def mask_request_for_persistence(req: DeploymentRequest) -> Dict[str, Any]:
     auth = dict(data.get("auth") or {})
     method = auth.get("method")
     data["auth"] = {"method": method}  # drop password/private_key
+    data.pop("master_password", None)
     return data

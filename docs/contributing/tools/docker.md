@@ -6,7 +6,7 @@ The canonical `make` command index lives in [makefile.md](makefile.md).
 ## Scope
 
 - Use [makefile.md](makefile.md) when you want the concrete repository targets.
-- Use [Testing and Validation](../flow/testing.md) for lint, unit, and integration guidance.
+- Use [Testing and Validation](../testing/common.md) for lint, unit, and integration guidance.
 
 ## Notes
 

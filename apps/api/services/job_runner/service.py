@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import os
+import shlex
 import shutil
 import threading
 import uuid
@@ -14,7 +16,12 @@ from fastapi import HTTPException
 from api.schemas.deployment import DeploymentRequest
 from api.schemas.deployment_job import DeploymentJobOut, JobStatus
 from services.inventory_preview import build_inventory_preview
+from services.infinito_nexus_versions import (
+    normalize_infinito_nexus_version,
+    resolve_job_runner_image,
+)
 from services.workspaces import WorkspaceService
+from services.workspaces.vault import _vault_password_from_kdbx
 
 from .paths import job_paths, jobs_root
 from .persistence import load_json, mask_request_for_persistence, write_meta
@@ -30,6 +37,106 @@ from .util import atomic_write_json, atomic_write_text, safe_mkdir, utc_iso
 from .log_hub import LogHub
 
 _WORKSPACE_SKIP_FILES = {"workspace.json", "credentials.kdbx"}
+
+_BAUDOLO_SEED_SHIM = """#!/usr/bin/env python3
+import csv
+import os
+import re
+import sys
+
+DB_NAME_RE = re.compile(r"^[a-zA-Z0-9_][a-zA-Z0-9_-]*$")
+FIELDNAMES = ["instance", "database", "username", "password"]
+
+
+def _validate_database(value: str, *, instance: str) -> str:
+    database = (value or "").strip()
+    if not database:
+        raise ValueError(
+            "Invalid databases.csv entry for instance "
+            f"'{instance}': column 'database' must be '*' or a concrete database name."
+        )
+    if database == "*":
+        return database
+    if database.lower() == "nan":
+        raise ValueError(
+            f"Invalid databases.csv entry for instance '{instance}': database must not be 'nan'."
+        )
+    if not DB_NAME_RE.match(database):
+        raise ValueError(
+            "Invalid databases.csv entry for instance "
+            f"'{instance}': invalid database name '{database}'."
+        )
+    return database
+
+
+def _read_rows(path: str) -> list[dict[str, str]]:
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle, delimiter=";")
+            if not reader.fieldnames:
+                print(
+                    f"WARNING: databases.csv exists but is empty: {path}. Creating header columns.",
+                    file=sys.stderr,
+                )
+                return []
+            return [{key: str(value or "") for key, value in row.items()} for row in reader]
+    except StopIteration:
+        print(
+            f"WARNING: databases.csv exists but is empty: {path}. Creating header columns.",
+            file=sys.stderr,
+        )
+        return []
+
+
+def _write_rows(path: str, rows: list[dict[str, str]]) -> None:
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=FIELDNAMES, delimiter=";")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({key: row.get(key, "") for key in FIELDNAMES})
+
+
+def main() -> int:
+    if len(sys.argv) != 6:
+        print(
+            "ERROR: expected arguments: <file> <instance> <database> <username> <password>",
+            file=sys.stderr,
+        )
+        return 1
+
+    file_path, instance, database, username, password = sys.argv[1:]
+    try:
+        database = _validate_database(database, instance=instance)
+        rows = _read_rows(file_path)
+        updated = False
+        for row in rows:
+            if row.get("instance") == instance and row.get("database") == database:
+                row["username"] = username
+                row["password"] = password
+                updated = True
+                break
+        if not updated:
+            rows.append(
+                {
+                    "instance": instance,
+                    "database": database,
+                    "username": username,
+                    "password": password,
+                }
+            )
+        _write_rows(file_path, rows)
+        return 0
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+"""
 
 
 class JobRunnerService:
@@ -88,6 +195,11 @@ class JobRunnerService:
             return []
         return []
 
+    def _write_controller_shims(self, dest_root: Path) -> None:
+        baudolo_seed_path = dest_root / "baudolo-seed"
+        atomic_write_text(baudolo_seed_path, _BAUDOLO_SEED_SHIM)
+        baudolo_seed_path.chmod(0o755)
+
     def create(self, req: DeploymentRequest) -> DeploymentJobOut:
         job_id = uuid.uuid4().hex[:12]
         p = job_paths(job_id)
@@ -100,6 +212,9 @@ class JobRunnerService:
             atomic_write_text(p.inventory_path, inv_yaml)
 
         secrets = collect_secrets(req)
+        runtime_vault_password = self._resolve_runtime_vault_password(req)
+        if runtime_vault_password and runtime_vault_password not in secrets:
+            secrets.append(runtime_vault_password)
         vars_data = self._build_vars(req, p, secrets)
         roles_from_inventory: List[str] = []
         if req.workspace_id and p.inventory_path.is_file():
@@ -122,6 +237,7 @@ class JobRunnerService:
 
         write_runner_script(p.run_path)
         self._write_infinito_shim(p.job_dir)
+        self._write_controller_shims(p.job_dir)
         self._remember_secrets(job_id, secrets)
 
         meta: Dict[str, Any] = {
@@ -139,6 +255,14 @@ class JobRunnerService:
         runner_args = None
         if not os.environ.get("RUNNER_CMD"):
             cfg = load_container_config()
+            selected_version = self._resolve_infinito_nexus_version(req)
+            cfg = replace(
+                cfg,
+                image=resolve_job_runner_image(
+                    selected_version,
+                    base_image=cfg.image,
+                ),
+            )
             inventory_arg = f"{cfg.workdir}/inventory.yml"
 
             cli_args = self._build_runner_args(
@@ -152,9 +276,16 @@ class JobRunnerService:
                 job_id=job_id,
                 job_dir=p.job_dir,
                 cli_args=cli_args,
+                runtime_env={
+                    "INFINITO_RUNTIME_PASSWORD": req.auth.password or "",
+                    "INFINITO_RUNTIME_SSH_PASS": req.auth.passphrase or "",
+                    "INFINITO_RUNTIME_VAULT_PASSWORD": runtime_vault_password or "",
+                },
                 cfg=cfg,
             )
             meta["container_id"] = container_id
+            meta["infinito_nexus_version"] = selected_version
+            meta["job_runner_image"] = cfg.image
             if cfg.skip_cleanup:
                 meta["skip_cleanup"] = True
             if cfg.skip_build:
@@ -300,8 +431,58 @@ class JobRunnerService:
                 merged_vars["ansible_ssh_pass"] = "<provided_at_runtime>"
         elif req.auth.method == "password":
             merged_vars["ansible_password"] = "<provided_at_runtime>"
+            merged_vars["ansible_become_password"] = "<provided_at_runtime>"
 
         return merged_vars
+
+    def _workspace_requires_vault(self, workspace_root: Path) -> bool:
+        for dirpath, dirnames, filenames in os.walk(workspace_root):
+            dirnames[:] = [
+                d for d in dirnames if not d.startswith(".") and d != "secrets"
+            ]
+            for fname in filenames:
+                path = Path(dirpath) / fname
+                try:
+                    text = path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+                if "!vault |" in text or "$ANSIBLE_VAULT;" in text:
+                    return True
+        return False
+
+    def _resolve_runtime_vault_password(self, req: DeploymentRequest) -> str | None:
+        workspace_id = (req.workspace_id or "").strip()
+        if not workspace_id:
+            return None
+
+        workspace_root = WorkspaceService().ensure(workspace_id)
+        if not self._workspace_requires_vault(workspace_root):
+            return None
+
+        if not req.master_password:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "master_password is required for workspaces with "
+                    "vault-encrypted values"
+                ),
+            )
+
+        return _vault_password_from_kdbx(workspace_root, req.master_password)
+
+    def _resolve_infinito_nexus_version(self, req: DeploymentRequest) -> str:
+        requested = str(req.infinito_nexus_version or "").strip()
+        if requested:
+            return normalize_infinito_nexus_version(requested)
+
+        workspace_root = WorkspaceService().ensure(req.workspace_id)
+        try:
+            meta = load_json(workspace_root / "workspace.json")
+        except Exception:
+            meta = {}
+        return normalize_infinito_nexus_version(
+            str(meta.get("infinito_nexus_version") or "").strip() or "latest"
+        )
 
     def _build_runner_args(
         self,
@@ -336,6 +517,16 @@ class JobRunnerService:
             cmd.append("--id")
             cmd.extend(roles)
 
+        extra_args_raw = (os.getenv("JOB_RUNNER_ANSIBLE_ARGS") or "").strip()
+        if extra_args_raw:
+            try:
+                cmd.extend(shlex.split(extra_args_raw))
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"invalid JOB_RUNNER_ANSIBLE_ARGS: {exc}",
+                ) from exc
+
         return cmd
 
     def _write_infinito_shim(self, job_dir: Path) -> None:
@@ -344,6 +535,16 @@ class JobRunnerService:
             return
         script = """#!/usr/bin/env bash
 set -euo pipefail
+
+repo_root="${JOB_RUNNER_REPO_DIR:-${PYTHONPATH%%:*}}"
+if [ -n "${repo_root}" ] && [ -d "${repo_root}" ]; then
+  cd "${repo_root}"
+fi
+
+runtime_python="${PYTHON:-/opt/venvs/infinito/bin/python}"
+if [ -x "${runtime_python}" ]; then
+  exec "${runtime_python}" -m cli.__main__ "$@"
+fi
 
 if command -v python3 >/dev/null 2>&1; then
   exec python3 -m cli.__main__ "$@"

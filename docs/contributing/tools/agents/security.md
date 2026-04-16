@@ -35,6 +35,8 @@ Patterns use shell-style wildcards: `*` matches any substring. Matching is again
 | `Bash(docker restart*)` | Restart existing containers | Medium — brief downtime; no new state. |
 | `Bash(docker compose*)` | Full Compose orchestration | High — can start, stop, rebuild, and wipe any service defined in `docker-compose.yml`. |
 | `Bash(docker exec*)` | Run commands inside containers | High — effectively shell access inside services. |
+| `Bash(docker network*)` | Inspect/create/remove Docker networks | Medium — modifies Docker networking state; can disconnect running containers. |
+| `Bash(docker volume*)` | Inspect/create/remove Docker volumes | Medium — destructive on volume data when used with `rm`/`prune`. |
 | `Bash(sleep*)` | Delay | Low. |
 | `Bash(grep*)` / `find*` / `ls*` / `cat*` / `head*` / `tail*` / `wc*` / `sort*` / `jq*` | Read-only inspection utilities | Low — subject to `sandbox.denyRead`. |
 | `Bash(sed -n *.log)` | Print ranges from log files | Low — constrained to non-edit mode (`-n`) and `.log` suffix. |
@@ -45,8 +47,11 @@ Patterns use shell-style wildcards: `*` matches any substring. Matching is again
 | `Bash(netstat*)` | Network/socket inspection | Low — read-only. |
 | `Bash(fuser*)` | Port/file user lookup; can kill with `-k` | Medium — `-k` terminates processes. |
 | `Bash(pkill*)` | Kill processes by name pattern | High — can kill any non-root user process; wide-ranging wildcards are easy to mistype. |
+| `Bash(unzip -l examples/workspace-import.zip)` | List contents of the bundled example workspace archive | Low — scoped to a single file and list-only (no extraction). |
 | `WebSearch` | Web search via Claude tooling | Low–Medium — content is fetched for context. |
-| `WebFetch(domain:*)` | Fetch allow-listed domains only | Low — scoped per domain; see list in settings. |
+| `WebFetch(domain:github.com)` / `raw.githubusercontent.com` / `api.github.com` | GitHub web/API + raw content | Low — read-only sources. |
+| `WebFetch(domain:docs.docker.com)` / `docs.python.org` / `pypi.org` / `nodejs.org` / `playwright.dev` / `fastapi.tiangolo.com` | Upstream framework/runtime docs | Low — read-only reference material. |
+| `WebFetch(domain:infinito.nexus)` / `docs.infinito.nexus` / `s.infinito.nexus` / `infinito.example` / `cybermaster.space` | Project-owned docs and reference sites | Low — first-party content. |
 
 ### `permissions.deny`
 

@@ -274,13 +274,13 @@ export function buildCredentialsPatchFromHostVarsData(data, credentials) {
     nextPort,
   } = parseHostVarsValues(data);
   const patch = {};
-  if (nextHost && nextHost !== credentials.host) {
+  if (nextHost && !credentials.host) {
     patch.host = nextHost;
   }
-  if (nextUser && nextUser !== credentials.user) {
+  if (nextUser && (!credentials.user || credentials.user === "root") && nextUser !== "root") {
     patch.user = nextUser;
   }
-  if (nextPort && nextPort !== credentials.port) {
+  if (nextPort && (!credentials.port || credentials.port === "22") && nextPort !== "22") {
     patch.port = nextPort;
   }
   if (nextDescription !== credentials.description) {

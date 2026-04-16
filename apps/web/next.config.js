@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  experimental: {
+    proxyTimeout: 600000,
+  },
   async rewrites() {
     const target = (process.env.API_PROXY_TARGET || "http://api:8000").replace(
       /\/+$/,

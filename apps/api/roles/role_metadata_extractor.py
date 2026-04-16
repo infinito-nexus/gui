@@ -223,9 +223,13 @@ def _load_nexus_types_from_group_names(
     repo_root: str,
 ) -> Callable[[List[str]], List[str]]:
     repo_path = Path(repo_root)
-    invokable_py = repo_path / "module_utils" / "invokable.py"
+    invokable_py = repo_path / "utils" / "invokable.py"
     if not invokable_py.is_file():
-        raise FileNotFoundError(f"Nexus SPOT module not found: {invokable_py}")
+        legacy = repo_path / "module_utils" / "invokable.py"
+        if legacy.is_file():
+            invokable_py = legacy
+        else:
+            raise FileNotFoundError(f"Nexus SPOT module not found: {invokable_py}")
 
     # Keep Nexus repo importable for module-internal imports such as
     # `from filter_plugins.invokable_paths import ...`.

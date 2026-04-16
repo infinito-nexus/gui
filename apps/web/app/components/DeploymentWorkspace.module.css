@@ -656,6 +656,26 @@
   font-size: 12px;
 }
 
+.serverTableMetaGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.versionSelectLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--deployer-muted-ink);
+}
+
+.versionSelect {
+  min-width: 152px;
+}
+
 .serverTableHeader {
   display: grid;
   grid-template-columns: var(--deploy-table-columns);

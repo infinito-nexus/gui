@@ -39,6 +39,8 @@
       "Bash(docker restart*)",
       "Bash(docker compose*)",
       "Bash(docker exec*)",
+      "Bash(docker network*)",
+      "Bash(docker volume*)",
       "Bash(sleep*)",
       "Bash(grep*)",
       "Bash(sed -n *.log)",
@@ -74,7 +76,8 @@
       "Bash(chmod +x *.sh)",
       "Bash(netstat*)",
       "Bash(fuser*)",
-      "Bash(pkill*)"
+      "Bash(pkill*)",
+      "Bash(unzip -l examples/workspace-import.zip)"
     ],
     "deny": [
       "Bash(git push --force*)",

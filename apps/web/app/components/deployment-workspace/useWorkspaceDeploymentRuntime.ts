@@ -4,6 +4,11 @@ import { useCallback, useMemo } from "react";
 import type { CSSProperties, Dispatch, MutableRefObject, SetStateAction } from "react";
 import styles from "../DeploymentWorkspace.module.css";
 import { buildDeploymentPayload } from "../../lib/deployment_payload";
+import {
+  clearWorkspaceMasterPassword,
+  getWorkspaceMasterPassword,
+  promptWorkspaceMasterPassword,
+} from "../../lib/workspaceVaultSession";
 import type {
   ConnectionResult,
   ServerState,
@@ -21,6 +26,7 @@ type UseWorkspaceDeploymentRuntimeProps = {
   deployRoleFilter: Set<string>;
   workspaceId: string | null;
   inventoryReady: boolean;
+  infinitoNexusVersion: string;
   deploying: boolean;
   setDeploying: Dispatch<SetStateAction<boolean>>;
   setDeployError: Dispatch<SetStateAction<string | null>>;
@@ -49,6 +55,7 @@ export function useWorkspaceDeploymentRuntime({
   deployRoleFilter,
   workspaceId,
   inventoryReady,
+  infinitoNexusVersion,
   deploying,
   setDeploying,
   setDeployError,
@@ -76,6 +83,7 @@ export function useWorkspaceDeploymentRuntime({
         roleFilter: Array.from(deployRoleFilter),
         workspaceId,
         inventoryReady,
+        infinitoNexusVersion,
       }),
     [
       activeServer,
@@ -85,6 +93,7 @@ export function useWorkspaceDeploymentRuntime({
       deployRoleFilter,
       workspaceId,
       inventoryReady,
+      infinitoNexusVersion,
     ]
   );
 
@@ -102,13 +111,46 @@ export function useWorkspaceDeploymentRuntime({
     lastDeploymentSelectionRef.current = Array.from(deploySelection);
     setDeploying(true);
     try {
-      const res = await fetch(`${baseUrl}/api/deployments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(deploymentPlan.payload),
-      });
+      const postDeployment = async (payload: Record<string, unknown>) =>
+        fetch(`${baseUrl}/api/deployments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+      let payload: Record<string, unknown> = { ...deploymentPlan.payload };
+      const cachedMasterPassword = getWorkspaceMasterPassword(workspaceId);
+      if (cachedMasterPassword) {
+        payload = {
+          ...payload,
+          master_password: cachedMasterPassword,
+        };
+      }
+
+      let res = await postDeployment(payload);
       if (!res.ok) {
-        throw new Error(await parseApiError(res));
+        let message = await parseApiError(res);
+        const needsVaultPassword =
+          /master_password is required for workspaces with vault-encrypted values/i.test(
+            message
+          ) || /invalid master password/i.test(message);
+
+        if (workspaceId && needsVaultPassword) {
+          clearWorkspaceMasterPassword(workspaceId);
+          const masterPassword = promptWorkspaceMasterPassword(workspaceId);
+          payload = {
+            ...deploymentPlan.payload,
+            master_password: masterPassword,
+          };
+          res = await postDeployment(payload);
+          if (!res.ok) {
+            message = await parseApiError(res);
+          }
+        }
+
+        if (!res.ok) {
+          throw new Error(message);
+        }
       }
       const data = await res.json();
       const created = String(data?.job_id ?? "");
@@ -130,6 +172,7 @@ export function useWorkspaceDeploymentRuntime({
     deploymentPlan.payload,
     lastDeploymentSelectionRef,
     onJobCreated,
+    workspaceId,
     setConnectRequestKey,
     setDeployError,
     setDeployViewTab,

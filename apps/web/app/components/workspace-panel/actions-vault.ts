@@ -1,3 +1,4 @@
+import { setWorkspaceMasterPassword } from "../../lib/workspaceVaultSession";
 import { extractVaultText, replaceVaultBlock } from "./utils";
 
 type CredentialsTarget = {
@@ -16,6 +17,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
     credentialsScope,
     credentialsRole,
     forceOverwrite,
+    hasCredentialsVault,
     pendingCredentials,
     vaultPromptMode,
     masterChangeValues,
@@ -108,6 +110,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
         masterPassword,
         aliasOverride
       );
+      setWorkspaceMasterPassword(workspaceId, masterPassword);
       setCredentialsStatus("Credentials generated.");
       await refreshFiles(workspaceId);
     } catch (err: any) {
@@ -150,7 +153,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
         targets,
       });
       setVaultPromptMode("generate");
-      setVaultPromptConfirm(false);
+      setVaultPromptConfirm(!hasCredentialsVault);
       setVaultPromptOpen(true);
       return;
     }
@@ -166,7 +169,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
       alias,
     });
     setVaultPromptMode("generate");
-    setVaultPromptConfirm(false);
+    setVaultPromptConfirm(!hasCredentialsVault);
     setVaultPromptOpen(true);
   };
 
@@ -198,6 +201,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
                 throw new Error(`${target.alias}: ${toUserError(err, "credential generation failed")}`);
               }
             }
+            setWorkspaceMasterPassword(workspaceId, masterPassword);
             const updatedTargets = pendingCredentials.targets.length;
             setCredentialsStatus(`Credentials generated for ${updatedTargets} device target(s).`);
             await refreshFiles(workspaceId);
@@ -248,6 +252,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
           const data = await res.json();
           const updatedValues = Number(data?.updated_values ?? 0);
           const updatedFiles = Number(data?.updated_files ?? 0);
+          setWorkspaceMasterPassword(workspaceId, masterPassword);
           setCredentialsStatus(
             `Vault password reset (${updatedValues} values in ${updatedFiles} files).`
           );
@@ -285,6 +290,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
       }
       setMasterChangeOpen(false);
       setMasterChangeValues({ current: "", next: "", confirm: "" });
+      setWorkspaceMasterPassword(workspaceId, masterChangeValues.next);
       setCredentialsStatus(
         masterChangeMode === "set"
           ? "Master password set."
@@ -399,6 +405,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
           throw new Error(text || `HTTP ${res.status}`);
         }
         const data = await res.json();
+        setWorkspaceMasterPassword(workspaceId, vaultValueInputs.master);
         setVaultValueModal({
           ...vaultValueModal,
           plaintext: String(data?.plaintext ?? ""),
@@ -420,6 +427,7 @@ export function createWorkspacePanelVaultActions(ctx: any) {
         throw new Error(text || `HTTP ${res.status}`);
       }
       const data = await res.json();
+      setWorkspaceMasterPassword(workspaceId, vaultValueInputs.master);
       const nextContent = replaceVaultBlock(
         lines,
         vaultValueModal.block,

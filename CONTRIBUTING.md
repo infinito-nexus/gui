@@ -15,7 +15,7 @@ Follow these steps to make your first contribution.
 1. [Create a fork and a branch with the right prefix](docs/contributing/flow/workflow.md).
 2. [Set up your local environment](docs/contributing/environment/setup.md).
 3. [Make a focused change](docs/contributing/flow/workflow.md).
-4. [Use the development and testing guide](docs/contributing/flow/testing.md).
+4. [Use the development and testing guide](docs/contributing/testing/common.md).
 5. [Push to your fork](docs/contributing/flow/workflow.md).
 6. [Open a Pull Request with the right template](docs/contributing/flow/pull-request.md).
 7. [Request review and address feedback in your fork](docs/contributing/flow/review.md).

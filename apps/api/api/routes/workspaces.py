@@ -30,6 +30,10 @@ from api.schemas.workspace import (
     WorkspaceRoleAppConfigImportOut,
     WorkspaceRoleAppConfigIn,
     WorkspaceRoleAppConfigOut,
+    WorkspaceRuntimeSettingsIn,
+    WorkspaceRuntimeSettingsOut,
+    WorkspaceServerConnectionIn,
+    WorkspaceServerConnectionOut,
     WorkspaceSshKeygenIn,
     WorkspaceSshKeygenOut,
     WorkspaceUploadPreviewOut,
@@ -63,6 +67,31 @@ def _require_workspace(request: Request, workspace_id: str) -> None:
 def list_files(workspace_id: str, request: Request) -> WorkspaceFileListOut:
     _require_workspace(request, workspace_id)
     return WorkspaceFileListOut(files=_svc().list_files(workspace_id))
+
+
+@router.get(
+    "/{workspace_id}/runtime-settings", response_model=WorkspaceRuntimeSettingsOut
+)
+def get_runtime_settings(
+    workspace_id: str, request: Request
+) -> WorkspaceRuntimeSettingsOut:
+    _require_workspace(request, workspace_id)
+    data = _svc().get_runtime_settings(workspace_id)
+    return WorkspaceRuntimeSettingsOut(**data)
+
+
+@router.put(
+    "/{workspace_id}/runtime-settings", response_model=WorkspaceRuntimeSettingsOut
+)
+def update_runtime_settings(
+    workspace_id: str, payload: WorkspaceRuntimeSettingsIn, request: Request
+) -> WorkspaceRuntimeSettingsOut:
+    _require_workspace(request, workspace_id)
+    data = _svc().update_runtime_settings(
+        workspace_id,
+        infinito_nexus_version=payload.infinito_nexus_version,
+    )
+    return WorkspaceRuntimeSettingsOut(**data)
 
 
 @router.get("/{workspace_id}/download/{path:path}")
@@ -419,6 +448,27 @@ def test_connection(
         key_passphrase=payload.key_passphrase,
     )
     return WorkspaceConnectionTestOut(**data)
+
+
+@router.put(
+    "/{workspace_id}/servers/{alias}/connection",
+    response_model=WorkspaceServerConnectionOut,
+)
+def set_server_connection(
+    workspace_id: str,
+    alias: str,
+    payload: WorkspaceServerConnectionIn,
+    request: Request,
+) -> WorkspaceServerConnectionOut:
+    _require_workspace(request, workspace_id)
+    data = _svc().upsert_server_connection(
+        workspace_id=workspace_id,
+        alias=alias,
+        host=payload.host,
+        user=payload.user,
+        port=payload.port,
+    )
+    return WorkspaceServerConnectionOut(workspace_id=workspace_id, **data)
 
 
 @router.get("/{workspace_id}/download.zip")

@@ -157,6 +157,7 @@ export default function RoleGridView({
             return (
               <article
                 key={role.id}
+                data-role-id={role.id}
                 className={`${styles.cardBase} ${styles.horizontalCard} ${
                   selectedState ? styles.cardSelected : styles.cardDefault
                 } ${isDeselectionFlashing ? styles.cardDeselectedFlash : ""}`}
@@ -237,6 +238,7 @@ export default function RoleGridView({
             return (
               <article
                 key={role.id}
+                data-role-id={role.id}
                 onMouseEnter={() => setHoveredRoleId(role.id)}
                 onMouseLeave={() => setHoveredRoleId(null)}
                 onFocus={() => setHoveredRoleId(role.id)}
@@ -292,6 +294,7 @@ export default function RoleGridView({
           return (
             <article
               key={role.id}
+              data-role-id={role.id}
               className={`${styles.cardBase} ${styles.detailCard} ${
                 selectedState ? styles.cardSelected : styles.cardDefault
               } ${isDeselectionFlashing ? styles.cardDeselectedFlash : ""}`}

@@ -9,6 +9,7 @@ import { validateForm } from "./deploy_form.js";
  * @param {string[]} [args.roleFilter]
  * @param {string | null} args.workspaceId
  * @param {boolean} args.inventoryReady
+ * @param {string} [args.infinitoNexusVersion]
  */
 export function buildDeploymentPayload({
   activeServer,
@@ -18,6 +19,7 @@ export function buildDeploymentPayload({
   roleFilter,
   workspaceId,
   inventoryReady,
+  infinitoNexusVersion,
 }) {
   const server = activeServer || {};
   const credentials = {
@@ -95,6 +97,10 @@ export function buildDeploymentPayload({
     auth,
     selected_roles: roles,
   };
+  const normalizedVersion = String(infinitoNexusVersion ?? "").trim();
+  if (normalizedVersion) {
+    payload.infinito_nexus_version = normalizedVersion;
+  }
 
   const portRaw = String(credentials.port ?? "").trim();
   if (portRaw) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type {
   ConnectionResult,
   ServerState,
@@ -7,7 +7,11 @@ import type {
   CredentialBlurPayload,
   PendingServerAction,
 } from "./DeploymentCredentialsForm.types";
-import { encodePath, sanitizeAliasFilename } from "../workspace-panel/utils";
+import {
+  getWorkspaceMasterPassword,
+  promptWorkspaceMasterPassword,
+} from "../../lib/workspaceVaultSession";
+import { encodePath } from "../workspace-panel/utils";
 
 type UseCredentialServerActionsArgs = {
   baseUrl: string;
@@ -31,6 +35,9 @@ export default function useCredentialServerActions({
   const [pendingAction, setPendingAction] = useState<PendingServerAction>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const serversRef = useRef(servers);
+  const connectionPersistVersionRef = useRef<Record<string, number>>({});
+  serversRef.current = servers;
 
   const parseErrorMessage = async (res: Response) => {
     try {
@@ -49,119 +56,41 @@ export default function useCredentialServerActions({
   };
 
   const promptMasterPassword = () => {
-    const value = window.prompt("Master password for credentials.kdbx");
-    const trimmed = String(value || "").trim();
-    if (!trimmed) {
-      throw new Error("Master password is required.");
-    }
-    return trimmed;
+    const cached = getWorkspaceMasterPassword(workspaceId);
+    if (cached) return cached;
+    return promptWorkspaceMasterPassword(workspaceId);
   };
 
-  const readWorkspaceFileOrEmpty = async (path: string) => {
-    if (!workspaceId) return "";
-    const res = await fetch(`${baseUrl}/api/workspaces/${workspaceId}/files/${encodePath(path)}`);
-    if (res.status === 404) return "";
+  const persistServerConnection = async (server: ServerState) => {
+    if (!workspaceId) return;
+    const host = String(server.host || "").trim();
+    const user = String(server.user || "").trim();
+    const portRaw = String(server.port || "").trim();
+    const portValue = Number(portRaw);
+    const portValid =
+      Number.isInteger(portValue) && portValue >= 1 && portValue <= 65535;
+
+    if (!host || !user || !portValid) {
+      return;
+    }
+
+    const res = await fetch(
+      `${baseUrl}/api/workspaces/${workspaceId}/servers/${encodeURIComponent(
+        server.alias
+      )}/connection`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          host,
+          user,
+          port: portValue,
+        }),
+      }
+    );
     if (!res.ok) {
       throw new Error(await parseErrorMessage(res));
     }
-    const data = await res.json();
-    return String(data?.content ?? "");
-  };
-
-  const writeWorkspaceFile = async (path: string, content: string) => {
-    if (!workspaceId) {
-      throw new Error("Workspace is not ready.");
-    }
-    const res = await fetch(`${baseUrl}/api/workspaces/${workspaceId}/files/${encodePath(path)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
-    });
-    if (!res.ok) {
-      throw new Error(await parseErrorMessage(res));
-    }
-  };
-
-  const upsertVaultYamlKey = (yamlText: string, key: string, vaultText: string): string => {
-    const content = String(yamlText || "").replace(/\r\n/g, "\n");
-    const keyRegex = new RegExp(`^(\\s*)${key}\\s*:\\s*!vault\\s*(\\|[-+]?)?\\s*$`);
-    const plainRegex = new RegExp(`^\\s*${key}\\s*:`);
-    const lines = content ? content.split("\n") : [];
-
-    let start = -1;
-    let end = -1;
-    for (let i = 0; i < lines.length; i += 1) {
-      const match = lines[i].match(keyRegex);
-      if (!match) continue;
-      start = i;
-      end = i;
-      const blockIndent = `${match[1] ?? ""}  `;
-      for (let j = i + 1; j < lines.length; j += 1) {
-        const next = lines[j];
-        if (j === i + 1 && !next.trim().startsWith("$ANSIBLE_VAULT")) {
-          break;
-        }
-        if (next.startsWith(blockIndent) || next.trim().startsWith("$ANSIBLE_VAULT")) {
-          end = j;
-          continue;
-        }
-        break;
-      }
-      break;
-    }
-
-    const blockLines = [
-      `${key}: !vault |`,
-      ...String(vaultText || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => `  ${line}`),
-    ];
-
-    let nextLines = [...lines];
-    if (start >= 0) {
-      nextLines.splice(start, end - start + 1, ...blockLines);
-    } else {
-      const plainIndex = nextLines.findIndex((line) => plainRegex.test(line));
-      if (plainIndex >= 0) {
-        nextLines.splice(plainIndex, 1, ...blockLines);
-      } else {
-        if (nextLines.length > 0 && nextLines[nextLines.length - 1].trim() !== "") {
-          nextLines.push("");
-        }
-        nextLines.push(...blockLines);
-      }
-    }
-
-    return `${nextLines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
-  };
-
-  const saveServerPasswordToHostVars = async (alias: string, password: string) => {
-    if (!workspaceId) {
-      throw new Error("Workspace is not ready.");
-    }
-    const masterPassword = promptMasterPassword();
-    const encryptRes = await fetch(`${baseUrl}/api/workspaces/${workspaceId}/vault/encrypt`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        master_password: masterPassword,
-        plaintext: password,
-      }),
-    });
-    if (!encryptRes.ok) {
-      throw new Error(await parseErrorMessage(encryptRes));
-    }
-    const encrypted = await encryptRes.json();
-    const vaultText = String(encrypted?.vault_text ?? "").trim();
-    if (!vaultText) {
-      throw new Error("Failed to encrypt server password.");
-    }
-    const hostVarsPath = `host_vars/${sanitizeAliasFilename(alias)}.yml`;
-    const current = await readWorkspaceFileOrEmpty(hostVarsPath);
-    const next = upsertVaultYamlKey(current, "ansible_password", vaultText);
-    await writeWorkspaceFile(hostVarsPath, next);
   };
 
   const saveKeyPassphraseToVault = async (alias: string, keyPassphrase: string) => {
@@ -270,21 +199,51 @@ export default function useCredentialServerActions({
 
   const handleCredentialFieldBlur = async (payload: CredentialBlurPayload) => {
     const { server, field, passwordConfirm: confirmValue } = payload;
+    const refServer = serversRef.current.find((entry) => entry.alias === server.alias);
+    const baseServer = refServer ?? servers.find((entry) => entry.alias === server.alias) ?? server;
+    const fieldToKey: Record<string, keyof ServerState | undefined> = {
+      host: "host",
+      port: "port",
+      user: "user",
+      password: "password",
+      keyPassphrase: "keyPassphrase",
+      privateKey: "privateKey",
+      primaryDomain: "primaryDomain",
+    };
+    const overrideKey = fieldToKey[field];
+    const resolvedServer: ServerState = overrideKey
+      ? ({ ...baseServer, [overrideKey]: (server as any)[overrideKey] } as ServerState)
+      : ({ ...baseServer } as ServerState);
 
-    if (server.authMethod === "password" && (field === "password" || field === "passwordConfirm")) {
-      const password = String(server.password || "");
+    if (field === "host" || field === "port" || field === "user") {
+      const alias = resolvedServer.alias;
+      const nextVersion =
+        (connectionPersistVersionRef.current[alias] || 0) + 1;
+      connectionPersistVersionRef.current[alias] = nextVersion;
+      await new Promise<void>((resolve) => {
+        window.setTimeout(resolve, 75);
+      });
+      if (connectionPersistVersionRef.current[alias] !== nextVersion) {
+        return;
+      }
+      await persistServerConnection(resolvedServer);
+    }
+
+    if (
+      resolvedServer.authMethod === "password" &&
+      (field === "password" || field === "passwordConfirm")
+    ) {
+      const password = String(resolvedServer.password || "");
       const confirm = String(confirmValue || "");
-      if (password && confirm && password === confirm) {
-        await saveServerPasswordToHostVars(server.alias, password);
-      } else if (password && confirm && password !== confirm) {
+      if (password && confirm && password !== confirm) {
         throw new Error("Password confirmation mismatch.");
       }
     }
 
-    if (server.authMethod === "private_key" && field === "keyPassphrase") {
-      const keyPassphrase = String(server.keyPassphrase || "");
+    if (resolvedServer.authMethod === "private_key" && field === "keyPassphrase") {
+      const keyPassphrase = String(resolvedServer.keyPassphrase || "");
       if (keyPassphrase.trim()) {
-        await saveKeyPassphraseToVault(server.alias, keyPassphrase);
+        await saveKeyPassphraseToVault(resolvedServer.alias, keyPassphrase);
       }
     }
 
@@ -294,8 +253,8 @@ export default function useCredentialServerActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workspace_id: workspaceId,
-          alias: server.alias,
-          primary_domain: String(server.primaryDomain || "").trim() || null,
+          alias: resolvedServer.alias,
+          primary_domain: String(resolvedServer.primaryDomain || "").trim() || null,
         }),
       });
       if (!res.ok) {
@@ -303,8 +262,8 @@ export default function useCredentialServerActions({
       }
     }
 
-    if (canTestConnection(server)) {
-      await testConnection(server);
+    if (canTestConnection(resolvedServer)) {
+      await testConnection(resolvedServer);
     }
   };
 

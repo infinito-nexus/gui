@@ -6,7 +6,7 @@ import subprocess
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import HTTPException
 
@@ -20,7 +20,6 @@ class ContainerRunnerConfig:
     workdir: str
     network: Optional[str]
     extra_args: List[str]
-    repo_host_path: Optional[str]
     skip_cleanup: bool
     skip_build: bool
 
@@ -56,25 +55,12 @@ def load_container_config() -> ContainerRunnerConfig:
     extra_raw = (os.getenv("JOB_RUNNER_DOCKER_ARGS") or "").strip()
     extra_args = shlex.split(extra_raw) if extra_raw else []
 
-    repo_host_path = (os.getenv("JOB_RUNNER_REPO_HOST_PATH") or "").strip() or None
-    if repo_host_path:
-        repo_host_path_path = _require_absolute(
-            repo_host_path, "JOB_RUNNER_REPO_HOST_PATH"
-        )
-        if not repo_host_path_path.is_dir():
-            raise HTTPException(
-                status_code=500,
-                detail="JOB_RUNNER_REPO_HOST_PATH is invalid",
-            )
-        repo_host_path = str(repo_host_path_path)
-
     return ContainerRunnerConfig(
         image=image,
         repo_dir=repo_dir,
         workdir=workdir,
         network=network,
         extra_args=extra_args,
-        repo_host_path=repo_host_path,
         skip_cleanup=env_bool("JOB_RUNNER_SKIP_CLEANUP", False),
         skip_build=env_bool("JOB_RUNNER_SKIP_BUILD", False),
     )
@@ -121,6 +107,7 @@ def build_container_command(
     job_id: str,
     job_dir: Path,
     cli_args: List[str],
+    runtime_env: Optional[Dict[str, str]] = None,
     cfg: Optional[ContainerRunnerConfig] = None,
 ) -> Tuple[List[str], str, ContainerRunnerConfig]:
     cfg = cfg or load_container_config()
@@ -128,9 +115,62 @@ def build_container_command(
     host_job_dir = resolve_host_job_dir(job_dir)
 
     container_name = f"infinito-job-{job_id}"
-    inner_cmd = f"export PATH={shlex.quote(cfg.workdir)}:$PATH; " + " ".join(
-        shlex.quote(arg) for arg in cli_args
-    )
+    inner_cmd = f"""set -euo pipefail
+export PATH={shlex.quote(cfg.workdir)}:$PATH
+if [ -x {shlex.quote(cfg.workdir)}/baudolo-seed ]; then
+  ln -sf {shlex.quote(cfg.workdir)}/baudolo-seed /usr/local/bin/baudolo-seed
+fi
+runtime_python="${{PYTHON:-/opt/venvs/infinito/bin/python}}"
+if [ ! -x "${{runtime_python}}" ]; then
+  runtime_python="$(command -v python3 || command -v python)"
+fi
+runtime_bin_dir="$(dirname "${{runtime_python}}")"
+export PATH={shlex.quote(cfg.workdir)}:"${{runtime_bin_dir}}":$PATH
+repo_root="${{JOB_RUNNER_REPO_DIR:-{shlex.quote(cfg.repo_dir)}}}"
+cd "${{repo_root}}"
+if ! "${{runtime_python}}" -c "import yaml" >/dev/null 2>&1; then
+  "${{runtime_python}}" -m pip install --disable-pip-version-check --no-cache-dir --break-system-packages pyyaml
+fi
+runtime_vars_file=""
+cleanup() {{
+  if [ -n "${{runtime_vars_file}}" ] && [ -f "${{runtime_vars_file}}" ]; then
+    rm -f "${{runtime_vars_file}}"
+  fi
+  if [ -n "${{runtime_vault_file:-}}" ] && [ -f "${{runtime_vault_file}}" ]; then
+    rm -f "${{runtime_vault_file}}"
+  fi
+}}
+trap cleanup EXIT
+if [ -n "${{INFINITO_RUNTIME_VAULT_PASSWORD:-}}" ]; then
+  runtime_vault_file="/tmp/infinito-runtime-vault.pass"
+  printf '%s' "${{INFINITO_RUNTIME_VAULT_PASSWORD}}" > "${{runtime_vault_file}}"
+  chmod 600 "${{runtime_vault_file}}"
+  export ANSIBLE_VAULT_PASSWORD_FILE="${{runtime_vault_file}}"
+fi
+if [ -n "${{INFINITO_RUNTIME_PASSWORD:-}}" ] || [ -n "${{INFINITO_RUNTIME_SSH_PASS:-}}" ]; then
+  runtime_vars_file="/tmp/infinito-runtime-vars.json"
+  "${{runtime_python}}" - "${{runtime_vars_file}}" <<'PY'
+import json
+import os
+import sys
+
+path = sys.argv[1]
+data = {{}}
+password = os.getenv("INFINITO_RUNTIME_PASSWORD")
+ssh_pass = os.getenv("INFINITO_RUNTIME_SSH_PASS")
+if password:
+    data["ansible_password"] = password
+    data["ansible_become_password"] = password
+if ssh_pass:
+    data["ansible_ssh_pass"] = ssh_pass
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(data, handle)
+PY
+  chmod 600 "${{runtime_vars_file}}"
+  exec "$@" -e "@${{runtime_vars_file}}"
+fi
+exec "$@"
+"""
 
     cmd: List[str] = [
         docker_bin,
@@ -148,21 +188,32 @@ def build_container_command(
 
     cmd.extend(["-v", f"{host_job_dir}:{cfg.workdir}"])
 
-    if cfg.repo_host_path:
-        cmd.extend(["-v", f"{cfg.repo_host_path}:{cfg.repo_dir}:ro"])
+    for key, value in (runtime_env or {}).items():
+        key_name = str(key or "").strip()
+        if not key_name:
+            continue
+        value_text = str(value or "")
+        if not value_text:
+            continue
+        cmd.extend(["-e", f"{key_name}={value_text}"])
 
     cmd.extend(
         [
+            "-e",
+            f"JOB_RUNNER_REPO_DIR={cfg.repo_dir}",
             "-e",
             f"PYTHONPATH={cfg.repo_dir}",
             "-e",
             "PYTHONUNBUFFERED=1",
             "-w",
             cfg.repo_dir,
-            cfg.image,
+            "--entrypoint",
             "/bin/bash",
+            cfg.image,
             "-lc",
             inner_cmd,
+            "container-runner",
+            *cli_args,
         ]
     )
 

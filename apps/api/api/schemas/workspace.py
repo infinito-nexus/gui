@@ -30,6 +30,14 @@ class WorkspaceDeleteOut(BaseModel):
     ok: bool
 
 
+class WorkspaceRuntimeSettingsIn(BaseModel):
+    infinito_nexus_version: str = Field(default="latest", min_length=1)
+
+
+class WorkspaceRuntimeSettingsOut(BaseModel):
+    infinito_nexus_version: str = "latest"
+
+
 class WorkspaceGenerateIn(BaseModel):
     alias: Optional[str] = Field(
         default=None, min_length=1, description="Inventory host alias"
@@ -261,3 +269,18 @@ class WorkspaceConnectionTestOut(BaseModel):
     ping_error: Optional[str] = None
     ssh_ok: bool
     ssh_error: Optional[str] = None
+
+
+class WorkspaceServerConnectionIn(BaseModel):
+    host: str = Field(..., min_length=1)
+    user: str = Field(..., min_length=1)
+    port: Optional[int] = Field(default=None, ge=1, le=65535)
+
+
+class WorkspaceServerConnectionOut(BaseModel):
+    workspace_id: str
+    alias: str
+    host_vars_path: str
+    host: str
+    user: str
+    port: Optional[int] = None

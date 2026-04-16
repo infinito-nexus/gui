@@ -15,6 +15,7 @@ class TestSecretsMasking(unittest.TestCase):
             workspace_id="abc123",
             host="localhost",
             user="root",
+            master_password="vault-master",
             auth={"method": "password", "password": "hunter2"},
             selected_roles=["base-role"],
         )
@@ -24,6 +25,7 @@ class TestSecretsMasking(unittest.TestCase):
         secrets = collect_secrets(req)
 
         self.assertIn("hunter2", secrets)
+        self.assertIn("vault-master", secrets)
 
     def test_mask_secrets_replaces_values_and_patterns(self) -> None:
         text = "password=hunter2 token=tok-123 sshpass -p secret"

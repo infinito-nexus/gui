@@ -115,6 +115,11 @@ type BuildDeploymentWorkspacePanelsProps = {
   onDeployViewTabChange: (tab: "live-log" | "terminal") => void;
   deployError: string | null;
   liveError: string | null;
+  infinitoNexusVersion: string;
+  infinitoNexusVersionOptions: Array<{ value: string; label: string }>;
+  infinitoNexusVersionBusy: boolean;
+  infinitoNexusVersionError: string | null;
+  onInfinitoNexusVersionChange: (value: string) => void;
   deployTableStyle: React.CSSProperties;
   deploySelection: Set<string>;
   deployRoleFilter: Set<string>;
@@ -218,6 +223,11 @@ export function buildDeploymentWorkspacePanels({
   onDeployViewTabChange,
   deployError,
   liveError,
+  infinitoNexusVersion,
+  infinitoNexusVersionOptions,
+  infinitoNexusVersionBusy,
+  infinitoNexusVersionError,
+  onInfinitoNexusVersionChange,
   deployTableStyle,
   deploySelection,
   deployRoleFilter,
@@ -372,6 +382,11 @@ export function buildDeploymentWorkspacePanels({
           onDeployViewTabChange={onDeployViewTabChange}
           deployError={deployError}
           liveError={liveError}
+          infinitoNexusVersion={infinitoNexusVersion}
+          infinitoNexusVersionOptions={infinitoNexusVersionOptions}
+          infinitoNexusVersionBusy={infinitoNexusVersionBusy}
+          infinitoNexusVersionError={infinitoNexusVersionError}
+          onInfinitoNexusVersionChange={onInfinitoNexusVersionChange}
           deployTableStyle={deployTableStyle}
           deploySelection={deploySelection}
           servers={servers}

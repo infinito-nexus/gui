@@ -21,6 +21,11 @@ type DeployPanelProps = {
   onDeployViewTabChange: (tab: "live-log" | "terminal") => void;
   deployError: string | null;
   liveError: string | null;
+  infinitoNexusVersion: string;
+  infinitoNexusVersionOptions: Array<{ value: string; label: string }>;
+  infinitoNexusVersionBusy: boolean;
+  infinitoNexusVersionError: string | null;
+  onInfinitoNexusVersionChange: (value: string) => void;
   deployTableStyle: CSSProperties;
   deploySelection: Set<string>;
   servers: ServerState[];
@@ -87,6 +92,11 @@ export default function DeployPanel({
   onDeployViewTabChange,
   deployError,
   liveError,
+  infinitoNexusVersion,
+  infinitoNexusVersionOptions,
+  infinitoNexusVersionBusy,
+  infinitoNexusVersionError,
+  onInfinitoNexusVersionChange,
   deployTableStyle,
   deploySelection,
   servers,
@@ -147,6 +157,9 @@ export default function DeployPanel({
 
       {deployError ? <div className={styles.errorText}>{deployError}</div> : null}
       {liveError ? <div className={styles.errorText}>{liveError}</div> : null}
+      {infinitoNexusVersionError ? (
+        <div className={styles.errorText}>{infinitoNexusVersionError}</div>
+      ) : null}
 
       <div className={styles.deployBody}>
         <div
@@ -158,9 +171,29 @@ export default function DeployPanel({
           <div className={styles.serverTableCard} style={deployTableStyle}>
             <div className={styles.serverTableTop}>
               <span className={styles.serverTableTitle}>Deploy devices</span>
-              <span className={`text-body-secondary ${styles.serverTableMeta}`}>
-                {deploySelection.size} selected
-              </span>
+              <div className={styles.serverTableMetaGroup}>
+                <label className={styles.versionSelectLabel}>
+                  <span>Infinito.Nexus</span>
+                  <select
+                    value={infinitoNexusVersion}
+                    onChange={(event) =>
+                      onInfinitoNexusVersionChange(event.target.value)
+                    }
+                    disabled={infinitoNexusVersionBusy}
+                    className={`form-select form-select-sm ${styles.versionSelect}`}
+                    aria-label="Infinito.Nexus version"
+                  >
+                    {infinitoNexusVersionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className={`text-body-secondary ${styles.serverTableMeta}`}>
+                  {deploySelection.size} selected
+                </span>
+              </div>
             </div>
             <div className={styles.serverTableHeader}>
               <span>Status</span>
@@ -215,6 +248,7 @@ export default function DeployPanel({
                 return (
                   <div
                     key={alias}
+                    data-server-alias={alias}
                     className={`${styles.serverRow} ${connectionState.rowClass} ${
                       isSelected ? styles.serverRowSelected : ""
                     } ${tintAllowed ? styles.serverRowTinted : ""}`}
@@ -347,6 +381,7 @@ export default function DeployPanel({
                     <div>
                       <input
                         type="checkbox"
+                        aria-label={`Select ${alias}`}
                         checked={isSelected}
                         disabled={!isSelectable}
                         onChange={() => onToggleDeployAlias(alias)}

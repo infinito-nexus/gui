@@ -62,6 +62,7 @@ export function useWorkspacePanelActions(ctx: any) {
     credentialsScope,
     credentialsRole,
     forceOverwrite,
+    hasCredentialsVault,
     pendingCredentials,
     vaultPromptMode,
     masterChangeValues,
@@ -99,7 +100,6 @@ export function useWorkspacePanelActions(ctx: any) {
     setUploadStatus,
     setFileOpError,
     isKdbx,
-    hasCredentialsVault,
   } = ctx;
 
   const coreActions = createWorkspacePanelCoreActions({
@@ -166,6 +166,7 @@ export function useWorkspacePanelActions(ctx: any) {
     credentialsScope,
     credentialsRole,
     forceOverwrite,
+    hasCredentialsVault,
     pendingCredentials,
     vaultPromptMode,
     masterChangeValues,

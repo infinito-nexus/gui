@@ -1,7 +1,7 @@
 # Makefile Commands
 
 Use these commands from the repository root. This is the SPOT for `make` targets in infinito-deployer.
-[Testing and Validation](../flow/testing.md) is the SPOT for when validation commands are required.
+[Testing and Validation](../testing/common.md) is the SPOT for when validation commands are required.
 
 ## Stack Management
 
@@ -37,7 +37,7 @@ Use these commands from the repository root. This is the SPOT for `make` targets
 | Category | Command | What it does | When to use it |
 |---|---|---|---|
 | Install dependencies | `make install` | Creates `.venv` and installs Python dependencies. | Use this before running tests on a fresh checkout. |
-| Run all tests | `make test` | Runs Python unit tests, Python integration tests, Node unit tests, and Node integration tests when present. | Use this when [Testing and Validation](../flow/testing.md) requires combined validation, or when you want the full local suite. |
+| Run all tests | `make test` | Runs Python unit tests, Python integration tests, Node unit tests, and Node integration tests when present. | Use this when [Testing and Validation](../testing/common.md) requires combined validation, or when you want the full local suite. |
 | Start test env | `make test-env-up` | Starts the SSH test environment (compose test profile). | Use this when testing SSH-based deployment flows. |
 | Stop test env | `make test-env-down` | Stops the SSH test environment. | Use this to clean up the test environment. |
 | Start arch test | `make test-arch` | Starts the architecture test container. | Use this for architecture validation. |

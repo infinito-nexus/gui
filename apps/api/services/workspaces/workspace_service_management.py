@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from services.infinito_nexus_versions import normalize_infinito_nexus_version
 from services.job_runner.util import atomic_write_text, safe_mkdir
 from .paths import workspace_dir, workspaces_root
 from .vault import _ensure_secrets_dirs
@@ -44,6 +45,7 @@ class WorkspaceServiceManagementMixin:
             "workspace_id": workspace_id,
             "created_at": _now_iso(),
             "inventory_generated_at": None,
+            "infinito_nexus_version": "latest",
             "selected_roles": [],
             "host": None,
             "user": None,
@@ -133,6 +135,32 @@ class WorkspaceServiceManagementMixin:
         meta["updated_at"] = _now_iso()
         _write_meta(root, meta)
 
+    def get_runtime_settings(self, workspace_id: str) -> dict[str, str]:
+        root = self.ensure(workspace_id)
+        meta = _load_meta(root)
+        return {
+            "infinito_nexus_version": normalize_infinito_nexus_version(
+                str(meta.get("infinito_nexus_version") or "").strip() or "latest"
+            )
+        }
+
+    def update_runtime_settings(
+        self, workspace_id: str, *, infinito_nexus_version: str | None
+    ) -> dict[str, str]:
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            meta = _load_meta(root)
+            meta["infinito_nexus_version"] = normalize_infinito_nexus_version(
+                infinito_nexus_version
+            )
+            meta["updated_at"] = _now_iso()
+            _write_meta(root, meta)
+            return {
+                "infinito_nexus_version": str(
+                    meta.get("infinito_nexus_version") or "latest"
+                )
+            }
+
     def list_files(self, workspace_id: str) -> list[dict[str, Any]]:
         root = self.ensure(workspace_id)
         entries: list[dict[str, Any]] = []
@@ -182,86 +210,96 @@ class WorkspaceServiceManagementMixin:
             ) from exc
 
     def write_file(self, workspace_id: str, rel_path: str, content: str) -> None:
-        root = self.ensure(workspace_id)
-        target = _safe_resolve(root, rel_path)
-        existed_before = target.exists()
-        safe_mkdir(target.parent)
-        try:
-            atomic_write_text(target, content)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500, detail=f"failed to write file: {exc}"
-            ) from exc
-        action = "edit" if existed_before else "create"
-        self._history_commit(root, f"{action}: {target.relative_to(root).as_posix()}")
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            target = _safe_resolve(root, rel_path)
+            existed_before = target.exists()
+            safe_mkdir(target.parent)
+            try:
+                atomic_write_text(target, content)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500, detail=f"failed to write file: {exc}"
+                ) from exc
+            action = "edit" if existed_before else "create"
+            self._history_commit(
+                root, f"{action}: {target.relative_to(root).as_posix()}"
+            )
 
     def create_dir(self, workspace_id: str, rel_path: str) -> str:
-        root = self.ensure(workspace_id)
-        raw = (rel_path or "").strip().lstrip("/")
-        if not raw:
-            raise HTTPException(status_code=400, detail="path required")
-        if raw.endswith("/"):
-            raw = raw.rstrip("/")
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            raw = (rel_path or "").strip().lstrip("/")
+            if not raw:
+                raise HTTPException(status_code=400, detail="path required")
+            if raw.endswith("/"):
+                raw = raw.rstrip("/")
 
-        target = _safe_resolve(root, raw)
-        if target.exists():
-            raise HTTPException(status_code=409, detail="target already exists")
+            target = _safe_resolve(root, raw)
+            if target.exists():
+                raise HTTPException(status_code=409, detail="target already exists")
 
-        try:
-            safe_mkdir(target)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500, detail=f"failed to create directory: {exc}"
-            ) from exc
-        path = target.relative_to(root).as_posix()
-        self._history_commit(root, f"create: {path}")
-        return path
+            try:
+                safe_mkdir(target)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500, detail=f"failed to create directory: {exc}"
+                ) from exc
+            path = target.relative_to(root).as_posix()
+            self._history_commit(root, f"create: {path}")
+            return path
 
     def rename_file(self, workspace_id: str, rel_path: str, new_path: str) -> str:
-        root = self.ensure(workspace_id)
-        source = _safe_resolve(root, rel_path)
-        if not source.exists():
-            raise HTTPException(status_code=404, detail="file not found")
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            source = _safe_resolve(root, rel_path)
+            if not source.exists():
+                raise HTTPException(status_code=404, detail="file not found")
 
-        raw_new_path = (new_path or "").strip().lstrip("/")
-        if not raw_new_path or raw_new_path.endswith("/"):
-            raise HTTPException(status_code=400, detail="invalid new path")
+            raw_new_path = (new_path or "").strip().lstrip("/")
+            if not raw_new_path or raw_new_path.endswith("/"):
+                raise HTTPException(status_code=400, detail="invalid new path")
 
-        destination = _safe_resolve(root, raw_new_path)
-        if source.is_dir() and source in destination.parents:
-            raise HTTPException(
-                status_code=400, detail="cannot move directory into itself"
+            destination = _safe_resolve(root, raw_new_path)
+            if source.is_dir() and source in destination.parents:
+                raise HTTPException(
+                    status_code=400, detail="cannot move directory into itself"
+                )
+            if destination.exists():
+                raise HTTPException(status_code=409, detail="target already exists")
+            if not destination.parent.exists():
+                raise HTTPException(
+                    status_code=400, detail="target directory missing"
+                )
+
+            try:
+                source.rename(destination)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500, detail=f"failed to rename file: {exc}"
+                ) from exc
+            self._history_commit(
+                root,
+                f"rename: {source.relative_to(root).as_posix()} -> {destination.relative_to(root).as_posix()}",
             )
-        if destination.exists():
-            raise HTTPException(status_code=409, detail="target already exists")
-        if not destination.parent.exists():
-            raise HTTPException(status_code=400, detail="target directory missing")
-
-        try:
-            source.rename(destination)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500, detail=f"failed to rename file: {exc}"
-            ) from exc
-        self._history_commit(
-            root,
-            f"rename: {source.relative_to(root).as_posix()} -> {destination.relative_to(root).as_posix()}",
-        )
-        return destination.relative_to(root).as_posix()
+            return destination.relative_to(root).as_posix()
 
     def delete_file(self, workspace_id: str, rel_path: str) -> None:
-        root = self.ensure(workspace_id)
-        target = _safe_resolve(root, rel_path)
-        if not target.exists():
-            raise HTTPException(status_code=404, detail="file not found")
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            target = _safe_resolve(root, rel_path)
+            if not target.exists():
+                raise HTTPException(status_code=404, detail="file not found")
 
-        try:
-            if target.is_dir():
-                shutil.rmtree(target)
-            else:
-                target.unlink()
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500, detail=f"failed to delete file: {exc}"
-            ) from exc
-        self._history_commit(root, f"delete: {target.relative_to(root).as_posix()}")
+            try:
+                if target.is_dir():
+                    shutil.rmtree(target)
+                else:
+                    target.unlink()
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500, detail=f"failed to delete file: {exc}"
+                ) from exc
+            self._history_commit(
+                root, f"delete: {target.relative_to(root).as_posix()}"
+            )

@@ -44,137 +44,139 @@ class WorkspaceServiceArtifactsMixin:
         force: bool,
         alias: str | None,
     ) -> None:
-        root = self.ensure(workspace_id)
-        meta = _load_meta(root)
-        role_ids = selected_roles or meta.get("selected_roles") or []
-        if not role_ids:
-            raise HTTPException(status_code=400, detail="no roles selected")
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            meta = _load_meta(root)
+            role_ids = selected_roles or meta.get("selected_roles") or []
+            if not role_ids:
+                raise HTTPException(status_code=400, detail="no roles selected")
 
-        vault_password = _vault_password_from_kdbx(
-            root,
-            master_password,
-            create_if_missing=True,
-            provision_if_missing=True,
-        )
-        with tempfile.NamedTemporaryFile(
-            mode="w", prefix="vault-pass-", delete=False
-        ) as tmp:
-            tmp.write(vault_password)
-            tmp.flush()
-            vault_password_file = Path(tmp.name)
-        try:
-            vault_password_file.chmod(0o600)
-        except Exception:
-            pass
-
-        host_vars_file = None
-        alias_value = (alias or meta.get("alias") or "").strip()
-        if alias_value:
-            host_vars_file = f"host_vars/{_sanitize_host_filename(alias_value)}.yml"
-        if not host_vars_file:
-            host_vars_file = meta.get("host_vars_file")
-        if not host_vars_file:
-            host = (meta.get("host") or "").strip()
-            if not host:
-                raise HTTPException(
-                    status_code=400, detail="host missing for workspace"
-                )
-            host_vars_file = f"host_vars/{_sanitize_host_filename(host)}.yml"
-
-        host_vars_path = _safe_resolve(root, host_vars_file)
-        if not host_vars_path.is_file():
-            host_vars_data: dict[str, Any] = {}
-            host = str(meta.get("host") or "").strip()
-            user = str(meta.get("user") or "").strip()
-            if host:
-                host_vars_data["ansible_host"] = host
-            if user:
-                host_vars_data["ansible_user"] = user
+            vault_password = _vault_password_from_kdbx(
+                root,
+                master_password,
+                create_if_missing=True,
+                provision_if_missing=True,
+            )
+            with tempfile.NamedTemporaryFile(
+                mode="w", prefix="vault-pass-", delete=False
+            ) as tmp:
+                tmp.write(vault_password)
+                tmp.flush()
+                vault_password_file = Path(tmp.name)
             try:
-                raw_port = meta.get("port")
-                if raw_port is not None:
-                    port = int(raw_port)
-                    if 1 <= port <= 65535:
-                        host_vars_data["ansible_port"] = port
+                vault_password_file.chmod(0o600)
             except Exception:
                 pass
 
-            try:
-                safe_mkdir(host_vars_path.parent)
-                atomic_write_text(
-                    host_vars_path,
-                    yaml.safe_dump(
-                        host_vars_data,
-                        sort_keys=False,
-                        default_flow_style=False,
-                        allow_unicode=True,
-                    ),
-                )
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=500, detail=f"failed to create host vars file: {exc}"
-                ) from exc
-
-        role_root = repo_roles_root()
-        repo_root = _repo_root()
-        env = os.environ.copy()
-        repo_root_str = str(repo_root)
-        env["PYTHONPATH"] = (
-            f"{repo_root_str}{os.pathsep}{env['PYTHONPATH']}"
-            if env.get("PYTHONPATH")
-            else repo_root_str
-        )
-
-        try:
-            for role_id in role_ids:
-                role_dir = role_root / role_id
-                if not role_dir.is_dir():
+            host_vars_file = None
+            alias_value = (alias or meta.get("alias") or "").strip()
+            if alias_value:
+                host_vars_file = f"host_vars/{_sanitize_host_filename(alias_value)}.yml"
+            if not host_vars_file:
+                host_vars_file = meta.get("host_vars_file")
+            if not host_vars_file:
+                host = (meta.get("host") or "").strip()
+                if not host:
                     raise HTTPException(
-                        status_code=400, detail=f"role not found: {role_id}"
+                        status_code=400, detail="host missing for workspace"
                     )
+                host_vars_file = f"host_vars/{_sanitize_host_filename(host)}.yml"
 
-                command = [
-                    sys.executable,
-                    "-m",
-                    "cli.create.credentials",
-                    "--role-path",
-                    str(role_dir),
-                    "--inventory-file",
-                    str(host_vars_path),
-                    "--vault-password-file",
-                    str(vault_password_file),
-                ]
-                if allow_empty_plain:
-                    command.append("--allow-empty-plain")
-                if force:
-                    command.extend(["--force", "--yes"])
-                for item in set_values or []:
-                    if item:
-                        command.extend(["--set", item])
+            host_vars_path = _safe_resolve(root, host_vars_file)
+            if not host_vars_path.is_file():
+                host_vars_data: dict[str, Any] = {}
+                host = str(meta.get("host") or "").strip()
+                user = str(meta.get("user") or "").strip()
+                if host:
+                    host_vars_data["ansible_host"] = host
+                if user:
+                    host_vars_data["ansible_user"] = user
+                try:
+                    raw_port = meta.get("port")
+                    if raw_port is not None:
+                        port = int(raw_port)
+                        if 1 <= port <= 65535:
+                            host_vars_data["ansible_port"] = port
+                except Exception:
+                    pass
 
-                result = subprocess.run(
-                    command,
-                    capture_output=True,
-                    text=True,
-                    check=False,
-                    cwd=str(repo_root),
-                    env=env,
-                )
-                if result.returncode != 0:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=(
-                            f"credential generation failed for {role_id} "
-                            f"(exit {result.returncode})"
+                try:
+                    safe_mkdir(host_vars_path.parent)
+                    atomic_write_text(
+                        host_vars_path,
+                        yaml.safe_dump(
+                            host_vars_data,
+                            sort_keys=False,
+                            default_flow_style=False,
+                            allow_unicode=True,
                         ),
                     )
-        finally:
-            try:
-                vault_password_file.unlink(missing_ok=True)
-            except Exception:
-                pass
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"failed to create host vars file: {exc}",
+                    ) from exc
 
-        self._history_commit(root, "bulk: credential generation")
+            role_root = repo_roles_root()
+            repo_root = _repo_root()
+            env = os.environ.copy()
+            repo_root_str = str(repo_root)
+            env["PYTHONPATH"] = (
+                f"{repo_root_str}{os.pathsep}{env['PYTHONPATH']}"
+                if env.get("PYTHONPATH")
+                else repo_root_str
+            )
+
+            try:
+                for role_id in role_ids:
+                    role_dir = role_root / role_id
+                    if not role_dir.is_dir():
+                        raise HTTPException(
+                            status_code=400, detail=f"role not found: {role_id}"
+                        )
+
+                    command = [
+                        sys.executable,
+                        "-m",
+                        "cli.create.credentials",
+                        "--role-path",
+                        str(role_dir),
+                        "--inventory-file",
+                        str(host_vars_path),
+                        "--vault-password-file",
+                        str(vault_password_file),
+                    ]
+                    if allow_empty_plain:
+                        command.append("--allow-empty-plain")
+                    if force:
+                        command.extend(["--force", "--yes"])
+                    for item in set_values or []:
+                        if item:
+                            command.extend(["--set", item])
+
+                    result = subprocess.run(
+                        command,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        cwd=str(repo_root),
+                        env=env,
+                    )
+                    if result.returncode != 0:
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                f"credential generation failed for {role_id} "
+                                f"(exit {result.returncode})"
+                            ),
+                        )
+            finally:
+                try:
+                    vault_password_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+            self._history_commit(root, "bulk: credential generation")
 
     def build_zip(self, workspace_id: str) -> bytes:
         import zipfile
@@ -352,89 +354,90 @@ class WorkspaceServiceArtifactsMixin:
     ) -> dict[str, int]:
         import zipfile
 
-        root = self.ensure(workspace_id)
-        try:
-            archive = zipfile.ZipFile(BytesIO(data))
-        except Exception as exc:
-            raise HTTPException(status_code=400, detail="invalid zip") from exc
+        with self.workspace_write_lock(workspace_id):
+            root = self.ensure(workspace_id)
+            try:
+                archive = zipfile.ZipFile(BytesIO(data))
+            except Exception as exc:
+                raise HTTPException(status_code=400, detail="invalid zip") from exc
 
-        default_mode_normalized = str(default_mode or "override").strip().lower()
-        if default_mode_normalized not in _ZIP_IMPORT_MODES:
-            default_mode_normalized = "override"
+            default_mode_normalized = str(default_mode or "override").strip().lower()
+            if default_mode_normalized not in _ZIP_IMPORT_MODES:
+                default_mode_normalized = "override"
 
-        root_resolved = root.resolve()
-        created_files = 0
-        overridden_files = 0
-        merged_files = 0
-        skipped_files = 0
+            root_resolved = root.resolve()
+            created_files = 0
+            overridden_files = 0
+            merged_files = 0
+            skipped_files = 0
 
-        with archive:
-            for info in archive.infolist():
-                if info.is_dir():
-                    continue
+            with archive:
+                for info in archive.infolist():
+                    if info.is_dir():
+                        continue
 
-                rel_path = self._normalize_zip_member_path(info.filename or "")
-                if not rel_path:
-                    continue
+                    rel_path = self._normalize_zip_member_path(info.filename or "")
+                    if not rel_path:
+                        continue
 
-                target = root / rel_path
-                resolved = target.resolve()
-                if resolved == root_resolved or root_resolved not in resolved.parents:
-                    continue
+                    target = root / rel_path
+                    resolved = target.resolve()
+                    if resolved == root_resolved or root_resolved not in resolved.parents:
+                        continue
 
-                safe_mkdir(resolved.parent)
-                try:
-                    with archive.open(info) as source:
-                        incoming_bytes = source.read()
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=500, detail=f"failed to extract zip: {exc}"
-                    ) from exc
-
-                existing_bytes: bytes | None = None
-                if resolved.is_file():
+                    safe_mkdir(resolved.parent)
                     try:
-                        existing_bytes = resolved.read_bytes()
-                    except Exception:
-                        existing_bytes = None
+                        with archive.open(info) as source:
+                            incoming_bytes = source.read()
+                    except Exception as exc:
+                        raise HTTPException(
+                            status_code=500, detail=f"failed to extract zip: {exc}"
+                        ) from exc
 
-                mode = self._resolve_zip_mode(
-                    rel_path,
-                    default_mode=default_mode_normalized,
-                    per_file_mode=per_file_mode,
-                )
+                    existing_bytes: bytes | None = None
+                    if resolved.is_file():
+                        try:
+                            existing_bytes = resolved.read_bytes()
+                        except Exception:
+                            existing_bytes = None
 
-                payload = incoming_bytes
-                if mode == "merge" and existing_bytes is not None:
-                    merged_payload = self._merge_structured_bytes(
-                        rel_path, existing_bytes, incoming_bytes
+                    mode = self._resolve_zip_mode(
+                        rel_path,
+                        default_mode=default_mode_normalized,
+                        per_file_mode=per_file_mode,
                     )
-                    if merged_payload is None:
-                        skipped_files += 1
-                        continue
-                    payload = merged_payload
-                    merged_files += 1
-                    if payload == existing_bytes:
-                        continue
-                else:
-                    if resolved.exists():
-                        overridden_files += 1
+
+                    payload = incoming_bytes
+                    if mode == "merge" and existing_bytes is not None:
+                        merged_payload = self._merge_structured_bytes(
+                            rel_path, existing_bytes, incoming_bytes
+                        )
+                        if merged_payload is None:
+                            skipped_files += 1
+                            continue
+                        payload = merged_payload
+                        merged_files += 1
+                        if payload == existing_bytes:
+                            continue
                     else:
-                        created_files += 1
+                        if resolved.exists():
+                            overridden_files += 1
+                        else:
+                            created_files += 1
 
-                try:
-                    with open(resolved, "wb") as destination:
-                        destination.write(payload)
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=500, detail=f"failed to extract zip: {exc}"
-                    ) from exc
+                    try:
+                        with open(resolved, "wb") as destination:
+                            destination.write(payload)
+                    except Exception as exc:
+                        raise HTTPException(
+                            status_code=500, detail=f"failed to extract zip: {exc}"
+                        ) from exc
 
-        self._refresh_meta_after_upload(root)
-        self._history_commit(root, "bulk: zip import")
-        return {
-            "created_files": created_files,
-            "overridden_files": overridden_files,
-            "merged_files": merged_files,
-            "skipped_files": skipped_files,
-        }
+            self._refresh_meta_after_upload(root)
+            self._history_commit(root, "bulk: zip import")
+            return {
+                "created_files": created_files,
+                "overridden_files": overridden_files,
+                "merged_files": merged_files,
+                "skipped_files": skipped_files,
+            }

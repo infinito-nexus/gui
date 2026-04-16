@@ -44,7 +44,9 @@ services:
       CATALOG_DIR: ${CATALOG_DIR}
 
     volumes:
-      - infinito_repo:${INFINITO_REPO_PATH}
+      - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
+        source: ${INFINITO_REPO_MOUNT_SOURCE:-infinito_repo}
+        target: ${INFINITO_REPO_PATH}
       - ${STATE_HOST_PATH}:${STATE_DIR}
 
     entrypoint: ["sh", "-lc"]
@@ -115,16 +117,20 @@ services:
       ROLE_CATALOG_CATEGORIES_YML: ${ROLE_CATALOG_CATEGORIES_YML}
 
       JOB_RUNNER_IMAGE: ${JOB_RUNNER_IMAGE}
-      JOB_RUNNER_REPO_DIR: ${JOB_RUNNER_REPO_DIR}
-      JOB_RUNNER_WORKDIR: ${JOB_RUNNER_WORKDIR}
-      JOB_RUNNER_REPO_HOST_PATH: ${JOB_RUNNER_REPO_HOST_PATH}
-      JOB_RUNNER_DOCKER_ARGS: ${JOB_RUNNER_DOCKER_ARGS}
-      JOB_RUNNER_SKIP_CLEANUP: ${JOB_RUNNER_SKIP_CLEANUP}
-      JOB_RUNNER_SKIP_BUILD: ${JOB_RUNNER_SKIP_BUILD}
+      JOB_RUNNER_REPO_DIR: ${JOB_RUNNER_REPO_DIR:-/opt/src/infinito}
+      JOB_RUNNER_WORKDIR: ${JOB_RUNNER_WORKDIR:-/workspace}
+      JOB_RUNNER_REPO_HOST_PATH: ${JOB_RUNNER_REPO_HOST_PATH:-}
+      JOB_RUNNER_DOCKER_ARGS: ${JOB_RUNNER_DOCKER_ARGS:-}
+      JOB_RUNNER_ANSIBLE_ARGS: ${JOB_RUNNER_ANSIBLE_ARGS:-}
+      JOB_RUNNER_SKIP_CLEANUP: ${JOB_RUNNER_SKIP_CLEANUP:-false}
+      JOB_RUNNER_SKIP_BUILD: ${JOB_RUNNER_SKIP_BUILD:-false}
       DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME}
 
     volumes:
-      - infinito_repo:${INFINITO_REPO_PATH}:ro
+      - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
+        source: ${INFINITO_REPO_MOUNT_SOURCE:-infinito_repo}
+        target: ${INFINITO_REPO_PATH}
+        read_only: true
       - ${STATE_HOST_PATH}:${STATE_DIR}
 
       # Required for containerized deployment jobs
@@ -229,6 +235,31 @@ services:
       dockerfile: Dockerfile
 
     container_name: infinito-deployer-ssh-password
+    privileged: true
+    cgroup: host
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      container: docker
+    tmpfs:
+      - /run
+      - /run/lock
+      - /tmp
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+      - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
+        source: ${INFINITO_REPO_MOUNT_SOURCE:-infinito_repo}
+        target: ${JOB_RUNNER_REPO_DIR:-/opt/src/infinito}
+        read_only: true
+
+    depends_on:
+      catalog:
+        condition: service_healthy
+
+    networks:
+      default:
+        ipv4_address: ${TEST_SSH_PASSWORD_IP:-172.28.0.10}
 
     ports:
       - "${TEST_SSH_PASSWORD_PORT:-2222}:22"
@@ -236,11 +267,11 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - '[ "$$(cat /proc/1/comm 2>/dev/null)" = "sshd" ]'
+        - systemctl is-active sshd.service docker.service >/dev/null
       interval: 10s
       timeout: 3s
-      retries: 5
-      start_period: 5s
+      retries: 18
+      start_period: 25s
 
     restart: ${RESTART_POLICY}
 
@@ -269,6 +300,9 @@ services:
 networks:
   default:
     name: ${DOCKER_NETWORK_NAME}
+    ipam:
+      config:
+        - subnet: ${DOCKER_NETWORK_SUBNET:-172.28.0.0/24}
 
 volumes:
   infinito_repo:

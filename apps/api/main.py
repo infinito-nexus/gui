@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import logging
 import os
+import sys
 from typing import List
 
 from urllib.parse import urlparse
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router as api_router
+
+logger = logging.getLogger("api.trace")
 
 
 def _parse_origins(raw: str) -> List[str]:
@@ -45,6 +49,30 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    @app.middleware("http")
+    async def _trace_requests(request: Request, call_next):
+        import time as _time
+        path = request.url.path
+        tracked = "/credentials" in path or "/test-connection" in path or "/connection" in path or "/primary-domain" in path
+        t0 = _time.monotonic()
+        if tracked:
+            print(f"TRACE: IN {request.method} {path}", file=sys.stderr, flush=True)
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            if tracked:
+                dt = _time.monotonic() - t0
+                print(f"TRACE: ERR {request.method} {path} dt={dt:.2f}s {exc!r}", file=sys.stderr, flush=True)
+            raise
+        if tracked:
+            dt = _time.monotonic() - t0
+            print(
+                f"TRACE: OUT {request.method} {path} {response.status_code} dt={dt:.2f}s",
+                file=sys.stderr,
+                flush=True,
+            )
+        return response
 
     app.include_router(api_router, prefix="/api")
 

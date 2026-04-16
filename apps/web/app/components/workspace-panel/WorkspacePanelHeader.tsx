@@ -32,6 +32,17 @@ export default function WorkspacePanelHeader({
   onSelectWorkspace,
   onDeleteWorkspace,
 }: WorkspacePanelHeaderProps) {
+  const workspaceSummary = (
+    <div
+      className={`text-body-secondary ${styles.topRight}`}
+      data-workspace-id={workspaceId || "creating"}
+    >
+      Workspace: <strong>{workspaceId ? workspaceId : "creating..."}</strong>
+      <br />
+      Inventory: <strong>{inventoryReady ? "ready" : "not generated"}</strong>
+    </div>
+  );
+
   return (
     <>
       {!compact ? (
@@ -43,11 +54,16 @@ export default function WorkspacePanelHeader({
               ZIP or deploy.
             </p>
           </div>
-          <div className={`text-body-secondary ${styles.topRight}`}>
-            Workspace: <strong>{workspaceId ? workspaceId : "creating..."}</strong>
-            <br />
-            Inventory: <strong>{inventoryReady ? "ready" : "not generated"}</strong>
+          {workspaceSummary}
+        </div>
+      ) : null}
+
+      {compact ? (
+        <div className={styles.topRow}>
+          <div className={styles.topLeft}>
+            <h2 className={`text-body ${styles.title}`}>Inventory</h2>
           </div>
+          {workspaceSummary}
         </div>
       ) : null}
 

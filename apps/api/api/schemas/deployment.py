@@ -57,6 +57,16 @@ class DeploymentRequest(BaseModel):
     port: Optional[int] = Field(default=None, ge=1, le=65535)
     user: str = Field(..., min_length=1, description="SSH user")
     auth: DeploymentAuth
+    master_password: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="Optional workspace vault master password for encrypted inventory values",
+    )
+    infinito_nexus_version: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="Optional Infinito.Nexus version selector (latest or stable semver)",
+    )
     limit: Optional[str] = Field(
         default=None, description="Optional Ansible --limit (inventory alias)"
     )
@@ -73,9 +83,9 @@ class DeploymentRequest(BaseModel):
             raise ValueError("must not be empty")
         return s
 
-    @field_validator("limit")
+    @field_validator("limit", "master_password", "infinito_nexus_version")
     @classmethod
-    def _strip_limit(cls, v: Optional[str]) -> Optional[str]:
+    def _strip_optional_string(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return None
         s = v.strip()

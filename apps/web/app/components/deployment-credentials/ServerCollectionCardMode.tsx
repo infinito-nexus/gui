@@ -315,7 +315,12 @@ export function renderServerCardMode(ctx: any) {
                   <input
                     value={server.host}
                     onChange={(event) => onPatchServer(server.alias, { host: event.target.value })}
-                    onBlur={() => emitCredentialBlur(server, "host")}
+                    onBlur={(event) =>
+                      emitCredentialBlur(
+                        { ...server, host: event.currentTarget.value },
+                        "host"
+                      )
+                    }
                     placeholder="example.com"
                     className={`${styles.fieldInput} ${
                       validation.hostMissing ? styles.inputError : ""
@@ -348,7 +353,12 @@ export function renderServerCardMode(ctx: any) {
                   <input
                     value={server.user}
                     onChange={(event) => onPatchServer(server.alias, { user: event.target.value })}
-                    onBlur={() => emitCredentialBlur(server, "user")}
+                    onBlur={(event) =>
+                      emitCredentialBlur(
+                        { ...server, user: event.currentTarget.value },
+                        "user"
+                      )
+                    }
                     placeholder="root"
                     className={`${styles.fieldInput} ${
                       validation.userMissing ? styles.inputError : ""

@@ -113,6 +113,7 @@ export function renderServerCollectionDetailModal({
     >
       <div
         className={`${styles.modalCard} ${styles.serverModalCard} ${styles.detailModalCard}`}
+        data-server-detail={detailServer.alias}
         onClick={(event) => event.stopPropagation()}
       >
         <div className={styles.modalHeader}>
@@ -259,7 +260,12 @@ export function renderServerCollectionDetailModal({
               onChange={(event) =>
                 onPatchServer(detailServer.alias, { host: event.target.value })
               }
-              onBlur={() => emitCredentialBlur(detailServer, "host")}
+              onBlur={(event) =>
+                emitCredentialBlur(
+                  { ...detailServer, host: event.currentTarget.value },
+                  "host"
+                )
+              }
               placeholder="example.com"
               className={`${styles.fieldInput} ${
                 detailValidation?.hostMissing ? styles.inputError : ""
@@ -298,7 +304,12 @@ export function renderServerCollectionDetailModal({
               onChange={(event) =>
                 onPatchServer(detailServer.alias, { user: event.target.value })
               }
-              onBlur={() => emitCredentialBlur(detailServer, "user")}
+              onBlur={(event) =>
+                emitCredentialBlur(
+                  { ...detailServer, user: event.currentTarget.value },
+                  "user"
+                )
+              }
               placeholder="root"
               className={`${styles.fieldInput} ${
                 detailValidation?.userMissing ? styles.inputError : ""

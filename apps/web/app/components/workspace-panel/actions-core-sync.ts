@@ -63,9 +63,15 @@ export function createWorkspacePanelSyncActions(ctx: any) {
         } catch {
           // ignore
         }
+        if (res.status === 409 && message === "inventory already exists") {
+          await refreshFiles(workspaceId);
+          setInventorySyncError(null);
+          return;
+        }
         throw new Error(message);
       }
       await refreshFiles(workspaceId);
+      setInventorySyncError(null);
     } catch (err: any) {
       setInventorySyncError(
         err?.message ? `Inventory creation failed: ${err.message}` : "Inventory creation failed."

@@ -58,7 +58,7 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
         text: bool = True,
         timeout: int = 30,
     ) -> subprocess.CompletedProcess[str] | subprocess.CompletedProcess[bytes]:
-        command = ["git", "-C", str(root), *args]
+        command = ["git", "-c", f"safe.directory={root}", "-C", str(root), *args]
         try:
             result = subprocess.run(
                 command,
@@ -249,6 +249,8 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
                         return True, line_number
                     if value.startswith(("!vault", "$ANSIBLE_VAULT;", "{{")):
                         continue
+                    if value.startswith(('"{{', "'{{")):
+                        continue
                     if _BLOCK_SCALAR_RE.match(value):
                         return True, line_number
                     if value.lower() in {"null", "~"}:
@@ -263,6 +265,8 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
                     if not value:
                         continue
                     if value.startswith(("{{", "$ANSIBLE_VAULT;")):
+                        continue
+                    if value.startswith(('"{{', "'{{")):
                         continue
                     return True, line_number
 
@@ -320,34 +324,34 @@ class WorkspaceServiceHistoryMixin(WorkspaceServiceHistoryRestoreMixin):
     ) -> str | None:
         if not self._history_enabled():
             return None
+        with self.workspace_write_lock(root.name):
+            self._ensure_history_repo(root)
+            self._history_stage_all(root)
+            if not self._history_has_index_changes(root):
+                return None
 
-        self._ensure_history_repo(root)
-        self._history_stage_all(root)
-        if not self._history_has_index_changes(root):
-            return None
+            try:
+                self._validate_no_plaintext_secrets(root)
+                full_message = self._format_commit_message(message, metadata)
+                self._run_git(
+                    root, ["commit", "--quiet", "-m", full_message, "--no-gpg-sign"]
+                )
+            except Exception:
+                self._history_unstage_all(root)
+                raise
 
-        try:
-            self._validate_no_plaintext_secrets(root)
-            full_message = self._format_commit_message(message, metadata)
-            self._run_git(
-                root, ["commit", "--quiet", "-m", full_message, "--no-gpg-sign"]
-            )
-        except Exception:
-            self._history_unstage_all(root)
-            raise
-
-        sha = str(self._run_git(root, ["rev-parse", "HEAD"]).stdout).strip()
-        tracked_status = str(
-            self._run_git(
-                root, ["status", "--porcelain", "--untracked-files=no"]
-            ).stdout
-            or ""
-        ).strip()
-        if tracked_status:
-            raise HTTPException(
-                status_code=500, detail="workspace history index not clean"
-            )
-        return sha
+            sha = str(self._run_git(root, ["rev-parse", "HEAD"]).stdout).strip()
+            tracked_status = str(
+                self._run_git(
+                    root, ["status", "--porcelain", "--untracked-files=no"]
+                ).stdout
+                or ""
+            ).strip()
+            if tracked_status:
+                raise HTTPException(
+                    status_code=500, detail="workspace history index not clean"
+                )
+            return sha
 
     def commit_workspace_history(
         self, workspace_id: str, message: str, metadata: dict[str, str] | None = None

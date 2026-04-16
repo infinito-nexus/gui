@@ -8,7 +8,8 @@
     "start": "next start -p 3000 -H 0.0.0.0",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:dashboard": "playwright test -c playwright.dashboard.config.ts"
   },
   "dependencies": {
     "@codemirror/lang-json": "6.0.2",

@@ -2,7 +2,7 @@
 
 This guide is the SPOT for local runtime setup, environment variables, database initialization, job runner configuration, and the SSH test environment.
 
-For a quick overview, see the [README](../README.md). For contributor workflow and validation requirements, see [Development Environment Setup](contributing/environment/setup.md) and [Testing and Validation](contributing/flow/testing.md).
+For a quick overview, see the [README](../../../README.md). For contributor workflow and validation requirements, see [Development Environment Setup](../environment/setup.md) and [Testing and Validation](common.md).
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ Copy `env.example` to `.env` and adjust the following runtime-facing variables w
 
 | Variable | Purpose | Example |
 |---|---|---|
-| `INFINITO_NEXUS_IMAGE` | Source image used to seed the bundled Infinito.Nexus repository and the default job runner fallback | `ghcr.io/kevinveenbirkenbach/infinito-debian:latest` |
+| `INFINITO_NEXUS_IMAGE` | Source image used to seed the bundled Infinito.Nexus repository and the default job runner fallback | `ghcr.io/infinito-nexus/core/debian:latest` |
 | `CORS_ALLOW_ORIGINS` | Allowed CORS origins for the API | `http://localhost:3000` |
 | `NEXT_PUBLIC_API_BASE_URL` | Optional browser-side API base URL override; leave it empty to use the local `/api` proxy | `(empty)` |
 | `POSTGRES_HOST` | Postgres hostname | `db` |
@@ -48,7 +48,7 @@ Notes:
 
 - `NEXT_PUBLIC_API_BASE_URL` SHOULD stay empty for the default local stack so the web app can use the built-in `/api` proxy.
 - `STATE_HOST_PATH` MAY stay relative for local startup, but it MUST be absolute before you run containerized deployment jobs from the API.
-- `INFINITO_REPO_HOST_PATH` is NOT part of the default runtime path. Use `JOB_RUNNER_REPO_HOST_PATH` when a custom runner needs a host-mounted checkout.
+- Use `JOB_RUNNER_REPO_HOST_PATH` when a custom runner needs a host-mounted checkout.
 
 ## Database Initialization
 
@@ -98,23 +98,132 @@ For stronger isolation, the job runner can be moved into a separate service that
 | `make db-logs` | Follow Postgres logs only. |
 | `make refresh-catalog` | Reload the catalog (invokable apps) and restart the API. |
 
-The SPOT for repository `make` targets is [makefile.md](contributing/tools/makefile.md).
+The SPOT for repository `make` targets is [makefile.md](../tools/makefile.md).
 
 ## SSH Test Environment
 
-The repository ships a small SSH test stack for testing deployment flows:
+The repository ships a small SSH test stack with two services:
+
+- `ssh-password` (password authentication)
+- `ssh-key` (public key authentication)
+
+Start and stop via `make`:
 
 ```bash
 make test-env-up
-```
-
-See [Test.md](../Test.md) for credentials and usage.
-
-Stop the test environment:
-
-```bash
 make test-env-down
 ```
+
+Alternatively via compose profile:
+
+```bash
+docker compose --profile test up -d --build
+docker compose --profile test down
+```
+
+### Password auth service
+
+- Host (from API container): `ssh-password`
+- Port (from API container): `22`
+- User: `deploy`
+- Password: `deploy`
+
+Connect from host:
+
+```bash
+ssh -p 2222 deploy@localhost
+```
+
+Use in UI/API (container-to-container):
+
+```
+Host: ssh-password
+Port: 22
+User: deploy
+Password: deploy
+```
+
+### Key auth service
+
+- Host (from API container): `ssh-key`
+- Port (from API container): `22`
+- User: `deploy`
+- Private key: `apps/test/ssh-key/test_id_ed25519`
+- Public key: `apps/test/ssh-key/test_id_ed25519.pub`
+
+Connect from host:
+
+```bash
+ssh -i apps/test/ssh-key/test_id_ed25519 -p 2223 deploy@localhost
+```
+
+If SSH asks about host key verification, bypass it for the test:
+
+```bash
+ssh -o StrictHostKeyChecking=no -i apps/test/ssh-key/test_id_ed25519 -p 2223 deploy@localhost
+```
+
+### Embedded test key (copy/paste)
+
+Private key:
+
+```text
+-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACCigUtlFhiovSEc9m/iY5AFhogJBQ68Z50F4rni0Eyg8wAAAJAf/nTxH/50
+8QAAAAtzc2gtZWQyNTUxOQAAACCigUtlFhiovSEc9m/iY5AFhogJBQ68Z50F4rni0Eyg8w
+AAAEBR9gZgUzGGRDOPEelNGNYk4qCapNn0TKobNocdi1kQsKKBS2UWGKi9IRz2b+JjkAWG
+iAkFDrxnnQXiueLQTKDzAAAADWluZmluaXRvLXRlc3Q=
+-----END OPENSSH PRIVATE KEY-----
+```
+
+Public key:
+
+```text
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKKBS2UWGKi9IRz2b+JjkAWGiAkFDrxnnQXiueLQTKDz infinito-test
+```
+
+### Notes
+
+- These credentials are for local testing only.
+- The `ssh-key` service uses `apps/test/ssh-key/authorized_keys`, already populated with the public key above.
+
+### Legacy compose file (optional)
+
+```bash
+docker compose -f docker-compose.ssh-test.yml up -d --build
+```
+
+## Example Workspace Import
+
+The repository ships a ready-to-import workspace baseline at [examples/workspace/](../../../examples/workspace/) and a packaged archive at [examples/workspace-import.zip](../../../examples/workspace-import.zip). The baseline targets the `test-arch` container started by `make test-env-up`.
+
+Rebuild the archive after editing any file under `examples/workspace/`:
+
+```bash
+make example-workspace-zip
+```
+
+Import it in the Web UI:
+
+1. Start both stacks: `make up` and `make test-env-up`.
+2. Open http://localhost:3000, sign in, and navigate to **Workspace → Import**.
+3. Upload `examples/workspace-import.zip`.
+
+The baseline contains:
+
+| File | Purpose |
+|---|---|
+| `inventory.yml` | empty `all.children` so apps can be picked in the UI |
+| `host_vars/test-arch.yml` | presets `ansible_host`, `ansible_user`, `ansible_port`, `DOMAIN_PRIMARY` for `test-arch` |
+| `group_vars/all.yml` | disables SSH host-key checks for local runs |
+
+Credentials are intentionally NOT stored in the workspace. Enter them in the UI when prompted:
+
+| Field | Value |
+|---|---|
+| auth method | `password` |
+| password | `deploy` |
 
 ## URLs After Startup
 

@@ -262,6 +262,7 @@ export function renderServerListMode(ctx: any) {
                 return (
                   <tr
                     key={server.alias}
+                    data-server-alias={server.alias}
                     className={`${styles.listTableRow} ${visual.rowClass} ${
                       tintStyle ? styles.rowTinted : ""
                     }`}
@@ -312,7 +313,12 @@ export function renderServerListMode(ctx: any) {
                         onChange={(event) =>
                           onPatchServer(server.alias, { host: event.target.value })
                         }
-                        onBlur={() => emitCredentialBlur(server, "host")}
+                        onBlur={(event) =>
+                          emitCredentialBlur(
+                            { ...server, host: event.currentTarget.value },
+                            "host"
+                          )
+                        }
                         placeholder="example.com"
                         className={`${styles.inputSmall} ${
                           validation.hostMissing ? styles.inputError : ""
@@ -341,7 +347,12 @@ export function renderServerListMode(ctx: any) {
                         onChange={(event) =>
                           onPatchServer(server.alias, { user: event.target.value })
                         }
-                        onBlur={() => emitCredentialBlur(server, "user")}
+                        onBlur={(event) =>
+                          emitCredentialBlur(
+                            { ...server, user: event.currentTarget.value },
+                            "user"
+                          )
+                        }
                         placeholder="root"
                         className={`${styles.inputSmall} ${
                           validation.userMissing ? styles.inputError : ""
