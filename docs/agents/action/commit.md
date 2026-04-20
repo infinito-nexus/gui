@@ -1,13 +1,7 @@
-# Committing
+# Committing 💾
 
-- You MUST run `make autoformat` before every commit, then stage every file that it modified, so commits never contain formatting drift. Apply this even for markdown/reStructuredText-only commits (ruff/shfmt will simply no-op on those paths).
-- You MUST run `make test` as the standard combined validation from [Testing and Validation](../../contributing/testing/common.md) before every commit whenever the staged change includes at least one file that is not `.md` or `.rst`, unless you are explicitly instructed not to.
-- If that validation fails, you MUST run `make clean` and rerun it.
-- You MUST skip the standard validation only for markdown/reStructuredText-only changes unless you are explicitly instructed to run it.
-- You MUST commit only after all required checks pass.
-- You MUST NOT commit automatically without explicit confirmation from the user. ALWAYS ask before committing.
-
-## Warnings
-
-- If the standard validation warns about a staged file or component, you MUST ask whether to fix that warning before you continue.
-- Keep the follow-up limited to the components touched by staged files so the change stays focused.
+- You MUST run `make autoformat` before every commit and stage every file it modified.
+- You MUST run `make test` (see [Testing and Validation](../../contributing/testing/common.md)) before every commit when the staged change includes at least one non-`.md`/`.rst` file. If it fails, you MUST run `make clean` and rerun it.
+- For markdown/reST-only changes you MAY skip `make test` unless the user explicitly requires it.
+- You MUST NOT commit without explicit user confirmation. You MUST always ask.
+- If validation warns about a staged file or component, you MUST ask the user whether to fix the warning first. You MUST keep the follow-up scoped to the staged files.
