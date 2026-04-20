@@ -69,6 +69,7 @@ As a developer, I want a headless Playwright end-to-end test that drives the rea
   - collect traces, logs, or artifacts on failure.
 - The test MUST run headless in CI.
 - The test MUST NOT require any real external network calls for its happy path.
+- The live log stream MUST be delivered in realtime. The delay between a log event being emitted by the job runner and being rendered in the UI MUST NOT exceed 30 seconds, and the test MUST verify this bound explicitly. Clock source for this measurement: the playbook MUST emit a monotonic counter and the playbook-start wall-clock timestamp in its first line; the runner's stdout writer MUST prepend a server-side receive timestamp to every line (format `[RX:<unix_ms>] ...`); the UI harness compares the server-side receive timestamp to the harness's own `Date.now()` at the moment the line is rendered. This isolates the runtime-to-UI leg from Ansible's own scheduling jitter.
 
 ## Scenario
 
@@ -148,6 +149,7 @@ Any bug or code-quality issue discovered while implementing or running this test
 - [x] Credential generation completes without exposing plaintext secrets in the visible UI, browser console, browser network payloads, or SSE stream.
 - [x] The Setup screen lists the target row as selectable and not already deployed before deployment starts.
 - [x] Starting deployment activates the live terminal/log view and emits log lines within 3 seconds.
+- [ ] Live log streaming is realtime: the measured delay between a runner-emitted log event and its UI rendering never exceeds 30 seconds, and the test fails the run if the bound is violated.
 - [x] The deployment completes with exit code `0` and a visible success state.
 - [x] The final deployed dashboard responds with HTTP `200` via the deterministic endpoint defined by the test stack or harness.
 - [ ] Re-running the test from a fresh anonymous browser context and fresh workspace state produces the same successful result.
@@ -155,7 +157,7 @@ Any bug or code-quality issue discovered while implementing or running this test
 ### Security and Quality
 
 - [x] No plaintext SSH passwords, vault passwords, private keys, or generated credentials appear in logs, SSE events, browser console output, or browser network payloads.
-- [ ] All bugs or warnings discovered while implementing this flow are fixed before the requirement is marked done.
+- [ ] All bugs or warnings (inside the deployer-repository) discovered while implementing this flow are fixed before the requirement is marked done.
 - [x] All modified or newly written code conforms to the project coding rules.
 - [x] No lint errors, type errors, or test warnings remain in the affected code paths.
 

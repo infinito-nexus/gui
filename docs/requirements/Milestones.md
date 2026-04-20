@@ -69,6 +69,8 @@ UI refinements, view modes, server switcher, performance, and security hardening
 - [002-server-switcher-and-list-layout.md](002-server-switcher-and-list-layout.md) – Top-nav server switcher, server list layout
 - [004-role-tile-quick-links.md](004-role-tile-quick-links.md) – Meta-driven icon row per role tile
 - [005-store-layout-filters-view.md](005-store-layout-filters-view.md) – Fixed pagination, sticky controls, Mini/List/Detail view modes
+- [016-performance-and-sse-scalability.md](016-performance-and-sse-scalability.md) – Warm-cache performance targets and SSE viewer scalability verification
+- [017-security-hardening.md](017-security-hardening.md) – Job isolation, secret lifecycle, container & transport hardening
 
 **Acceptance Criteria**
 
