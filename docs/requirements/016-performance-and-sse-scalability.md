@@ -63,6 +63,9 @@ As an operator, I want the role-index API and the dashboard view to meet warm-ca
 
 ## SSE Viewer Scalability
 
+- In this requirement, a "viewer" means one independent SSE client connection opened by the Python scalability test.
+- Browser DOM rendering under scalability load is out of scope here and remains covered by [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md).
+
 ### Load-Generator Job
 
 - [ ] A test fixture playbook at `tests/fixtures/perf/emit_lines.yml` MUST exist.
@@ -72,7 +75,7 @@ As an operator, I want the role-index API and the dashboard view to meet warm-ca
 
 ### Load Profile
 
-- [ ] The scalability test MUST attach exactly 10 concurrent viewers to the same running deployment job via `GET /api/deployments/{job_id}/logs`.
+- [ ] The scalability test MUST attach exactly 10 concurrent viewers to the same running deployment job via `GET /api/deployments/{job_id}/logs`; each viewer MUST be an independent SSE client connection.
 - [ ] All 10 viewers MUST remain connected until the job reaches a terminal state (`done` event) or 120 s have elapsed, whichever comes first.
 - [ ] A late-joining (11th) viewer MUST attach at t ≥ 30 s after job start and MUST remain until the terminal state.
 
@@ -92,8 +95,8 @@ As an operator, I want the role-index API and the dashboard view to meet warm-ca
 
 ### Latency Under Load
 
-- [ ] The 30-second runner-emission-to-UI-rendering bound from [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md) (Test Harness Contract) MUST continue to hold for every viewer throughout the load profile.
-- [ ] The test MUST measure per-line delay between `emit_lines.yml` emission (inferred from the playbook's monotonically increasing line counter) and viewer reception, and MUST fail the run if any single line exceeds 30 s for any viewer.
+- [ ] The timestamping contract introduced by [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md) MUST continue to hold under load: the delay between the API receive timestamp prefix `[RX:<unix_ms>]` and viewer reception MUST NOT exceed 30 s for any viewer. Browser render latency remains owned by [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md).
+- [ ] The test MUST measure per-line delay between the `[RX:<unix_ms>]` timestamp and viewer reception time, and MUST fail the run if any single line exceeds 30 s for any viewer. The playbook's monotonically increasing line counter is used to detect missing or reordered lines, not as the wall-clock source for this bound.
 
 ### Memory Assertions
 
@@ -140,7 +143,7 @@ As an operator, I want the role-index API and the dashboard view to meet warm-ca
 
 ### SSE Scalability
 
-- [ ] The scalability test attaches exactly 10 concurrent viewers plus one late-joiner to a job running `emit_lines.yml`.
+- [ ] The scalability test attaches exactly 10 concurrent SSE client viewers plus one late-joiner to a job running `emit_lines.yml`.
 - [ ] No viewer is disconnected by the server before the `done` event.
 - [ ] During the load profile, `GET /api/roles` continues to meet its warm-cache p95 target.
 - [ ] Post-test API memory max ≤ baseline max × 1.2 within the post-test sampling window.

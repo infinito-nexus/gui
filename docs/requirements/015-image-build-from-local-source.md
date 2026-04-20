@@ -2,7 +2,7 @@
 
 ## User Story
 
-As a developer, I want to point the deployer at a local Infinito.Nexus source directory and have it build the job-runner image automatically using that directory's own `make build` target so that I never need to maintain a separate `./infinito-nexus` checkout inside the deployer repository and there is no manual `cp` or bind-mount of source files into job containers.
+As a developer, I want to point the deployer at a local Infinito.Nexus source directory and have it build the job-runner image automatically using that directory's own image-build target so that I never need to maintain a separate `./infinito-nexus` checkout inside the deployer repository and there is no manual `cp` or bind-mount of source files into job containers.
 
 ## Background
 

@@ -46,7 +46,8 @@ Deployment runs from the UI with live log streaming and cancellation.
 **Requirements**
 
 - [006-deploy-server-selection-and-layout.md](006-deploy-server-selection-and-layout.md) – Server selection table, `--limit` behaviour, terminal layout
-- [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md) – E2E Playwright test: deploy web-app-dashboard to a fresh local SSH container using the locally mounted infinito-nexus
+- [014-e2e-dashboard-deploy.md](014-e2e-dashboard-deploy.md) – E2E Playwright test: deploy `web-app-dashboard` to a fresh local SSH container using the source/image strategy defined for the current mode
+- [015-image-build-from-local-source.md](015-image-build-from-local-source.md) – Local source-directory image build flow for dashboard E2E and runner image selection
 
 **Acceptance Criteria**
 
@@ -56,7 +57,7 @@ Deployment runs from the UI with live log streaming and cancellation.
 - [x] Server selection is tabular; deployed servers are marked and non-selectable
 - [x] `--limit` is omitted when all selectable servers are selected
 - [x] Terminal uses all remaining space; no rounded corners
-- [ ] E2E test: full deploy flow of `web-app-dashboard` to a fresh local SSH container passes headless in CI (see [014](014-e2e-dashboard-deploy.md))
+- [ ] E2E test: full deploy flow of `web-app-dashboard` to a fresh local SSH container passes headless in CI (see [014](014-e2e-dashboard-deploy.md); local source/image strategy see [015](015-image-build-from-local-source.md))
 
 ---
 
@@ -81,8 +82,8 @@ UI refinements, view modes, server switcher, performance, and security hardening
 - [x] Role index is cached; logo resolution is cached
 - [x] Secrets never appear in logs or browser devtools
 - [x] CORS restricted to UI origin; input validation everywhere
-- [~] Dashboard loads < 1 s on warm cache (in-memory cache implemented; not strictly measured)
-- [~] Multiple concurrent SSE viewers do not crash the API
+- [~] Dashboard warm-cache load time is measured and enforced at < 1 s (see [016](016-performance-and-sse-scalability.md))
+- [~] 10 concurrent SSE viewers plus one late-joiner stay connected without API crash and within the documented latency/memory bounds (see [016](016-performance-and-sse-scalability.md))
 
 ---
 
@@ -186,7 +187,7 @@ All API actions are written to a database with retention, export, and configurab
 - [ ] Plaintext secrets and vault passwords are never written to audit records
 - [ ] Audit records are workspace-scoped; no cross-workspace visibility
 - [ ] Configurable retention (default 6 months); expired records deleted automatically
-- [ ] Per-workspace logging policy (all / writes-only / auth-only / errors-only; health endpoints excludable)
+- [ ] Per-workspace logging policy (`all` / `writes-only` / `auth-only` / `deployment-only` / `errors-only`; health endpoints excludable)
 - [ ] `GET /api/workspaces/{id}/logs/entries` with pagination and filters (from, to, user, ip, q, status, method)
 - [ ] `GET /api/workspaces/{id}/logs/entries/export` supporting JSONL, CSV, and ZIP for large sets
 - [ ] Audit Logs UI view with filter, pagination, and export

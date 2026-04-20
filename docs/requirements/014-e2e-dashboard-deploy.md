@@ -31,12 +31,14 @@ As a developer, I want a headless Playwright end-to-end test that drives the rea
 
 ### Local development
 
-- Local execution MUST use the local `./infinito-nexus` checkout as the role source for both:
-  - catalog generation,
-  - containerized deployment jobs.
-- Local execution MUST use a locally built job-runner image from the relevant `Dockerfile`, not only a prebuilt registry image.
+- Local execution of the dedicated dashboard E2E entry point MUST follow the source/image strategy defined in [015-image-build-from-local-source.md](015-image-build-from-local-source.md).
+- When `INFINITO_NEXUS_SRC_DIR=<path>` (or the equivalent local-source parameter) is provided, the local entry point MUST:
+  - resolve the source directory to an absolute path,
+  - build the required image before the stack starts,
+  - use the resulting local image for both catalog generation and containerized deployment jobs.
+- Local execution MUST use a locally built job-runner image when the local-source parameter is provided, not only a prebuilt registry image.
 - The local helper command MUST resolve any repo path that needs to be absolute for containerized jobs automatically. Manual `.env` editing MUST NOT be required.
-- Local execution MUST fail fast with a clear error if `./infinito-nexus` is missing or empty.
+- Local execution MUST fail fast with a clear error if the provided source directory is missing or empty.
 
 ### CI/CD
 
@@ -69,7 +71,7 @@ As a developer, I want a headless Playwright end-to-end test that drives the rea
   - collect traces, logs, or artifacts on failure.
 - The test MUST run headless in CI.
 - The test MUST NOT require any real external network calls for its happy path.
-- The live log stream MUST be delivered in realtime. The delay between a log event being emitted by the job runner and being rendered in the UI MUST NOT exceed 30 seconds, and the test MUST verify this bound explicitly. Clock source for this measurement: the playbook MUST emit a monotonic counter and the playbook-start wall-clock timestamp in its first line; the runner's stdout writer MUST prepend a server-side receive timestamp to every line (format `[RX:<unix_ms>] ...`); the UI harness compares the server-side receive timestamp to the harness's own `Date.now()` at the moment the line is rendered. This isolates the runtime-to-UI leg from Ansible's own scheduling jitter.
+- The live log stream MUST be delivered in realtime. The delay between the API receiving a log line from the job runner and the line being rendered in the UI MUST NOT exceed 30 seconds, and the test MUST verify this bound explicitly. Clock source for this measurement: the playbook MUST emit a monotonic counter and the playbook-start wall-clock timestamp in its first line; the runner's stdout writer MUST prepend a server-side receive timestamp to every line (format `[RX:<unix_ms>] ...`); the UI harness compares the server-side receive timestamp to the harness's own `Date.now()` at the moment the line is rendered. This isolates the API-to-UI leg from Ansible's own scheduling jitter and runner-side buffering.
 
 ## Scenario
 
@@ -80,7 +82,7 @@ The test runs against:
 - a fresh auto-created workspace,
 - a fresh `docker compose --profile test up -d` stack,
 - the `ssh-password` local target,
-- the configured infinito source for the current mode.
+- the configured infinito source/image strategy for the current mode.
 
 Any bug or code-quality issue discovered while implementing or running this test MUST be fixed before this requirement is marked done.
 
@@ -119,10 +121,11 @@ Any bug or code-quality issue discovered while implementing or running this test
 
 ### Environment and Source
 
-- [x] Local execution uses the local `./infinito-nexus` checkout as the role source for both catalog generation and deployment jobs.
-- [x] Local execution uses a locally built job-runner image instead of only a registry image.
+- [x] Local execution of the dedicated dashboard E2E entry point follows the source/image strategy defined by [015-image-build-from-local-source.md](015-image-build-from-local-source.md).
+- [x] When `INFINITO_NEXUS_SRC_DIR=<path>` is provided, local execution uses the built image from that source directory for both catalog generation and deployment jobs.
+- [x] Local execution uses a locally built job-runner image instead of only a registry image when the local-source parameter is provided.
 - [x] Local execution resolves required absolute host paths automatically; no manual `.env` editing is required.
-- [x] Local execution fails fast with a clear error when `./infinito-nexus` is missing or empty.
+- [x] Local execution fails fast with a clear error when the provided source directory is missing or empty.
 - [x] CI execution uses `INFINITO_NEXUS_IMAGE` without depending on a host-mounted local checkout.
 - [x] The repository exposes explicit local and CI entry points for this dashboard E2E flow.
 - [x] The test stack starts with `docker compose --profile test up -d` and all required test containers are healthy before the browser flow begins.
@@ -149,15 +152,21 @@ Any bug or code-quality issue discovered while implementing or running this test
 - [x] Credential generation completes without exposing plaintext secrets in the visible UI, browser console, browser network payloads, or SSE stream.
 - [x] The Setup screen lists the target row as selectable and not already deployed before deployment starts.
 - [x] Starting deployment activates the live terminal/log view and emits log lines within 3 seconds.
-- [ ] Live log streaming is realtime: the measured delay between a runner-emitted log event and its UI rendering never exceeds 30 seconds, and the test fails the run if the bound is violated.
+- [ ] Live log streaming is realtime: the measured delay between an API-received log line and its UI rendering never exceeds 30 seconds.
+  - [ ] The harness records the server-side `[RX:<unix_ms>]` timestamp for every rendered line and compares it to `Date.now()` at render time.
+  - [ ] The run fails on the first observed line whose receive-to-render delay exceeds 30 seconds and surfaces the offending line in test output.
 - [x] The deployment completes with exit code `0` and a visible success state.
 - [x] The final deployed dashboard responds with HTTP `200` via the deterministic endpoint defined by the test stack or harness.
-- [ ] Re-running the test from a fresh anonymous browser context and fresh workspace state produces the same successful result.
+- [ ] Re-running the test from fresh anonymous state is reproducible.
+  - [ ] The same dedicated E2E entry point runs successfully twice in succession without manual cleanup beyond its own setup/teardown.
+  - [ ] Each run starts with a fresh browser context and a newly auto-created anonymous workspace.
 
 ### Security and Quality
 
 - [x] No plaintext SSH passwords, vault passwords, private keys, or generated credentials appear in logs, SSE events, browser console output, or browser network payloads.
-- [ ] All bugs or warnings (inside the deployer-repository) discovered while implementing this flow are fixed before the requirement is marked done.
+- [ ] All deployer-repository-local bugs or warnings discovered while implementing this flow are fixed before the requirement is marked done.
+  - [ ] The final green run no longer depends on any temporary debug artifact listed below.
+  - [ ] No runtime warning or error remains in the touched deployer services for the exercised happy path.
 - [x] All modified or newly written code conforms to the project coding rules.
 - [x] No lint errors, type errors, or test warnings remain in the affected code paths.
 

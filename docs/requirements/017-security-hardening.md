@@ -80,7 +80,7 @@ As an operator running the deployer against real infrastructure, I want every de
   - `GET /jobs?workspace_id=<id>&status=running` — list running jobs, used as the source of truth for concurrency limits,
   - `GET /jobs/{job_id}/logs` — stream stdout/stderr.
 - [ ] The API surface MUST NOT proxy arbitrary Docker commands and MUST NOT accept image names, volume mounts, or capability lists not declared in the job spec schema.
-- [ ] The job spec schema MUST be a Pydantic model with the explicit fields: `job_id` (UUIDv4), `workspace_id` (opaque ID), `runner_image` (digest-pinned string), `inventory_path` (workspace-relative), `secrets_dir` (host tmpfs path), `role_ids` (list of allowed-regex strings), `network_name` (string matching `^job-[0-9a-f\-]{36}$`), `labels` (dict of the three documented labels only). Any additional field MUST be rejected.
+- [ ] The job spec schema MUST be a Pydantic model with the explicit fields: `job_id` (UUIDv4), `workspace_id` (opaque ID), `runner_image` (image reference string; MUST be digest-pinned in CI and production, and MAY be tag-based only for the local source-directory build flow from [015-image-build-from-local-source.md](015-image-build-from-local-source.md)), `inventory_path` (workspace-relative), `secrets_dir` (host tmpfs path), `role_ids` (list of allowed-regex strings), `network_name` (string matching `^job-[0-9a-f\-]{36}$`), `labels` (dict of the three documented labels only). Any additional field MUST be rejected.
 
 ### 2.2 Authentication Between API and runner-manager
 
