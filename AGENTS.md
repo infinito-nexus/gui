@@ -34,6 +34,16 @@ When overriding Make variables, agents MUST append `VAR=value` pairs **after** t
 
 Trailing `VAR=value` arguments are Make-native overrides and apply to the make invocation only. Use them for all environment-dependent parameters.
 
+## Network Failures — Fix Causes, Not Symptoms
+
+- When a failure appears network-related (for example DNS resolution errors, routing problems, TLS handshake timeouts, registry/index access failures, proxy issues, CA trust problems, IPv4/IPv6 reachability problems, or firewall/NAT interference), agents MUST identify the root cause and the affected layer instead of only treating the visible symptom.
+- Agents MUST first collect concrete evidence: the exact failing command, the exact error text, whether the failure is DNS, TCP, TLS, HTTP, registry, Git, or container-runtime related, and whether it reproduces from the host, container, or both.
+- Before adding any workaround, agents SHOULD reproduce the problem with direct diagnostic commands from the affected layer whenever feasible.
+- Agents MUST fix the root cause when it is solvable within this repository or its runtime configuration. Durable fixes such as correcting DNS configuration, routes, proxy settings, CA trust, service endpoints, firewall rules, or container-network wiring are preferred over patching tests or application logic around the failure.
+- Agents MUST NOT treat repeated retries, longer timeouts, disabled checks, caches, mirrors, fallback logic, or unrelated workaround code as a sufficient fix unless the root cause has already been identified, documented, and explicitly marked as unresolved external dependency or temporary mitigation.
+- If the root cause cannot be fixed autonomously from within this repository, or requires host-level or external infrastructure changes, the agent MUST say explicitly that the issue is external, stop presenting the symptom as solved, and provide concrete diagnostic or remediation commands the user can run. Prefer actionable commands with expected intent, for example: `ip route`, `ip -6 route`, `resolvectl status`, `curl -4 -I https://registry-1.docker.io/v2/`, `curl -6 -I https://registry-1.docker.io/v2/`, `docker pull <image>`, `ss -tpn`, or `journalctl -u docker --since "15 min ago"`.
+- Any temporary workaround that remains necessary during investigation MUST be labeled clearly as a workaround, including what it mitigates, why the real root cause is still unresolved, and what the next manual step is if user intervention is required.
+
 ## For Humans
 
 Human contributors working alongside AI agents MUST read [common.md](docs/contributing/tools/agents/common.md) and the agent permission model in [security.md](docs/contributing/tools/agents/security.md).
