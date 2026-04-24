@@ -80,7 +80,7 @@ class TestDockerComposeSecurityTopology(unittest.TestCase):
         command = "\n".join(init_service["command"])
 
         self.assertIn("openssl rand -hex 32", command)
-        self.assertIn("token=\"$$(openssl rand -hex 32)\"", command)
+        self.assertIn('token="$$(openssl rand -hex 32)"', command)
         self.assertIn("printf '%s\\n' \"$${token}\" > /auth/token", command)
         self.assertIn("install -d -o 10003 -g 10900 -m 0750 /auth", command)
         self.assertIn("chown 10003:10900 /auth/token", command)
@@ -101,11 +101,14 @@ class TestDockerComposeSecurityTopology(unittest.TestCase):
         self.assertEqual(environment["STATE_HOST_GID"], "${STATE_HOST_GID:-}")
         self.assertIn('state_uid="$${STATE_HOST_UID:-$$(stat -c', command)
         self.assertIn('state_gid="$${STATE_HOST_GID:-$$(stat -c', command)
-        self.assertIn('install -d -o "$${state_uid}" -g "$${state_gid}" -m 0755 "$${STATE_DIR}"', command)
-        self.assertIn('install -d -o 10001 -g 10900 -m 2770', command)
+        self.assertIn(
+            'install -d -o "$${state_uid}" -g "$${state_gid}" -m 0755 "$${STATE_DIR}"',
+            command,
+        )
+        self.assertIn("install -d -o 10001 -g 10900 -m 2770", command)
         self.assertIn('"$${STATE_DIR}/workspaces"', command)
         self.assertIn('"$${STATE_DIR}/jobs"', command)
-        self.assertIn('install -d -o 10001 -g 10900 -m 0755', command)
+        self.assertIn("install -d -o 10001 -g 10900 -m 0755", command)
         self.assertIn('"$${STATE_DIR}/catalog"', command)
 
         self.assertEqual(
@@ -160,9 +163,14 @@ class TestDockerComposeSecurityTopology(unittest.TestCase):
         )
         self.assertIn('> "$${CATALOG_DIR}/roles/list.json"', command)
         self.assertEqual(healthcheck, 'test -s "$$CATALOG_DIR/roles/list.json"')
-        self.assertIn('python3 -m pip install --disable-pip-version-check --no-cache-dir --target "$${catalog_pylib}" pyyaml >/dev/null', command)
+        self.assertIn(
+            'python3 -m pip install --disable-pip-version-check --no-cache-dir --target "$${catalog_pylib}" pyyaml >/dev/null',
+            command,
+        )
         self.assertIn('pythonpath_prefix="$${catalog_pylib}:"', command)
-        self.assertNotIn("apt-get install -y --no-install-recommends python3-yaml", command)
+        self.assertNotIn(
+            "apt-get install -y --no-install-recommends python3-yaml", command
+        )
 
     def test_ssh_password_target_uses_explicit_caps_instead_of_privileged(self) -> None:
         ssh_password = self.compose["services"]["ssh-password"]

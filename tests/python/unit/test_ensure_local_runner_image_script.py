@@ -8,9 +8,7 @@ from tempfile import TemporaryDirectory
 class TestEnsureLocalRunnerImageScript(unittest.TestCase):
     def setUp(self) -> None:
         self.repo_root = Path(__file__).resolve().parents[3]
-        self.script_path = (
-            self.repo_root / "scripts" / "ensure-local-runner-image.sh"
-        )
+        self.script_path = self.repo_root / "scripts" / "ensure-local-runner-image.sh"
 
     def _run_script(
         self,
@@ -39,7 +37,9 @@ class TestEnsureLocalRunnerImageScript(unittest.TestCase):
                 env=env,
                 check=False,
             )
-            log_text = docker_log.read_text(encoding="utf-8") if docker_log.exists() else ""
+            log_text = (
+                docker_log.read_text(encoding="utf-8") if docker_log.exists() else ""
+            )
             return completed, log_text
 
     def test_rebuilds_repo_managed_infinito_arch_local_runner_image(self) -> None:

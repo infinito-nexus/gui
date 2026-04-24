@@ -29,7 +29,7 @@ load_cached_image() {
     fi
     manifest_archive=""
     manifest_loaded=""
-  done < "${MANIFEST_PATH}"
+  done <"${MANIFEST_PATH}"
 
   [ -n "${manifest_archive}" ] || return 1
   [ -s "${CACHE_DIR}/${manifest_archive}" ] || return 1
@@ -62,7 +62,7 @@ load_all_cached_images() {
     if [ "${manifest_loaded}" != "${manifest_image}" ] && "${REAL_DOCKER}" image inspect "${manifest_loaded}" >/dev/null 2>&1; then
       "${REAL_DOCKER}" tag "${manifest_loaded}" "${manifest_image}" >/dev/null
     fi
-  done < "${MANIFEST_PATH}"
+  done <"${MANIFEST_PATH}"
 }
 
 compose_exempt_images() {
@@ -105,7 +105,7 @@ compose_exempt_images() {
         }
       }
     }
-  ' <<< "${compose_config}"
+  ' <<<"${compose_config}"
 }
 
 image_is_in_list() {
@@ -126,13 +126,13 @@ compose_subcommand_index() {
 
   while [ "${index}" -lt "${#compose_args_ref[@]}" ]; do
     case "${compose_args_ref[$index]}" in
-      -f|--file|-p|--project-name|--project-directory|--env-file|--profile|--ansi|--progress|--parallel)
+      -f | --file | -p | --project-name | --project-directory | --env-file | --profile | --ansi | --progress | --parallel)
         index=$((index + 2))
         ;;
-      --file=*|--project-name=*|--project-directory=*|--env-file=*|--profile=*|--ansi=*|--progress=*|--parallel=*)
+      --file=* | --project-name=* | --project-directory=* | --env-file=* | --profile=* | --ansi=* | --progress=* | --parallel=*)
         index=$((index + 1))
         ;;
-      --all-resources|--compatibility|--dry-run)
+      --all-resources | --compatibility | --dry-run)
         index=$((index + 1))
         ;;
       -*)
@@ -194,7 +194,7 @@ if [ "${1:-}" = "compose" ]; then
           all_images_local=0
           break
         fi
-      done <<< "${compose_images}"
+      done <<<"${compose_images}"
 
       if [ "${all_images_local}" = "1" ]; then
         echo "[infinito-e2e] using optional hermetic image cache instead of docker compose pull" >&2

@@ -67,7 +67,9 @@ class TestWorkspaceAccessSecurity(unittest.TestCase):
 
     def test_workspace_create_returns_uuid4_id(self) -> None:
         client = self._client()
-        response = client.post("/api/workspaces", headers={"X-Auth-Request-User": "alice"})
+        response = client.post(
+            "/api/workspaces", headers={"X-Auth-Request-User": "alice"}
+        )
 
         self.assertEqual(response.status_code, 200)
         workspace_id = str(response.json().get("workspace_id") or "")

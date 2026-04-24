@@ -88,7 +88,15 @@ class TestPrepareLocalRepoCacheScript(unittest.TestCase):
                 text=True,
             )
             subprocess.run(
-                ["git", "-C", str(work_repo), "remote", "add", "origin", f"file://{bare_repo}"],
+                [
+                    "git",
+                    "-C",
+                    str(work_repo),
+                    "remote",
+                    "add",
+                    "origin",
+                    f"file://{bare_repo}",
+                ],
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,

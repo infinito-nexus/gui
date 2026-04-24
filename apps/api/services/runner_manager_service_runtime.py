@@ -4,7 +4,10 @@ import importlib
 
 from fastapi import HTTPException
 
-from .runner_manager_service_support import RUNNER_SECRETS_DIR, RUNNER_SECRETS_READY_FILE
+from .runner_manager_service_support import (
+    RUNNER_SECRETS_DIR,
+    RUNNER_SECRETS_READY_FILE,
+)
 
 
 def _root():
@@ -132,7 +135,9 @@ class RunnerManagerServiceRuntimeMixin:
                     image=cfg.image,
                 )
         except Exception as exc:
-            root.terminate_process_group(proc.pid if isinstance(proc.pid, int) else None)
+            root.terminate_process_group(
+                proc.pid if isinstance(proc.pid, int) else None
+            )
             root.stop_container(container_id)
             root.remove_container(container_id)
             self._disconnect_mode_a_targets(
@@ -246,7 +251,9 @@ class RunnerManagerServiceRuntimeMixin:
     def list_jobs(self, *, workspace_id: str | None = None, status: str | None = None):
         root = _root()
         out = []
-        for job_dir in sorted(root.jobs_root().iterdir() if root.jobs_root().exists() else []):
+        for job_dir in sorted(
+            root.jobs_root().iterdir() if root.jobs_root().exists() else []
+        ):
             if not job_dir.is_dir():
                 continue
             meta = root.load_json(job_dir / "job.json")

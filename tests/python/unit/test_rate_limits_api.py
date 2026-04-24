@@ -17,7 +17,9 @@ class _FakeRateLimits:
         self._error: HTTPException | None = None
 
     def fail_with(self, status_code: int) -> None:
-        self._error = HTTPException(status_code=status_code, detail="rate limit exceeded")
+        self._error = HTTPException(
+            status_code=status_code, detail="rate limit exceeded"
+        )
 
     def enforce_deployment(self, _request, workspace_id: str) -> None:
         self.calls.append(("deploy", workspace_id))
@@ -80,7 +82,9 @@ class TestRateLimitsApi(unittest.TestCase):
             patch("api.routes.deployments._workspaces") as m_workspaces,
         ):
             m_access.return_value = None
-            m_roles.return_value.get.return_value = SimpleNamespace(id="web-app-dashboard")
+            m_roles.return_value.get.return_value = SimpleNamespace(
+                id="web-app-dashboard"
+            )
             m_jobs.return_value.create.return_value = SimpleNamespace(job_id="job-1")
 
             response = client.post(

@@ -11,9 +11,7 @@ class TestE2EGitWrapper(unittest.TestCase):
     @staticmethod
     def _install_wrapper(tmp_path: Path, invocation_name: str) -> Path:
         repo_root = Path(__file__).resolve().parents[3]
-        source_wrapper = (
-            repo_root / "apps" / "test" / "ssh-password" / "git-wrapper.sh"
-        )
+        source_wrapper = repo_root / "apps" / "test" / "ssh-password" / "git-wrapper.sh"
         installed_wrapper = tmp_path / invocation_name
         shutil.copyfile(source_wrapper, installed_wrapper)
         installed_wrapper.chmod(0o755)
@@ -117,7 +115,9 @@ class TestE2EGitWrapper(unittest.TestCase):
             dest_path = tmp_path / "repository"
             git_dir = dest_path / ".git"
             git_dir.mkdir(parents=True)
-            (git_dir / "HEAD").write_text("ref: refs/heads/.invalid\n", encoding="utf-8")
+            (git_dir / "HEAD").write_text(
+                "ref: refs/heads/.invalid\n", encoding="utf-8"
+            )
 
             calls_path = tmp_path / "calls.log"
             fake_git = tmp_path / "git.actual"
@@ -179,7 +179,12 @@ class TestE2EGitWrapper(unittest.TestCase):
             env["INFINITO_E2E_REPO_MIRROR_ROOT"] = str(tmp_path / "repo-mirrors")
 
             proc = subprocess.run(
-                [str(helper_path), "--stateless-rpc", "--advertise-refs", str(bare_repo)],
+                [
+                    str(helper_path),
+                    "--stateless-rpc",
+                    "--advertise-refs",
+                    str(bare_repo),
+                ],
                 cwd=tmp,
                 env=env,
                 text=True,

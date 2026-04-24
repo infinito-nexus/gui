@@ -245,7 +245,10 @@ class WorkspaceServiceArtifactsZipMixin:
 
                     target = root / rel_path
                     resolved = target.resolve()
-                    if resolved == root_resolved or root_resolved not in resolved.parents:
+                    if (
+                        resolved == root_resolved
+                        or root_resolved not in resolved.parents
+                    ):
                         raise HTTPException(
                             status_code=400,
                             detail=f"zip import rejected path traversal entry: {info.filename}",

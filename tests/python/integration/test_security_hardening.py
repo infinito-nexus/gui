@@ -323,8 +323,8 @@ class TestSecurityHardening(unittest.TestCase):
                 "sh",
                 "-lc",
                 (
-                    f'stat -c \'%a\' "${{STATE_DIR}}/jobs/{job_one}/secrets"'
-                    f' && stat -c \'%a\' "${{STATE_DIR}}/jobs/{job_one}/secrets/ssh_password"'
+                    f"stat -c '%a' \"${{STATE_DIR}}/jobs/{job_one}/secrets\""
+                    f" && stat -c '%a' \"${{STATE_DIR}}/jobs/{job_one}/secrets/ssh_password\""
                 ),
             ).splitlines()
             self.assertEqual(host_secret_meta, ["700", "400"])
@@ -337,12 +337,14 @@ class TestSecurityHardening(unittest.TestCase):
                 "sh",
                 "-lc",
                 (
-                    'test -r /run/secrets/infinito/ssh_password'
+                    "test -r /run/secrets/infinito/ssh_password"
                     ' && printf "%s\\n" "$(wc -c < /run/secrets/infinito/ssh_password)"'
                     ' && stat -c "%u:%g %a" /run/secrets/infinito/ssh_password'
                 ),
             ).splitlines()
-            self.assertEqual(runner_secret_meta, [str(len(SECRET_VALUE)), "10002:10002 400"])
+            self.assertEqual(
+                runner_secret_meta, [str(len(SECRET_VALUE)), "10002:10002 400"]
+            )
 
             self._cancel_deployment(client, job_one)
             self._cancel_deployment(client, job_two)

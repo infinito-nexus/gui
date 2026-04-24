@@ -17,7 +17,7 @@ cache_dir="$1"
 mkdir -p "${cache_dir}"
 manifest_path="${cache_dir}/images.tsv"
 tmp_manifest="${manifest_path}.tmp"
-: > "${tmp_manifest}"
+: >"${tmp_manifest}"
 
 # Optional cache specs support the format:
 #   <requested-ref>|<pinned-source-ref>|<loaded-ref>
@@ -51,7 +51,7 @@ parse_image_spec() {
   local source_ref=""
   local loaded_ref=""
 
-  IFS='|' read -r requested_ref source_ref loaded_ref <<< "${spec}"
+  IFS='|' read -r requested_ref source_ref loaded_ref <<<"${spec}"
   if [[ -z "${source_ref}" ]]; then
     source_ref="${requested_ref}"
   fi
@@ -140,11 +140,11 @@ EOF
 }
 
 for image_spec in "${image_specs[@]}"; do
-  IFS=$'\t' read -r image_ref source_ref loaded_ref <<< "$(parse_image_spec "${image_spec}")"
+  IFS=$'\t' read -r image_ref source_ref loaded_ref <<<"$(parse_image_spec "${image_spec}")"
 
   archive_path="${cache_dir}/$(sanitize_image_ref "${source_ref}")"
   if [[ -s "${archive_path}" ]]; then
-    printf '%s\t%s\t%s\n' "${image_ref}" "$(basename "${archive_path}")" "${loaded_ref}" >> "${tmp_manifest}"
+    printf '%s\t%s\t%s\n' "${image_ref}" "$(basename "${archive_path}")" "${loaded_ref}" >>"${tmp_manifest}"
     continue
   fi
 
@@ -164,7 +164,7 @@ for image_spec in "${image_specs[@]}"; do
   echo "→ Saving optional hermetic E2E image cache (${image_ref} <= ${source_ref})" >&2
   docker save -o "${tmp_path}" "${loaded_ref}"
   mv "${tmp_path}" "${archive_path}"
-  printf '%s\t%s\t%s\n' "${image_ref}" "$(basename "${archive_path}")" "${loaded_ref}" >> "${tmp_manifest}"
+  printf '%s\t%s\t%s\n' "${image_ref}" "$(basename "${archive_path}")" "${loaded_ref}" >>"${tmp_manifest}"
 done
 
 mv "${tmp_manifest}" "${manifest_path}"

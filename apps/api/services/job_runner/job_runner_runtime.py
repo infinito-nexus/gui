@@ -50,7 +50,9 @@ class JobRunnerServiceRuntimeMixin:
             if roles_from_inventory and not req.selected_roles:
                 vars_data["selected_roles"] = roles_from_inventory
 
-        root.atomic_write_json(paths.request_path, root.mask_request_for_persistence(req))
+        root.atomic_write_json(
+            paths.request_path, root.mask_request_for_persistence(req)
+        )
         root.atomic_write_json(paths.vars_json_path, vars_data)
         root.atomic_write_text(
             paths.vars_yaml_path,
@@ -320,12 +322,16 @@ class JobRunnerServiceRuntimeMixin:
             {"cli_args": [str(arg) for arg in cli_args]},
         )
 
-    def _materialize_secret_files(self, *, paths, req, runtime_vault_password: str | None) -> None:
+    def _materialize_secret_files(
+        self, *, paths, req, runtime_vault_password: str | None
+    ) -> None:
         root = _root()
         root.safe_mkdir(paths.secrets_dir)
         paths.secrets_dir.chmod(0o700)
         workspace_kdbx = (
-            root.WorkspaceService().ensure(req.workspace_id) / "secrets" / root.KDBX_FILENAME
+            root.WorkspaceService().ensure(req.workspace_id)
+            / "secrets"
+            / root.KDBX_FILENAME
         )
         if workspace_kdbx.is_file():
             root.shutil.copyfile(workspace_kdbx, paths.secret_kdbx_path)
@@ -337,7 +343,9 @@ class JobRunnerServiceRuntimeMixin:
             root.atomic_write_text(paths.secret_ssh_password_path, req.auth.password)
             paths.secret_ssh_password_path.chmod(0o400)
         if runtime_vault_password:
-            root.atomic_write_text(paths.secret_vault_password_path, runtime_vault_password)
+            root.atomic_write_text(
+                paths.secret_vault_password_path, runtime_vault_password
+            )
             paths.secret_vault_password_path.chmod(0o400)
 
     def _build_vars(self, req, paths, secrets, *, use_secret_files: bool = False):

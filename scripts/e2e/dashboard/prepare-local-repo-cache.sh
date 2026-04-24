@@ -191,7 +191,7 @@ sync_repo() {
     git -C "${seed_repo}" remote set-url origin "${mirror_repo}"
     git -C "${seed_repo}" fetch --prune origin
     if [[ -n "${default_branch}" ]] && git -C "${seed_repo}" rev-parse --verify "refs/remotes/origin/${default_branch}" >/dev/null 2>&1; then
-      git -C "${seed_repo}" checkout -f "${default_branch}" >/dev/null 2>&1 || \
+      git -C "${seed_repo}" checkout -f "${default_branch}" >/dev/null 2>&1 ||
         git -C "${seed_repo}" checkout -f -B "${default_branch}" "origin/${default_branch}"
       git -C "${seed_repo}" reset --hard "origin/${default_branch}" >/dev/null
     else
@@ -215,14 +215,14 @@ for key in "${sync_keys[@]}"; do
   fi
 done
 
-if [[ "${max_age_seconds}" =~ ^[0-9]+$ ]] \
-  && [[ -s "${sync_stamp}" ]] \
-  && [[ "${cache_is_complete}" == true ]] \
-  && [[ -n "$(find "${mirror_root}" -mindepth 1 -print -quit 2>/dev/null)" ]] \
-  && [[ -n "$(find "${seed_root}" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
+if [[ "${max_age_seconds}" =~ ^[0-9]+$ ]] &&
+  [[ -s "${sync_stamp}" ]] &&
+  [[ "${cache_is_complete}" == true ]] &&
+  [[ -n "$(find "${mirror_root}" -mindepth 1 -print -quit 2>/dev/null)" ]] &&
+  [[ -n "$(find "${seed_root}" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
   last_sync="$(cat "${sync_stamp}" 2>/dev/null || true)"
   now_epoch="$(date +%s)"
-  if [[ "${last_sync}" =~ ^[0-9]+$ ]] && (( now_epoch - last_sync <= max_age_seconds )); then
+  if [[ "${last_sync}" =~ ^[0-9]+$ ]] && ((now_epoch - last_sync <= max_age_seconds)); then
     echo "→ Reusing recently synced optional hermetic repo cache ($((now_epoch - last_sync))s old)" >&2
     printf '%s\n%s\n' \
       "$(resolve_dir "${mirror_root}")" \
@@ -236,7 +236,7 @@ for key in "${sync_keys[@]}"; do
   sync_repo "${key_provider}" "${key_account}" "${key_repo}" "${sync_sources[${key}]}"
 done
 
-date +%s > "${sync_stamp}"
+date +%s >"${sync_stamp}"
 
 printf '%s\n%s\n' \
   "$(resolve_dir "${mirror_root}")" \

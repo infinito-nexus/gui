@@ -76,7 +76,9 @@ class TestRunnerManagerApi(unittest.TestCase):
         self.assertIn(("GET", "/jobs/{job_id}/logs"), routes)
 
     @patch("manager_main._service")
-    def test_internal_job_routes_forward_optional_workspace_scope(self, m_service) -> None:
+    def test_internal_job_routes_forward_optional_workspace_scope(
+        self, m_service
+    ) -> None:
         app = create_app()
         client = TestClient(app)
         headers = {"x-manager-token": "secret-token"}

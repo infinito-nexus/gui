@@ -35,7 +35,9 @@ class RunnerManagerServiceSweepMixin:
             ).start()
 
     def _orphan_sweep_interval_seconds(self) -> int:
-        raw = str(_root().os.getenv("JOB_ORPHAN_SWEEP_INTERVAL_SECONDS") or "600").strip()
+        raw = str(
+            _root().os.getenv("JOB_ORPHAN_SWEEP_INTERVAL_SECONDS") or "600"
+        ).strip()
         try:
             return max(int(raw), 0)
         except ValueError:
@@ -56,7 +58,9 @@ class RunnerManagerServiceSweepMixin:
     def _active_jobs(self) -> dict[str, dict[str, str]]:
         root = _root()
         active: dict[str, dict[str, str]] = {}
-        for job_dir in sorted(root.jobs_root().iterdir() if root.jobs_root().exists() else []):
+        for job_dir in sorted(
+            root.jobs_root().iterdir() if root.jobs_root().exists() else []
+        ):
             if not job_dir.is_dir():
                 continue
             meta = root.load_json(job_dir / "job.json")
@@ -219,7 +223,9 @@ chmod 0400 "{RUNNER_SECRETS_READY_FILE}"
             return container_matches[0]
         return None
 
-    def _connect_mode_a_targets(self, paths, network_name: str) -> list[dict[str, object]]:
+    def _connect_mode_a_targets(
+        self, paths, network_name: str
+    ) -> list[dict[str, object]]:
         root = _root()
         host_vars_dir = paths.job_dir / "host_vars"
         if not host_vars_dir.is_dir():
@@ -351,16 +357,21 @@ chmod 0400 "{RUNNER_SECRETS_READY_FILE}"
         if text.endswith("Z"):
             text = f"{text[:-1]}+00:00"
         try:
-            return _root().datetime.fromisoformat(text).astimezone(
-                _root().timezone.utc
-            ).timestamp()
+            return (
+                _root()
+                .datetime.fromisoformat(text)
+                .astimezone(_root().timezone.utc)
+                .timestamp()
+            )
         except ValueError:
             return None
 
     def _sweep_stale_job_dirs(self, active_jobs: dict[str, dict[str, str]]) -> None:
         root = _root()
         cutoff = root.time.time() - (self._job_retention_days() * 86400)
-        for job_dir in sorted(root.jobs_root().iterdir() if root.jobs_root().exists() else []):
+        for job_dir in sorted(
+            root.jobs_root().iterdir() if root.jobs_root().exists() else []
+        ):
             if not job_dir.is_dir():
                 continue
             job_id = str(job_dir.name).strip()

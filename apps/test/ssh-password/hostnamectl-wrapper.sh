@@ -7,7 +7,7 @@ find_set_hostname_value() {
   local expect_value=0
   local arg=""
   for arg in "$@"; do
-    if (( expect_value )); then
+    if ((expect_value)); then
       printf '%s\n' "${arg}"
       return 0
     fi

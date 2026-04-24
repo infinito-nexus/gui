@@ -87,5 +87,6 @@ class RunnerManagerClient:
         }
         response = self._request("GET", "/jobs", params=params or None)
         return [
-            DeploymentJobOut.model_validate(item) for item in list(response.json() or [])
+            DeploymentJobOut.model_validate(item)
+            for item in list(response.json() or [])
         ]

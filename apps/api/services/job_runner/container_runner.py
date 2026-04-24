@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json  # noqa: F401 - re-exported for runtime module via _root()
 import os
 import shlex
 import shutil
+import subprocess  # noqa: F401 - re-exported for test patchability
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -121,3 +123,32 @@ def resolve_host_mount_source(source: str) -> str:
     except Exception:
         return str(source_path)
     return str(host_state_path / rel)
+
+
+from .container_runner_command import build_container_command  # noqa: E402
+from .container_runner_runtime import (  # noqa: E402
+    create_internal_network,
+    create_tmpfs_volume,
+    inspect_container_labels,
+    remove_container,
+    remove_network,
+    remove_volume,
+    stop_container,
+)
+
+__all__ = [
+    "ContainerRunnerConfig",
+    "DISALLOWED_HARDENED_FLAGS",
+    "build_container_command",
+    "create_internal_network",
+    "create_tmpfs_volume",
+    "inspect_container_labels",
+    "load_container_config",
+    "remove_container",
+    "remove_network",
+    "remove_volume",
+    "resolve_docker_bin",
+    "resolve_host_job_dir",
+    "resolve_host_mount_source",
+    "stop_container",
+]

@@ -14,6 +14,7 @@ from services.job_runner.container_runner import (
     stop_container,
 )
 
+
 def _make_cfg(**overrides) -> ContainerRunnerConfig:
     defaults = dict(
         image="infinito-arch",
@@ -27,23 +28,25 @@ def _make_cfg(**overrides) -> ContainerRunnerConfig:
     defaults.update(overrides)
     return ContainerRunnerConfig(**defaults)
 
+
 __all__ = [
-    'os',
-    'unittest',
-    'Path',
-    'TemporaryDirectory',
-    'patch',
-    'HTTPException',
-    'ContainerRunnerConfig',
-    'build_container_command',
-    'create_internal_network',
-    'inspect_container_labels',
-    'load_container_config',
-    'remove_network',
-    'stop_container',
-    '_make_cfg',
-    'ContainerRunnerTestCase',
+    "os",
+    "unittest",
+    "Path",
+    "TemporaryDirectory",
+    "patch",
+    "HTTPException",
+    "ContainerRunnerConfig",
+    "build_container_command",
+    "create_internal_network",
+    "inspect_container_labels",
+    "load_container_config",
+    "remove_network",
+    "stop_container",
+    "_make_cfg",
+    "ContainerRunnerTestCase",
 ]
+
 
 class ContainerRunnerTestCase(unittest.TestCase):
     pass

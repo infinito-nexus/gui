@@ -14,9 +14,11 @@ from services.audit_logs import (
     request_id_from_headers,
 )
 
+
 class _Headers(dict):
     def get(self, key, default=None):
         return super().get(str(key).lower(), default)
+
 
 def _build_request(
     *,
@@ -35,25 +37,27 @@ def _build_request(
         state=SimpleNamespace(),
     )
 
+
 __all__ = [
-    'os',
-    'unittest',
-    'zipfile',
-    'BytesIO',
-    'datetime',
-    'timezone',
-    'Full',
-    'SimpleNamespace',
-    'patch',
-    'AuditLogConfig',
-    'AuditLogService',
-    'actor_identity',
-    'canonical_client_ip',
-    'request_id_from_headers',
-    '_Headers',
-    '_build_request',
-    'AuditLogServiceTestCase',
+    "os",
+    "unittest",
+    "zipfile",
+    "BytesIO",
+    "datetime",
+    "timezone",
+    "Full",
+    "SimpleNamespace",
+    "patch",
+    "AuditLogConfig",
+    "AuditLogService",
+    "actor_identity",
+    "canonical_client_ip",
+    "request_id_from_headers",
+    "_Headers",
+    "_build_request",
+    "AuditLogServiceTestCase",
 ]
+
 
 class AuditLogServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:

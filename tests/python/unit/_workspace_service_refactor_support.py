@@ -13,18 +13,19 @@ if __name__ == "__main__":
     unittest.main()
 
 __all__ = [
-    'annotations',
-    'os',
-    'subprocess',
-    'threading',
-    'unittest',
-    'Path',
-    'TemporaryDirectory',
-    'patch',
-    'HTTPException',
-    'WorkspaceService',
-    'WorkspaceServiceRefactorTestCase',
+    "annotations",
+    "os",
+    "subprocess",
+    "threading",
+    "unittest",
+    "Path",
+    "TemporaryDirectory",
+    "patch",
+    "HTTPException",
+    "WorkspaceService",
+    "WorkspaceServiceRefactorTestCase",
 ]
+
 
 class WorkspaceServiceRefactorTestCase(unittest.TestCase):
     def setUp(self) -> None:

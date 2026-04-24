@@ -50,7 +50,9 @@ class JobRunnerServiceWorkspaceMixin:
 
     def _purge_orphaned_secret_material(self) -> None:
         root = _root()
-        for job_dir in sorted(root.jobs_root().iterdir() if root.jobs_root().exists() else []):
+        for job_dir in sorted(
+            root.jobs_root().iterdir() if root.jobs_root().exists() else []
+        ):
             if not job_dir.is_dir():
                 continue
             paths = root.job_paths(job_dir.name)
@@ -174,7 +176,9 @@ class JobRunnerServiceWorkspaceMixin:
 
     def _inject_related_domains(self, req, job_dir) -> None:
         root = _root()
-        selected_roles = [str(role_id).strip() for role_id in req.selected_roles if role_id]
+        selected_roles = [
+            str(role_id).strip() for role_id in req.selected_roles if role_id
+        ]
         if not selected_roles:
             return
         related_domains = root.discover_related_role_domains(
@@ -287,7 +291,9 @@ class JobRunnerServiceWorkspaceMixin:
                     )
                 except Exception:
                     existing_raw = {}
-                existing_host_vars = existing_raw if isinstance(existing_raw, dict) else {}
+                existing_host_vars = (
+                    existing_raw if isinstance(existing_raw, dict) else {}
+                )
 
             for key, workspace_value in workspace_overrides.items():
                 existing_value = existing_host_vars.get(key)

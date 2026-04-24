@@ -41,3 +41,8 @@ py-modules = []
 
 [tool.ruff.lint]
 external = ["WPS"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/python/unit/test_*_part*.py" = ["F405"]
+"tests/python/unit/_*_support.py" = ["F401"]
+"apps/api/services/workspaces/workspace_service_artifacts_support.py" = ["F401"]

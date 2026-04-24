@@ -64,9 +64,7 @@ class PerfSseScalabilityStreamMixin:
                             data_lines: list[str] = []
                             for line in raw_frame.split("\n"):
                                 if line.startswith(":"):
-                                    failure = (
-                                        f"{name} received unsupported SSE comment line: {line!r}"
-                                    )
+                                    failure = f"{name} received unsupported SSE comment line: {line!r}"
                                     break
                                 field, separator, raw_value = line.partition(":")
                                 if not separator or field not in {
@@ -75,9 +73,7 @@ class PerfSseScalabilityStreamMixin:
                                     "id",
                                     "retry",
                                 }:
-                                    failure = (
-                                        f"{name} received invalid SSE line in frame {frame_index}: {line!r}"
-                                    )
+                                    failure = f"{name} received invalid SSE line in frame {frame_index}: {line!r}"
                                     break
                                 value = (
                                     raw_value[1:]
@@ -91,9 +87,7 @@ class PerfSseScalabilityStreamMixin:
                             if failure:
                                 break
                             if not data_lines:
-                                failure = (
-                                    f"{name} received frame {frame_index} without any data lines"
-                                )
+                                failure = f"{name} received frame {frame_index} without any data lines"
                                 break
                             event_name, last_seq, saw_done, failure = (
                                 self._handle_sse_event(

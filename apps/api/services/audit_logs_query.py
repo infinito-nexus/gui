@@ -300,9 +300,7 @@ class AuditLogServiceQueryMixin:
             method=method,
         )
         payload = (
-            encode_jsonl(rows)
-            if normalized_format == "jsonl"
-            else encode_csv(rows)
+            encode_jsonl(rows) if normalized_format == "jsonl" else encode_csv(rows)
         )
         file_name = f"audit-log-{workspace_key}.{normalized_format}"
         media_type = (

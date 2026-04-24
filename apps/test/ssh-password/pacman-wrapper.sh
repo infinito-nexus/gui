@@ -33,7 +33,7 @@ lookup_installed_version() {
   if ! package_line="$("${REAL_PACMAN}" -Q "${package_name}" 2>/dev/null)"; then
     return 1
   fi
-  printf '%s\n' "${package_line#${package_name} }"
+  printf '%s\n' "${package_line#"${package_name}" }"
 }
 
 # Ansible's pacman integration probes and installs Arch repo packages via
@@ -49,8 +49,8 @@ if [[ " $* " == *" --upgrade "* ]]; then
   skip_next=0
   capture_print_format=0
   for arg in "$@"; do
-    if (( skip_next )); then
-      if (( capture_print_format )); then
+    if ((skip_next)); then
+      if ((capture_print_format)); then
         print_format="${arg}"
         capture_print_format=0
       fi

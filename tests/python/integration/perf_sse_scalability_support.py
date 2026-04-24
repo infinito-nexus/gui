@@ -196,8 +196,7 @@ class PerfSseScalabilityScenarioMixin:
         )
         return {
             "status": status,
-            "failure_message": "; ".join(failure_messages)
-            or "SSE scalability failed",
+            "failure_message": "; ".join(failure_messages) or "SSE scalability failed",
         }
 
     def _sample_memory(

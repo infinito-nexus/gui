@@ -18,23 +18,24 @@ _UUID4_RE = re.compile(
 _PINNED_RUNNER_IMAGE = "ghcr.io/example/runner@sha256:" + ("a" * 64)
 
 __all__ = [
-    'os',
-    'time',
-    'json',
-    're',
-    'shlex',
-    'subprocess',
-    'unittest',
-    'TemporaryDirectory',
-    'Path',
-    'SimpleNamespace',
-    'MagicMock',
-    'patch',
-    'yaml',
-    '_UUID4_RE',
-    '_PINNED_RUNNER_IMAGE',
-    'JobRunnerServiceTestCase',
+    "os",
+    "time",
+    "json",
+    "re",
+    "shlex",
+    "subprocess",
+    "unittest",
+    "TemporaryDirectory",
+    "Path",
+    "SimpleNamespace",
+    "MagicMock",
+    "patch",
+    "yaml",
+    "_UUID4_RE",
+    "_PINNED_RUNNER_IMAGE",
+    "JobRunnerServiceTestCase",
 ]
+
 
 class JobRunnerServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:

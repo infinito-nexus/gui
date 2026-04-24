@@ -6,8 +6,19 @@ from typing import Any
 
 
 from services.job_runner.secrets import mask_secrets
+from services.job_runner.util import atomic_write_text, safe_mkdir
+from services.role_index.paths import repo_roles_root
 
 from .workspace_context import (
+    INVENTORY_FILENAME,
+    WORKSPACE_META_FILENAME,
+    _dump_yaml_mapping,
+    _load_meta,
+    _now_iso,
+    _repo_root,
+    _safe_resolve,
+    _sanitize_host_filename,
+    _write_meta,
     load_workspace_yaml_document,
 )
 
@@ -52,7 +63,9 @@ def resolve_role_entity_name(role_root: Path, role_name: str) -> str:
     )
     if categories:
         role_name_lc = role_name.lower()
-        for category in sorted(flatten_role_categories(categories), key=len, reverse=True):
+        for category in sorted(
+            flatten_role_categories(categories), key=len, reverse=True
+        ):
             category_lc = category.lower()
             if role_name_lc.startswith(category_lc + "-"):
                 return role_name[len(category) + 1 :]

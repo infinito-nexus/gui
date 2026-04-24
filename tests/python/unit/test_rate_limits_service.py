@@ -21,7 +21,9 @@ def _build_request(
     client_host: str = "127.0.0.1",
 ):
     return SimpleNamespace(
-        headers=_Headers({key.lower(): value for key, value in (headers or {}).items()}),
+        headers=_Headers(
+            {key.lower(): value for key, value in (headers or {}).items()}
+        ),
         client=SimpleNamespace(host=client_host),
     )
 

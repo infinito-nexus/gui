@@ -14,22 +14,23 @@ if __name__ == "__main__":
     unittest.main()
 
 __all__ = [
-    'json',
-    'os',
-    'unittest',
-    'datetime',
-    'timedelta',
-    'timezone',
-    'Path',
-    'TemporaryDirectory',
-    'MagicMock',
-    'patch',
-    'HTTPException',
-    'RunnerManagerJobSpec',
-    'ContainerRunnerConfig',
-    'RunnerManagerService',
-    'RunnerManagerServiceTestCase',
+    "json",
+    "os",
+    "unittest",
+    "datetime",
+    "timedelta",
+    "timezone",
+    "Path",
+    "TemporaryDirectory",
+    "MagicMock",
+    "patch",
+    "HTTPException",
+    "RunnerManagerJobSpec",
+    "ContainerRunnerConfig",
+    "RunnerManagerService",
+    "RunnerManagerServiceTestCase",
 ]
+
 
 class RunnerManagerServiceTestCase(unittest.TestCase):
     JOB_ID = "123e4567-e89b-42d3-a456-426614174000"

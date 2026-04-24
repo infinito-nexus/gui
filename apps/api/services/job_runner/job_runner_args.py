@@ -108,11 +108,15 @@ class JobRunnerServiceArgsMixin:
 
         return cmd
 
-    def _build_direct_playbook_args(self, *, req, job_dir, inventory_arg: str, inventory_path):
+    def _build_direct_playbook_args(
+        self, *, req, job_dir, inventory_arg: str, inventory_path
+    ):
         root = _root()
         rel_path = str(req.playbook_path or "").strip().lstrip("/")
         if not rel_path:
-            raise root.HTTPException(status_code=400, detail="playbook_path is required")
+            raise root.HTTPException(
+                status_code=400, detail="playbook_path is required"
+            )
         job_root = job_dir.resolve()
         playbook_host_path = (job_dir / rel_path).resolve()
         if playbook_host_path == job_root or job_root not in playbook_host_path.parents:
