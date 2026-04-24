@@ -29,6 +29,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "pip-audit>=2.8",
     "ruff>=0.6",
 ]
 

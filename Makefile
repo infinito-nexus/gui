@@ -5,6 +5,7 @@
 DOCKER_COMPOSE ?= docker compose
 COMPOSE_FILE   ?= docker-compose.yml
 ENV_FILE       ?= .env
+EFFECTIVE_ENV_FILE = $(if $(wildcard $(ENV_FILE)),$(ENV_FILE),env.example)
 DOCKER_SOCKET_PATH ?= /var/run/docker.sock
 export DOCKER_SOCKET_GID ?= $(shell stat -c '%g' "$(DOCKER_SOCKET_PATH)" 2>/dev/null || printf '10900')
 CI_INFINITO_NEXUS_IMAGE ?= ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
@@ -44,8 +45,8 @@ warn-local-unpinned-images:
 	resolve_from_env() { \
 		key="$$1"; \
 		value="$$(printenv "$$key" 2>/dev/null || true)"; \
-		if [ -z "$$value" ] && [ -f "$(ENV_FILE)" ]; then \
-			value="$$(awk -F= -v key="$$key" '$$1 == key { sub(/^[^=]*=/, "", $$0); value=$$0 } END { print value }' "$(ENV_FILE)")"; \
+		if [ -z "$$value" ] && [ -f "$(EFFECTIVE_ENV_FILE)" ]; then \
+			value="$$(awk -F= -v key="$$key" '$$1 == key { sub(/^[^=]*=/, "", $$0); value=$$0 } END { print value }' "$(EFFECTIVE_ENV_FILE)")"; \
 		fi; \
 		printf '%s' "$$value"; \
 	}; \
@@ -66,72 +67,72 @@ warn-local-unpinned-images:
 
 up:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
-	@bash scripts/ensure-local-runner-image.sh "$(ENV_FILE)"
-	@echo "→ Starting stack via compose ($(COMPOSE_FILE), env=$(ENV_FILE))"
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build --remove-orphans
+	@bash scripts/ensure-local-runner-image.sh "$(EFFECTIVE_ENV_FILE)"
+	@echo "→ Starting stack via compose ($(COMPOSE_FILE), env=$(EFFECTIVE_ENV_FILE))"
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build --remove-orphans
 
 down:
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" down
 
 logs:
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f --tail=200
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f --tail=200
 
 restart: down up
 
 ps:
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" ps
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" ps
 
 db-up:
 	@echo "→ Starting Postgres (db)"
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d db
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d db
 
 db-stop:
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" stop db
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" stop db
 
 db-logs:
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f --tail=200 db
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f --tail=200 db
 
 db-wait:
 	@echo "→ Waiting for Postgres to become ready"
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T db sh -lc 'for i in $$(seq 1 60); do pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" >/dev/null 2>&1 && echo "✔ Postgres is ready." && exit 0; sleep 1; done; echo "✖ Postgres not ready after 60s"; exit 1'
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T db sh -lc 'for i in $$(seq 1 60); do pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" >/dev/null 2>&1 && echo "✔ Postgres is ready." && exit 0; sleep 1; done; echo "✖ Postgres not ready after 60s"; exit 1'
 
 db-psql:
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec db sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" exec db sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
 requirements-init: db-up db-wait
 	@echo "→ Ensuring requirements tables exist"
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" run --rm --no-deps --build api python -c 'from services.server_requirements import WorkspaceServerRequirementsService; WorkspaceServerRequirementsService().list_requirements("bootstrap"); print("✔ requirements schema ready")'
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" run --rm --no-deps --build api python -c 'from services.server_requirements import WorkspaceServerRequirementsService; WorkspaceServerRequirementsService().list_requirements("bootstrap"); print("✔ requirements schema ready")'
 
 refresh-catalog:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --force-recreate catalog
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" restart api
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --force-recreate catalog
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" restart api
 
 ensure-local-runner-image:
-	@bash scripts/ensure-local-runner-image.sh "$(ENV_FILE)"
+	@bash scripts/ensure-local-runner-image.sh "$(EFFECTIVE_ENV_FILE)"
 
 web-sync:
 	@echo "→ Syncing web sources into running container"
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d web
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T web sh -lc 'rm -rf /tmp/web-src && mkdir -p /tmp/web-src'
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" cp apps/web/. web:/tmp/web-src
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T web sh -lc 'cd /tmp/web-src && npm ci && npm run build'
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T web sh -lc 'rm -rf /app/.next /app/public /app/server.js /app/package.json /app/node_modules; mkdir -p /app/.next; cp -a /tmp/web-src/.next/standalone/. /app/; cp -a /tmp/web-src/.next/static /app/.next/; cp -a /tmp/web-src/public /app/public'
-	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" restart web
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d web
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T web sh -lc 'rm -rf /tmp/web-src && mkdir -p /tmp/web-src'
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" cp apps/web/. web:/tmp/web-src
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T web sh -lc 'cd /tmp/web-src && npm ci && npm run build'
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" exec -T web sh -lc 'rm -rf /app/.next /app/public /app/server.js /app/package.json /app/node_modules; mkdir -p /app/.next; cp -a /tmp/web-src/.next/standalone/. /app/; cp -a /tmp/web-src/.next/static /app/.next/; cp -a /tmp/web-src/public /app/public'
+	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" restart web
 	@echo "✔ Web container refreshed."
 
 test-arch:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@$(MAKE) --no-print-directory ensure-local-runner-image
-	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build test-arch
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build test-arch
 
 test-env-up:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@$(MAKE) --no-print-directory ensure-local-runner-image
-	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build
 
 test-env-down:
-	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" down
 
 # Start the minimal test stack (api db catalog runner-manager web) under the test profile.
 # Pass image overrides via env, e.g.:
@@ -140,7 +141,7 @@ TEST_UP_SERVICES ?= api db catalog runner-manager web
 test-up:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@$(MAKE) --no-print-directory ensure-local-runner-image
-	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build $(TEST_UP_SERVICES)
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build $(TEST_UP_SERVICES)
 
 venv:
 	@test -d "$(VENV_DIR)" || python -m venv "$(VENV_DIR)"
@@ -176,7 +177,7 @@ test-perf: dirs
 	}; \
 	$(MAKE) --no-print-directory ensure-local-runner-image; \
 	started_here=0; \
-	running_services="$$(COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" ps --services --filter status=running)"; \
+	running_services="$$(COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" ps --services --filter status=running)"; \
 	if ! printf '%s\n' "$$running_services" | grep -qx api || \
 	   ! printf '%s\n' "$$running_services" | grep -qx runner-manager || \
 	   ! printf '%s\n' "$$running_services" | grep -qx web || \
@@ -198,7 +199,7 @@ test-perf: dirs
 	STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) scripts/verify_perf_artifacts.py; \
 	if [ "$$started_here" = "1" ]; then \
 		echo "→ Tearing down perf test stack"; \
-		COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down; \
+		COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" down; \
 	fi
 
 clean:

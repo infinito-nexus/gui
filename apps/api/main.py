@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 import time
+import ipaddress
 from typing import List
 
 from urllib.parse import urlparse
@@ -101,6 +102,44 @@ def _request_csrf_header(request: Request) -> str:
     return (request.headers.get("x-csrf") or "").strip()
 
 
+def _is_loopback_host(hostname: str | None) -> bool:
+    normalized = str(hostname or "").strip().strip("[]").lower()
+    if not normalized:
+        return False
+    if normalized == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(normalized).is_loopback
+    except ValueError:
+        return False
+
+
+def _request_external_origins(request: Request) -> list[str]:
+    candidates: list[str] = []
+    for header in ("origin", "referer"):
+        raw = (request.headers.get(header) or "").strip()
+        if raw:
+            candidates.append(raw)
+    forwarded_proto = (
+        (request.headers.get("x-forwarded-proto") or "").split(",", 1)[0].strip()
+    )
+    forwarded_host = (
+        (request.headers.get("x-forwarded-host") or "").split(",", 1)[0].strip()
+    )
+    if forwarded_host:
+        scheme = forwarded_proto or "https"
+        candidates.append(f"{scheme}://{forwarded_host}")
+    return candidates
+
+
+def _csrf_cookie_secure(request: Request) -> bool:
+    for raw_origin in _request_external_origins(request):
+        parsed = urlparse(raw_origin)
+        if parsed.scheme.lower() == "http" and _is_loopback_host(parsed.hostname):
+            return False
+    return True
+
+
 def _referrer_policy_for_request(request: Request | None) -> str:
     path = ((request.url.path if request is not None else "") or "").strip()
     if any(token in path for token in ("/credentials", "/vault/", "/ssh-keys")):
@@ -115,11 +154,11 @@ def _apply_security_headers(response, request: Request | None = None) -> None:
     )
 
 
-def _set_csrf_cookie(response, token: str) -> None:
+def _set_csrf_cookie(response, request: Request, token: str) -> None:
     response.set_cookie(
         key=_CSRF_COOKIE_NAME,
         value=token,
-        secure=True,
+        secure=_csrf_cookie_secure(request),
         httponly=False,
         samesite="strict",
         path="/",
@@ -162,7 +201,7 @@ def create_app() -> FastAPI:
                         content={"detail": "CSRF token mismatch"},
                     )
                     if not csrf_cookie:
-                        _set_csrf_cookie(response, _new_csrf_token())
+                        _set_csrf_cookie(response, request, _new_csrf_token())
                     _apply_security_headers(response, request)
                     status_code = int(response.status_code)
                     return response
@@ -188,7 +227,7 @@ def create_app() -> FastAPI:
                             },
                         )
                         if not auth_context.proxy_enabled and not csrf_cookie:
-                            _set_csrf_cookie(response, _new_csrf_token())
+                            _set_csrf_cookie(response, request, _new_csrf_token())
                         _apply_security_headers(response, request)
                         status_code = int(response.status_code)
                         return response
@@ -200,7 +239,7 @@ def create_app() -> FastAPI:
                         content={"detail": "request body exceeds INPUT_MAX_BODY_BYTES"},
                     )
                     if not auth_context.proxy_enabled and not csrf_cookie:
-                        _set_csrf_cookie(response, _new_csrf_token())
+                        _set_csrf_cookie(response, request, _new_csrf_token())
                     _apply_security_headers(response, request)
                     status_code = int(response.status_code)
                     return response
@@ -221,7 +260,7 @@ def create_app() -> FastAPI:
                             },
                         )
                         if not auth_context.proxy_enabled and not csrf_cookie:
-                            _set_csrf_cookie(response, _new_csrf_token())
+                            _set_csrf_cookie(response, request, _new_csrf_token())
                         _apply_security_headers(response, request)
                         status_code = int(response.status_code)
                         return response
@@ -229,7 +268,7 @@ def create_app() -> FastAPI:
             response = await call_next(request)
             status_code = int(getattr(response, "status_code", 500) or 500)
             if not auth_context.proxy_enabled and not csrf_cookie:
-                _set_csrf_cookie(response, _new_csrf_token())
+                _set_csrf_cookie(response, request, _new_csrf_token())
             _apply_security_headers(response, request)
             return response
         finally:

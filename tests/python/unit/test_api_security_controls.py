@@ -61,6 +61,21 @@ class TestApiSecurityControls(unittest.TestCase):
         self.assertIn("samesite=strict", set_cookie.lower())
         self.assertNotIn("httponly", set_cookie.lower())
 
+    def test_loopback_browser_requests_get_non_secure_csrf_cookie(self) -> None:
+        main_module = importlib.import_module("main")
+        os.environ["ALLOWED_ORIGINS"] = "http://127.0.0.1:3000"
+        os.environ["CORS_ALLOW_ORIGINS"] = ""
+        app = main_module.create_app()
+        client = TestClient(app)
+
+        response = client.get("/health", headers={"Referer": "http://127.0.0.1:3000/"})
+
+        self.assertEqual(response.status_code, 200)
+        set_cookie = response.headers.get("set-cookie", "")
+        self.assertIn("csrf=", set_cookie)
+        self.assertNotIn("secure", set_cookie.lower())
+        self.assertIn("samesite=strict", set_cookie.lower())
+
     def test_health_endpoint_payload_is_minimal(self) -> None:
         main_module = importlib.import_module("main")
         os.environ["ALLOWED_ORIGINS"] = "http://127.0.0.1:3000"

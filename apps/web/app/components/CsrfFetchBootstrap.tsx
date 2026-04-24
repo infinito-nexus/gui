@@ -20,6 +20,27 @@ export default function CsrfFetchBootstrap() {
   useLayoutEffect(() => {
     const nativeFetch = window.fetch.bind(window);
     const bootstrapFlag = "__infinitoCsrfBootstrapReady";
+    let csrfPrimePromise: Promise<string> | null = null;
+
+    const ensureCsrfCookie = async () => {
+      const existing = readCookie(CSRF_COOKIE_NAME);
+      if (existing) {
+        return existing;
+      }
+      if (!csrfPrimePromise) {
+        csrfPrimePromise = nativeFetch("/api/workspaces", {
+          cache: "no-store",
+          credentials: "same-origin",
+        })
+          .catch(() => null)
+          .then(() => {
+            const nextToken = readCookie(CSRF_COOKIE_NAME);
+            csrfPrimePromise = null;
+            return nextToken;
+          });
+      }
+      return (await csrfPrimePromise) || "";
+    };
 
     window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       const request = new Request(input, init);
@@ -29,7 +50,7 @@ export default function CsrfFetchBootstrap() {
         url.origin === window.location.origin &&
         STATE_CHANGING_METHODS.has(request.method.toUpperCase())
       ) {
-        const csrfToken = readCookie(CSRF_COOKIE_NAME);
+        const csrfToken = (await ensureCsrfCookie()) || readCookie(CSRF_COOKIE_NAME);
         if (csrfToken) {
           const headers = new Headers(request.headers);
           headers.set("X-CSRF", csrfToken);

@@ -13,3 +13,5 @@ examples/workspace-import.zip
 .codex
 *.lock
 *.egg-info
+!apps/api/requirements.lock
+apps/web/test-results/
