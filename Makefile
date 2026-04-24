@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -16,6 +16,7 @@ VENV_DIR       ?= .venv
 PYTHON         := $(VENV_DIR)/bin/python
 PIP            := $(VENV_DIR)/bin/pip
 RUFF           := $(VENV_DIR)/bin/ruff
+PRE_COMMIT     := $(VENV_DIR)/bin/pre-commit
 
 # Make tests import the app packages
 export PYTHONPATH := $(PWD)/apps/api
@@ -306,3 +307,10 @@ autoformat-shell:
 	else \
 		echo "→ (shfmt not installed, skipping)"; \
 	fi
+
+pre-commit-install:
+	@$(PIP) install --quiet "pre-commit>=3.7"
+	@$(PRE_COMMIT) install
+
+pre-commit-run:
+	@$(PRE_COMMIT) run --all-files
