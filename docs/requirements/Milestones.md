@@ -39,7 +39,7 @@ Users can configure a full inventory including credentials before deployment.
 
 ---
 
-## Milestone 3 – Live Deployment 🟡
+## Milestone 3 – Live Deployment ✅
 
 Deployment runs from the UI with live log streaming and cancellation.
 
@@ -57,11 +57,11 @@ Deployment runs from the UI with live log streaming and cancellation.
 - [x] Server selection is tabular; deployed servers are marked and non-selectable
 - [x] `--limit` is omitted when all selectable servers are selected
 - [x] Terminal uses all remaining space; no rounded corners
-- [ ] E2E test: full deploy flow of `web-app-dashboard` to a fresh local SSH container passes headless in CI (see [014](014-e2e-dashboard-deploy.md); local source/image strategy see [015](015-image-build-from-local-source.md))
+- [x] E2E test: full deploy flow of `web-app-dashboard` to a fresh local SSH container passes headless in CI (see [014](014-e2e-dashboard-deploy.md); local source/image strategy see [015](015-image-build-from-local-source.md))
 
 ---
 
-## Milestone 4 – Harden & Polish 🟡
+## Milestone 4 – Harden & Polish ✅
 
 UI refinements, view modes, server switcher, performance, and security hardening.
 
@@ -82,8 +82,8 @@ UI refinements, view modes, server switcher, performance, and security hardening
 - [x] Role index is cached; logo resolution is cached
 - [x] Secrets never appear in logs or browser devtools
 - [x] CORS restricted to UI origin; input validation everywhere
-- [~] Dashboard warm-cache load time is measured and enforced at < 1 s (see [016](016-performance-and-sse-scalability.md))
-- [~] 10 concurrent SSE viewers plus one late-joiner stay connected without API crash and within the documented latency/memory bounds (see [016](016-performance-and-sse-scalability.md))
+- [x] Dashboard warm-cache load time is measured and enforced at < 1 s (see [016](016-performance-and-sse-scalability.md))
+- [x] 10 concurrent SSE viewers plus one late-joiner stay connected without API crash and within the documented latency/memory bounds (see [016](016-performance-and-sse-scalability.md))
 
 ---
 
@@ -172,7 +172,7 @@ LDAP-based user management available after a successful deployment with Keycloak
 
 ---
 
-## Milestone 9 – Observability & Audit Logging ⬜
+## Milestone 9 – Observability & Audit Logging ✅
 
 All API actions are written to a database with retention, export, and configurable filtering.
 
@@ -182,15 +182,15 @@ All API actions are written to a database with retention, export, and configurab
 
 **Acceptance Criteria**
 
-- [ ] Every backend API request creates exactly one structured audit event in the database
-- [ ] Audit records include: timestamp, workspace_id, user, method, path, status, duration_ms, optional request_id and user-agent
-- [ ] Plaintext secrets and vault passwords are never written to audit records
-- [ ] Audit records are workspace-scoped; no cross-workspace visibility
-- [ ] Configurable retention (default 6 months); expired records deleted automatically
-- [ ] Per-workspace logging policy (`all` / `writes-only` / `auth-only` / `deployment-only` / `errors-only`; health endpoints excludable)
-- [ ] `GET /api/workspaces/{id}/logs/entries` with pagination and filters (from, to, user, ip, q, status, method)
-- [ ] `GET /api/workspaces/{id}/logs/entries/export` supporting JSONL, CSV, and ZIP for large sets
-- [ ] Audit Logs UI view with filter, pagination, and export
-- [ ] Access to audit endpoints is RBAC-protected
-- [ ] Audit writing is non-blocking; cleanup/export runs in background jobs
-- [ ] All backend and Playwright tests pass headless in CI
+- [x] Every backend API request creates exactly one structured audit event in the database
+- [x] Audit records include: timestamp, workspace_id, user, method, path, status, duration_ms, optional request_id and user-agent
+- [x] Plaintext secrets and vault passwords are never written to audit records
+- [x] Audit records are workspace-scoped; no cross-workspace visibility
+- [x] Configurable retention (default 6 months); expired records deleted automatically
+- [x] Per-workspace logging policy (`all` / `writes-only` / `auth-only` / `deployment-only` / `errors-only`; health endpoints excludable)
+- [x] `GET /api/workspaces/{id}/logs/entries` with pagination and filters (from, to, user, ip, q, status, method)
+- [x] `GET /api/workspaces/{id}/logs/entries/export` supporting JSONL, CSV, and ZIP for large sets
+- [x] Audit Logs UI view with filter, pagination, and export
+- [x] Access to audit endpoints is RBAC-protected
+- [x] Audit writing is non-blocking; cleanup/export runs in background jobs
+- [x] All backend and Playwright tests pass headless in CI

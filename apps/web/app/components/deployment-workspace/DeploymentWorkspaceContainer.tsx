@@ -32,10 +32,14 @@ import { useDeploymentWorkspaceEffects } from "./useDeploymentWorkspaceEffects";
 import { useInfinitoNexusVersion } from "./useInfinitoNexusVersion";
 export default function DeploymentWorkspace({
   baseUrl,
+  streamBaseUrl,
   onJobCreated,
+  initialRoles = [],
+  initialPanel = "store",
+  initialWorkspaceId,
 }: DeploymentWorkspaceProps) {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [rolesLoading, setRolesLoading] = useState(true);
+  const [roles, setRoles] = useState<Role[]>(() => initialRoles);
+  const [rolesLoading, setRolesLoading] = useState(initialRoles.length === 0);
   const [rolesError, setRolesError] = useState<string | null>(null);
   const [servers, setServers] = useState<ServerState[]>([]);
   const [activeAlias, setActiveAlias] = useState("");
@@ -69,7 +73,9 @@ export default function DeploymentWorkspace({
   const lastDeploymentSelectionRef = useRef<string[] | null>(null);
   const uiQueryReadyRef = useRef(false);
   const pendingAliasFromQueryRef = useRef("");
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(
+    initialWorkspaceId ?? null
+  );
   const [workspacePrimaryDomain, setWorkspacePrimaryDomain] = useState(
     DEFAULT_PRIMARY_DOMAIN
   );
@@ -121,7 +127,7 @@ export default function DeploymentWorkspace({
   const [domainPopupTargetAlias, setDomainPopupTargetAlias] = useState<
     string | null
   >(null);
-  const [activePanel, setActivePanel] = useState<PanelKey>("intro");
+  const [activePanel, setActivePanel] = useState<PanelKey>(initialPanel);
   const [accountTab, setAccountTab] = useState<AccountTabKey>("profile");
   const handleModeChange = useCallback(
     (mode: "customer" | "expert") => {
@@ -344,7 +350,7 @@ export default function DeploymentWorkspace({
     [servers]
   );
   const panels = buildDeploymentWorkspacePanels({
-    baseUrl, roles, rolesLoading, rolesError, selectedRoles,
+    baseUrl, streamBaseUrl, roles, rolesLoading, rolesError, selectedRoles,
     onToggleSelected: toggleSelected, onLoadRoleAppConfig: loadRoleAppConfig, onSaveRoleAppConfig: saveRoleAppConfig, onImportRoleAppDefaults: importRoleAppDefaults,
     activeAlias, servers, serverMetaByAlias, selectedRolesByAlias, onToggleSelectedForAlias: toggleSelectedForAlias, selectedPlansByAlias, onSelectRolePlanForAlias: selectRolePlanForAlias,
     serverSwitcher, onCreateServerForTarget: addServerWithDefaults, deviceMode, onModeChange: handleModeChange, domainFilterQuery, onDomainFilterQueryChange: setDomainFilterQuery,
@@ -395,7 +401,7 @@ export default function DeploymentWorkspace({
     [panels]
   );
   useDeploymentWorkspaceEffects({
-    baseUrl, setRoles, setRolesLoading, setRolesError, setAccountTab, setActivePanel, setDeviceMode, pendingAliasFromQueryRef, uiQueryReadyRef, activeAlias, servers,
+    baseUrl, initialRolesLoaded: initialRoles.length > 0, setRoles, setRolesLoading, setRolesError, setAccountTab, setActivePanel, setDeviceMode, pendingAliasFromQueryRef, uiQueryReadyRef, activeAlias, servers,
     setActiveAlias, setSelectedByAlias, workspaceId, setDeployedAliases, setConnectionResults, setDeploySelection, setDeployRoleFilter, setSelectedPlansByAlias,
     setAliasRenames, setAliasDeletes, setAliasCleanups, setLiveJobId, setLiveConnected, setLiveCanceling, setLiveError, setOpenCredentialsAlias, setExpertConfirmOpen,
     setDetailSearchOpen, setDetailSearchTargetAlias, setPrimaryDomainDraft, setPrimaryDomainModalError, setPrimaryDomainModalSaving, setDomainFilterQuery, setDomainFilterKind,

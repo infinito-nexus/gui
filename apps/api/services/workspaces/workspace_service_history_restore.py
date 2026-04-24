@@ -8,14 +8,13 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import yaml
 from fastapi import HTTPException
 
 from services.job_runner.util import safe_mkdir
 from .workspace_context import (
     WORKSPACE_META_FILENAME,
-    _WorkspaceYamlLoader,
     _safe_resolve,
+    load_workspace_yaml_document,
 )
 
 
@@ -68,7 +67,7 @@ class WorkspaceServiceHistoryRestoreMixin:
                 if suffix == ".json":
                     json.loads(raw or "{}")
                 else:
-                    yaml.load(raw or "{}", Loader=_WorkspaceYamlLoader)
+                    load_workspace_yaml_document(raw or "{}")
             except Exception as exc:
                 rel = path.relative_to(snapshot_root).as_posix()
                 raise HTTPException(

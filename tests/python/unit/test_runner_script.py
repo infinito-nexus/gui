@@ -59,3 +59,10 @@ class TestRunnerScript(unittest.TestCase):
             self.assertIn("+ bash -lc echo\\ cli-command", proc.stdout)
             self.assertIn("cli-command", proc.stdout)
             self.assertNotIn("should-not-run", proc.stdout)
+
+    def test_runner_script_is_group_executable_for_runner_manager(self) -> None:
+        with TemporaryDirectory() as tmp:
+            run_path = Path(tmp) / "run.sh"
+            write_runner_script(run_path)
+
+            self.assertEqual(run_path.stat().st_mode & 0o777, 0o750)

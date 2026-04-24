@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import re
 from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 AuthMethod = Literal["password", "private_key"]
+ROLE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]{0,63}$")
 
 
 class DeploymentAuth(BaseModel):
@@ -67,6 +69,14 @@ class DeploymentRequest(BaseModel):
         min_length=1,
         description="Optional Infinito.Nexus version selector (latest or stable semver)",
     )
+    playbook_path: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Optional workspace-relative playbook path. When set, the runner executes "
+            "this playbook directly instead of the role-based infinito deploy command."
+        ),
+    )
     limit: Optional[str] = Field(
         default=None, description="Optional Ansible --limit (inventory alias)"
     )
@@ -83,7 +93,12 @@ class DeploymentRequest(BaseModel):
             raise ValueError("must not be empty")
         return s
 
-    @field_validator("limit", "master_password", "infinito_nexus_version")
+    @field_validator(
+        "limit",
+        "master_password",
+        "infinito_nexus_version",
+        "playbook_path",
+    )
     @classmethod
     def _strip_optional_string(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
@@ -93,7 +108,7 @@ class DeploymentRequest(BaseModel):
 
     @field_validator("selected_roles")
     @classmethod
-    def _clean_and_require_roles(cls, v: List[str]) -> List[str]:
+    def _clean_roles(cls, v: List[str]) -> List[str]:
         out: List[str] = []
         seen: set[str] = set()
 
@@ -103,14 +118,23 @@ class DeploymentRequest(BaseModel):
             s = x.strip()
             if not s:
                 continue
+            if not ROLE_ID_RE.match(s):
+                raise ValueError(
+                    "selected_roles entries must match ^[a-z0-9][a-z0-9\\-_]{0,63}$"
+                )
             if s not in seen:
                 out.append(s)
                 seen.add(s)
 
-        if not out:
-            raise ValueError("must not be empty")
-
         return out
+
+    @model_validator(mode="after")
+    def _require_roles_or_playbook(self) -> "DeploymentRequest":
+        if not self.selected_roles and not self.playbook_path:
+            raise ValueError(
+                "selected_roles must not be empty when playbook_path is absent"
+            )
+        return self
 
 
 class InventoryPreviewOut(BaseModel):

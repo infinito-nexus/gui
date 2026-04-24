@@ -52,6 +52,7 @@ def ensure_workspace_access(
     request: Request, workspace_id: str, svc: "WorkspaceService"
 ) -> AuthContext:
     ctx = resolve_auth_context(request)
+    request.state.audit_workspace_id = (workspace_id or "").strip() or None
     svc.assert_workspace_access(workspace_id, ctx.user_id)
     return ctx
 

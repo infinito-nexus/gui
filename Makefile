@@ -1,10 +1,15 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init test-arch test-env-up test-env-down test-up web-sync venv install test clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci lint lint-python lint-shell autoformat autoformat-python autoformat-shell
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
 DOCKER_COMPOSE ?= docker compose
 COMPOSE_FILE   ?= docker-compose.yml
 ENV_FILE       ?= .env
+DOCKER_SOCKET_PATH ?= /var/run/docker.sock
+export DOCKER_SOCKET_GID ?= $(shell stat -c '%g' "$(DOCKER_SOCKET_PATH)" 2>/dev/null || printf '10900')
+CI_INFINITO_NEXUS_IMAGE ?= ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
+CI_JOB_RUNNER_IMAGE ?= ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb
+CI_POSTGRES_IMAGE ?= postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
 
 VENV_DIR       ?= .venv
 PYTHON         := $(VENV_DIR)/bin/python
@@ -34,7 +39,34 @@ dirs:
 	@mkdir -p state
 	@echo "→ Ensured state/ directory exists"
 
+warn-local-unpinned-images:
+	@set -e; \
+	resolve_from_env() { \
+		key="$$1"; \
+		value="$$(printenv "$$key" 2>/dev/null || true)"; \
+		if [ -z "$$value" ] && [ -f "$(ENV_FILE)" ]; then \
+			value="$$(awk -F= -v key="$$key" '$$1 == key { sub(/^[^=]*=/, "", $$0); value=$$0 } END { print value }' "$(ENV_FILE)")"; \
+		fi; \
+		printf '%s' "$$value"; \
+	}; \
+	warn_if_unpinned() { \
+		image="$$1"; \
+		if [ -n "$$image" ] && ! printf '%s' "$$image" | grep -Eq '@sha256:[0-9a-f]{64}$$'; then \
+			echo "WARN: unpinned local image $$image, digest pinning enforced only in CI/prod"; \
+		fi; \
+	}; \
+	catalog_image="$$(resolve_from_env INFINITO_NEXUS_IMAGE)"; \
+	runner_image="$$(resolve_from_env JOB_RUNNER_IMAGE)"; \
+	if [ -z "$$runner_image" ]; then runner_image="$$catalog_image"; fi; \
+	db_image="$$(resolve_from_env POSTGRES_IMAGE)"; \
+	if [ -z "$$db_image" ]; then db_image="postgres:16-alpine"; fi; \
+	warn_if_unpinned "$$catalog_image"; \
+	if [ "$$runner_image" != "$$catalog_image" ]; then warn_if_unpinned "$$runner_image"; fi; \
+	warn_if_unpinned "$$db_image"
+
 up:
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
+	@bash scripts/ensure-local-runner-image.sh "$(ENV_FILE)"
 	@echo "→ Starting stack via compose ($(COMPOSE_FILE), env=$(ENV_FILE))"
 	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build --remove-orphans
 
@@ -71,8 +103,12 @@ requirements-init: db-up db-wait
 	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" run --rm --no-deps --build api python -c 'from services.server_requirements import WorkspaceServerRequirementsService; WorkspaceServerRequirementsService().list_requirements("bootstrap"); print("✔ requirements schema ready")'
 
 refresh-catalog:
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --force-recreate catalog
 	@$(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" restart api
+
+ensure-local-runner-image:
+	@bash scripts/ensure-local-runner-image.sh "$(ENV_FILE)"
 
 web-sync:
 	@echo "→ Syncing web sources into running container"
@@ -85,20 +121,26 @@ web-sync:
 	@echo "✔ Web container refreshed."
 
 test-arch:
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
+	@$(MAKE) --no-print-directory ensure-local-runner-image
 	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build test-arch
 
 test-env-up:
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
+	@$(MAKE) --no-print-directory ensure-local-runner-image
 	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build
 
 test-env-down:
 	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down
 
-# Start the minimal test stack (api db catalog web) under the test profile.
+# Start the minimal test stack (api db catalog runner-manager web) under the test profile.
 # Pass image overrides via env, e.g.:
 #   INFINITO_NEXUS_IMAGE=infinito-debian:latest JOB_RUNNER_IMAGE=infinito-debian:latest make test-up
-TEST_UP_SERVICES ?= api db catalog web
+TEST_UP_SERVICES ?= api db catalog runner-manager web
 test-up:
-	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d $(TEST_UP_SERVICES)
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
+	@$(MAKE) --no-print-directory ensure-local-runner-image
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build $(TEST_UP_SERVICES)
 
 venv:
 	@test -d "$(VENV_DIR)" || python -m venv "$(VENV_DIR)"
@@ -109,13 +151,55 @@ install: venv
 
 test: dirs install
 	@echo "→ Running Python unit tests"
-	@STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest discover -s tests/python -p "test_*.py" -t . -v
+	@STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest discover -s tests/python/unit -p "test_*.py" -t . -v
 	@echo "→ Running Python integration tests"
-	@if ls tests/python/integration/test_*.py >/dev/null 2>&1; then STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest discover -s tests/python/integration -p "test_*.py" -t . -v; else echo "→ (no python integration tests)"; fi
+	@modules=$$(find tests/python/integration -maxdepth 1 -name 'test_*.py' ! -name 'test_perf_*.py' -printf '%f\n' 2>/dev/null | sed 's/\.py$$//' | sed 's/^/tests.python.integration./'); \
+	if [ -n "$$modules" ]; then \
+		STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest $$modules -v; \
+	else \
+		echo "→ (no python integration tests)"; \
+	fi
 	@echo "→ Running Node unit tests"
 	@STATE_DIR="$(TEST_STATE_DIR)" node --test tests/node/unit/*.mjs
 	@echo "→ Running Node integration tests"
 	@if ls tests/node/integration/*.mjs >/dev/null 2>&1; then STATE_DIR="$(TEST_STATE_DIR)" node --test tests/node/integration/*.mjs; else echo "→ (no node integration tests)"; fi
+
+test-perf: dirs
+	@set -e; \
+	if [ ! -x "$(PYTHON)" ]; then \
+		echo "✖ Missing $(PYTHON). Run 'make install' once before 'make test-perf'."; \
+		exit 1; \
+	fi; \
+	"$(PYTHON)" -c 'import httpx, psycopg, yaml' >/dev/null 2>&1 || { \
+		echo "✖ Python perf dependencies are missing in $(VENV_DIR). Run 'make install' first."; \
+		exit 1; \
+	}; \
+	$(MAKE) --no-print-directory ensure-local-runner-image; \
+	started_here=0; \
+	running_services="$$(COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" ps --services --filter status=running)"; \
+	if ! printf '%s\n' "$$running_services" | grep -qx api || \
+	   ! printf '%s\n' "$$running_services" | grep -qx runner-manager || \
+	   ! printf '%s\n' "$$running_services" | grep -qx web || \
+	   ! printf '%s\n' "$$running_services" | grep -qx ssh-password; then \
+		echo "→ Starting test stack for perf harness"; \
+		$(MAKE) test-up TEST_UP_SERVICES="api db catalog runner-manager web ssh-password"; \
+		started_here=1; \
+	fi; \
+	mkdir -p state/perf/016; \
+	echo "→ Running Python perf tests"; \
+	STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest tests.python.integration.test_perf_role_index tests.python.integration.test_perf_sse_scalability -v; \
+	echo "→ Running dashboard perf Playwright spec"; \
+	if [ ! -d apps/web/node_modules ]; then (cd apps/web && npm ci); fi; \
+	if ! find "$$HOME/.cache/ms-playwright" -maxdepth 1 -type d -name 'chromium-*' -print -quit 2>/dev/null | grep -q .; then \
+		(cd apps/web && npx playwright install chromium >/dev/null); \
+	fi; \
+	(cd apps/web && PLAYWRIGHT_BASE_URL="http://127.0.0.1:$${WEB_PORT:-3000}" npx playwright test -c playwright.dashboard.config.ts tests/dashboard-perf.spec.ts); \
+	echo "→ Verifying perf result artifacts"; \
+	STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) scripts/verify_perf_artifacts.py; \
+	if [ "$$started_here" = "1" ]; then \
+		echo "→ Tearing down perf test stack"; \
+		COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(ENV_FILE)" -f "$(COMPOSE_FILE)" down; \
+	fi
 
 clean:
 	@rm -rf "$(VENV_DIR)" state
@@ -130,6 +214,7 @@ example-workspace-zip:
 	@echo "✔ Created $(EXAMPLE_WORKSPACE_ZIP)"
 
 e2e-dashboard-local:
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@INFINITO_NEXUS_SRC_DIR="$(INFINITO_NEXUS_SRC_DIR)" ./scripts/e2e/dashboard/run.sh local
 
 e2e-dashboard-ci:
@@ -142,9 +227,41 @@ lint: lint-python lint-shell
 
 lint-python:
 	@echo "→ ruff check"
-	@$(RUFF) check .
+	@files=$$(git ls-files '*.py' '*.pyi' | rg -v '^e2e/repo-cache/' || true); \
+	if [ -n "$$files" ]; then \
+		$(RUFF) check $$files; \
+	else \
+		echo "→ (no tracked Python files)"; \
+	fi
 	@echo "→ ruff format --check"
-	@$(RUFF) format --check .
+	@files=$$(git ls-files '*.py' '*.pyi' | rg -v '^e2e/repo-cache/' || true); \
+	if [ -n "$$files" ]; then \
+		$(RUFF) format --check $$files; \
+	else \
+		echo "→ (no tracked Python files)"; \
+	fi
+	@echo "→ banned-pattern check"
+	@failed=0; \
+	check_pattern() { \
+		label="$$1"; \
+		pattern="$$2"; \
+		shift 2; \
+		paths="$$@"; \
+		if rg -n -- "$$pattern" $$paths >/dev/null; then \
+			echo "✖ banned $$label usage found in tracked sources"; \
+			rg -n -- "$$pattern" $$paths; \
+			failed=1; \
+		else \
+			echo "→ no banned $$label usage found"; \
+		fi; \
+	}; \
+	check_pattern "yaml.load(" "yaml\\.load\\(" apps tests; \
+	check_pattern "eval(" "\\beval\\(" apps tests; \
+	check_pattern "shell=True" "shell=True" apps tests; \
+	check_pattern "mode=0o777" "mode\\s*=\\s*0o777" apps tests; \
+	sh_files=$$(git ls-files '*.sh' | rg -v '^e2e/repo-cache/' || true); \
+	check_pattern "privileged container flags" "(--privileged|privileged:[[:space:]]*true)" docker-compose.yml docker-compose.ssh-test.yml $$sh_files; \
+	if [ "$$failed" -ne 0 ]; then exit 1; fi
 
 lint-shell:
 	@echo "→ shellcheck (tracked *.sh)"
@@ -166,9 +283,19 @@ autoformat: autoformat-python autoformat-shell
 
 autoformat-python:
 	@echo "→ ruff check --fix"
-	@$(RUFF) check . --fix
+	@files=$$(git ls-files '*.py' '*.pyi' | rg -v '^e2e/repo-cache/' || true); \
+	if [ -n "$$files" ]; then \
+		$(RUFF) check $$files --fix; \
+	else \
+		echo "→ (no tracked Python files)"; \
+	fi
 	@echo "→ ruff format"
-	@$(RUFF) format .
+	@files=$$(git ls-files '*.py' '*.pyi' | rg -v '^e2e/repo-cache/' || true); \
+	if [ -n "$$files" ]; then \
+		$(RUFF) format $$files; \
+	else \
+		echo "→ (no tracked Python files)"; \
+	fi
 
 autoformat-shell:
 	@if command -v shfmt >/dev/null 2>&1; then \

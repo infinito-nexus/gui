@@ -152,21 +152,21 @@ Any bug or code-quality issue discovered while implementing or running this test
 - [x] Credential generation completes without exposing plaintext secrets in the visible UI, browser console, browser network payloads, or SSE stream.
 - [x] The Setup screen lists the target row as selectable and not already deployed before deployment starts.
 - [x] Starting deployment activates the live terminal/log view and emits log lines within 3 seconds.
-- [ ] Live log streaming is realtime: the measured delay between an API-received log line and its UI rendering never exceeds 30 seconds.
-  - [ ] The harness records the server-side `[RX:<unix_ms>]` timestamp for every rendered line and compares it to `Date.now()` at render time.
-  - [ ] The run fails on the first observed line whose receive-to-render delay exceeds 30 seconds and surfaces the offending line in test output.
+- [x] Live log streaming is realtime: the measured delay between an API-received log line and its UI rendering never exceeds 30 seconds.
+  - [x] The harness records the server-side `[RX:<unix_ms>]` timestamp for every rendered line and compares it to `Date.now()` at render time.
+  - [x] The run fails on the first observed line whose receive-to-render delay exceeds 30 seconds and surfaces the offending line in test output.
 - [x] The deployment completes with exit code `0` and a visible success state.
 - [x] The final deployed dashboard responds with HTTP `200` via the deterministic endpoint defined by the test stack or harness.
-- [ ] Re-running the test from fresh anonymous state is reproducible.
-  - [ ] The same dedicated E2E entry point runs successfully twice in succession without manual cleanup beyond its own setup/teardown.
-  - [ ] Each run starts with a fresh browser context and a newly auto-created anonymous workspace.
+- [x] Re-running the test from fresh anonymous state is reproducible.
+  - [x] The same dedicated E2E entry point runs successfully twice in succession without manual cleanup beyond its own setup/teardown.
+  - [x] Each run starts with a fresh browser context and a newly auto-created anonymous workspace.
 
 ### Security and Quality
 
 - [x] No plaintext SSH passwords, vault passwords, private keys, or generated credentials appear in logs, SSE events, browser console output, or browser network payloads.
-- [ ] All deployer-repository-local bugs or warnings discovered while implementing this flow are fixed before the requirement is marked done.
-  - [ ] The final green run no longer depends on any temporary debug artifact listed below.
-  - [ ] No runtime warning or error remains in the touched deployer services for the exercised happy path.
+- [x] All deployer-repository-local bugs or warnings discovered while implementing this flow are fixed before the requirement is marked done.
+  - [x] The final green run no longer depends on any temporary debug artifact listed below.
+  - [x] No runtime warning or error remains in the touched deployer services for the exercised happy path.
 - [x] All modified or newly written code conforms to the project coding rules.
 - [x] No lint errors, type errors, or test warnings remain in the affected code paths.
 

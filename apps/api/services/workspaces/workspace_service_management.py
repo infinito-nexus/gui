@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import shutil
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -14,8 +13,11 @@ from .paths import workspace_dir, workspaces_root
 from .vault import _ensure_secrets_dirs
 from .workspace_context import (
     _HIDDEN_FILES,
+    _dump_yaml_mapping,
     _ensure_workspace_root,
     _load_meta,
+    _merge_missing,
+    _new_workspace_id,
     _now_iso,
     _safe_resolve,
     _sanitize_workspace_id,
@@ -23,6 +25,7 @@ from .workspace_context import (
     _to_entry,
     _workspace_last_modified_iso,
     _write_meta,
+    load_workspace_yaml_document,
 )
 
 
@@ -34,7 +37,7 @@ class WorkspaceServiceManagementMixin:
         self, *, owner_id: str | None = None, owner_email: str | None = None
     ) -> dict[str, Any]:
         _ensure_workspace_root()
-        workspace_id = uuid.uuid4().hex[:12]
+        workspace_id = _new_workspace_id()
         root = workspace_dir(workspace_id)
         safe_mkdir(root)
         safe_mkdir(root / "host_vars")
@@ -209,14 +212,54 @@ class WorkspaceServiceManagementMixin:
                 status_code=500, detail=f"failed to read file: {exc}"
             ) from exc
 
+    def _preserve_host_vars_applications(
+        self,
+        target: Path,
+        content: str,
+    ) -> str:
+        if target.parent.name != "host_vars" or target.suffix not in {".yml", ".yaml"}:
+            return content
+        if not target.is_file():
+            return content
+
+        try:
+            incoming_loaded = load_workspace_yaml_document(content)
+            existing_loaded = load_workspace_yaml_document(
+                target.read_text(encoding="utf-8", errors="replace")
+            )
+        except Exception:
+            return content
+
+        if not isinstance(incoming_loaded, dict) or not isinstance(
+            existing_loaded, dict
+        ):
+            return content
+
+        existing_applications = existing_loaded.get("applications")
+        if not isinstance(existing_applications, dict) or not existing_applications:
+            return content
+
+        incoming_applications = incoming_loaded.get("applications")
+        if incoming_applications is None:
+            incoming_applications = {}
+            incoming_loaded["applications"] = incoming_applications
+        if not isinstance(incoming_applications, dict):
+            return content
+
+        merged_paths = _merge_missing(incoming_applications, existing_applications)
+        if merged_paths <= 0:
+            return content
+        return _dump_yaml_mapping(incoming_loaded)
+
     def write_file(self, workspace_id: str, rel_path: str, content: str) -> None:
         with self.workspace_write_lock(workspace_id):
             root = self.ensure(workspace_id)
             target = _safe_resolve(root, rel_path)
             existed_before = target.exists()
             safe_mkdir(target.parent)
+            content_to_write = self._preserve_host_vars_applications(target, content)
             try:
-                atomic_write_text(target, content)
+                atomic_write_text(target, content_to_write)
             except Exception as exc:
                 raise HTTPException(
                     status_code=500, detail=f"failed to write file: {exc}"

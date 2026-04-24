@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createWorkspacePanelCoreActions } from "./actions-core";
 import { createWorkspacePanelVaultActions } from "./actions-vault";
 import { createWorkspacePanelFileActions } from "./actions-files";
@@ -232,11 +232,17 @@ export function useWorkspacePanelActions(ctx: any) {
     setUploadStatus,
   });
 
+  const initWorkspaceRef = useRef(coreActions.initWorkspace);
+
+  useEffect(() => {
+    initWorkspaceRef.current = coreActions.initWorkspace;
+  }, [coreActions.initWorkspace]);
+
   useEffect(() => {
     let alive = true;
     void (async () => {
       if (!alive) return;
-      await coreActions.initWorkspace();
+      await initWorkspaceRef.current();
     })();
     return () => {
       alive = false;
@@ -250,7 +256,14 @@ export function useWorkspacePanelActions(ctx: any) {
     setKdbxLoading(false);
     setKdbxRevealed({});
     kdbxPasswordRef.current = "";
-  }, [isKdbx]);
+  }, [
+    isKdbx,
+    kdbxPasswordRef,
+    setKdbxEntries,
+    setKdbxError,
+    setKdbxLoading,
+    setKdbxRevealed,
+  ]);
 
   const openMasterPasswordDialog = () => {
     setMasterChangeMode(hasCredentialsVault ? "reset" : "set");

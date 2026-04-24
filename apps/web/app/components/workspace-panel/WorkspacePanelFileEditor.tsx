@@ -2,11 +2,8 @@
 
 import type { CSSProperties } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import dynamic from "next/dynamic";
 import { findVaultBlock } from "./utils";
 import styles from "./WorkspacePanelFileEditor.module.css";
-
-const ReactQuill = dynamic(() => import("react-quill"), { ssr: false });
 
 export default function WorkspacePanelFileEditor(props: any) {
   const {
@@ -29,11 +26,6 @@ export default function WorkspacePanelFileEditor(props: any) {
     editorViewRef,
     setContextMenu,
     setEditorMenu,
-    markdownHtml,
-    setMarkdownHtml,
-    markdownSyncRef,
-    turndown,
-    quillModules,
     kdbxLoading,
     kdbxError,
     kdbxEntries,
@@ -147,20 +139,19 @@ export default function WorkspacePanelFileEditor(props: any) {
               </div>
               {activeExtension === "markdown" ? (
                 <div className={styles.editorSurface}>
-                  <ReactQuill
-                    theme="snow"
-                    value={markdownHtml}
+                  <CodeMirror
+                    value={editorValue}
+                    height="100%"
+                    className={styles.codeEditor}
+                    onCreateEditor={(view) => {
+                      editorViewRef.current = view;
+                    }}
                     onChange={(value) => {
-                      markdownSyncRef.current = true;
-                      setMarkdownHtml(value);
-                      const nextMarkdown = turndown.turndown(value || "");
-                      setEditorValue(nextMarkdown);
+                      setEditorValue(value);
                       setEditorDirty(true);
                       setEditorStatus(null);
                       setEditorError(null);
                     }}
-                    modules={quillModules}
-                    className={styles.quillWrap}
                   />
                 </div>
               ) : isKdbx ? (

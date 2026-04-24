@@ -286,6 +286,7 @@ export function useWorkspacePanelSyncEffects({
 
     void run();
   }, [
+    baseUrl,
     workspaceId,
     inventoryReady,
     aliasRenames,
@@ -340,6 +341,7 @@ export function useWorkspacePanelSyncEffects({
 
     void run();
   }, [
+    baseUrl,
     workspaceId,
     inventoryReady,
     aliasDeletes,
@@ -465,9 +467,9 @@ export function useWorkspacePanelSyncEffects({
     hostVarsPath,
     activePath,
     editorDirty,
+    hostVarsSyncTimerRef,
     syncHostVarsFromCredentials,
     syncServerRequirementsFromCredentials,
-    hostVarsSyncTimerRef,
   ]);
 
   useEffect(() => {

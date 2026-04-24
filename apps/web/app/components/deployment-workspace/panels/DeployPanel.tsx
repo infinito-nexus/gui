@@ -17,6 +17,7 @@ type DeployConnectionState = {
 
 type DeployPanelProps = {
   baseUrl: string;
+  streamBaseUrl?: string;
   deployViewTab: "live-log" | "terminal";
   onDeployViewTabChange: (tab: "live-log" | "terminal") => void;
   deployError: string | null;
@@ -88,6 +89,7 @@ function computeRoleView(
 
 export default function DeployPanel({
   baseUrl,
+  streamBaseUrl,
   deployViewTab,
   onDeployViewTabChange,
   deployError,
@@ -429,6 +431,7 @@ export default function DeployPanel({
           <div className={styles.liveWrap}>
             <LiveDeploymentView
               baseUrl={baseUrl}
+              streamBaseUrl={streamBaseUrl}
               jobId={liveJobId}
               compact
               fill

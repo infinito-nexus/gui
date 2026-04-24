@@ -16,6 +16,9 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 APPS_WEB_DIR="${REPO_ROOT}/apps/web"
 STATE_DIR="${REPO_ROOT}/state"
 ENV_SOURCE="${REPO_ROOT}/.env"
+CI_CATALOG_IMAGE_DEFAULT="ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023"
+CI_RUNNER_IMAGE_DEFAULT="ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb"
+CI_POSTGRES_IMAGE_DEFAULT="postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2"
 
 if [[ ! -f "${ENV_SOURCE}" ]]; then
   ENV_SOURCE="${REPO_ROOT}/env.example"
@@ -29,6 +32,56 @@ resolve_dir() {
     cd "${target}"
     pwd -P
   )
+}
+
+warn_unpinned_local_image() {
+  local image_ref="${1}"
+  if [[ -n "${image_ref}" && ! "${image_ref}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+    echo "WARN: unpinned local image ${image_ref}, digest pinning enforced only in CI/prod"
+  fi
+}
+
+ensure_state_dir_access() {
+  local repair_image="${1}"
+  local current_uid current_gid
+  current_uid="$(id -u)"
+  current_gid="$(id -g)"
+
+  mkdir -p "${STATE_DIR}"
+  if [[ -d "${STATE_DIR}" && -r "${STATE_DIR}" && -w "${STATE_DIR}" && -x "${STATE_DIR}" ]]; then
+    return 0
+  fi
+
+  echo "→ Repairing repo-local state/ ownership for the current user (${current_uid}:${current_gid})"
+  docker run --rm \
+    -v "${STATE_DIR}:/mnt" \
+    "${repair_image}" \
+    sh -lc "chown ${current_uid}:${current_gid} /mnt && chmod 0755 /mnt"
+
+  if [[ ! -d "${STATE_DIR}" || ! -r "${STATE_DIR}" || ! -w "${STATE_DIR}" || ! -x "${STATE_DIR}" ]]; then
+    echo "✖ state/ is still not accessible after ownership repair." >&2
+    echo "  Run: docker run --rm -v \"${STATE_DIR}:/mnt\" \"${repair_image}\" sh -lc 'chown ${current_uid}:${current_gid} /mnt && chmod 0755 /mnt'" >&2
+    exit 1
+  fi
+}
+
+resolve_docker_socket_path() {
+  local socket_path="${DOCKER_SOCKET_PATH:-/var/run/docker.sock}"
+  printf '%s\n' "${socket_path}"
+}
+
+resolve_docker_socket_gid() {
+  local socket_path
+  socket_path="$(resolve_docker_socket_path)"
+
+  if [[ ! -S "${socket_path}" ]]; then
+    echo "✖ Docker socket is missing or not a Unix socket: ${socket_path}" >&2
+    echo "  Run: ls -ln ${socket_path}" >&2
+    echo "  Run: stat -c '%u %g %a %n' ${socket_path}" >&2
+    exit 1
+  fi
+
+  stat -c '%g' "${socket_path}"
 }
 
 require_src_dir() {
@@ -72,27 +125,65 @@ build_local_image() {
   )
 }
 
+prepare_local_repo_cache() {
+  local cache_output
+  mapfile -t cache_output < <(
+    "${SCRIPT_DIR}/prepare-local-repo-cache.sh" \
+      --repo-root "${REPO_ROOT}" \
+      --state-dir "${STATE_DIR}"
+  )
+  if [[ "${#cache_output[@]}" -lt 2 ]]; then
+    echo "✖ Failed to prepare the local E2E repo cache." >&2
+    exit 1
+  fi
+  printf '%s\n%s\n' "${cache_output[0]}" "${cache_output[1]}"
+}
+
+prepare_local_image_cache() {
+  local cache_dir="${STATE_DIR}/e2e/image-cache"
+  mkdir -p "${cache_dir}"
+  bash "${SCRIPT_DIR}/prepare-local-image-cache.sh" "${cache_dir}"
+}
+
 render_env_file() {
   local target_file="${1}"
   local catalog_image
   local runner_image
+  local enforce_digest_pinning="true"
+  local docker_socket_path
+  local docker_socket_gid
+  local test_repo_mirror_host_path
+  local test_repo_seed_host_path
+  local test_image_cache_host_path
 
   if [[ "${MODE}" == "local" ]]; then
     local src_dir distro image_tag
     src_dir="$(require_src_dir)"
     distro="${INFINITO_E2E_LOCAL_DISTRO:-debian}"
     image_tag="${INFINITO_E2E_LOCAL_IMAGE:-$(resolve_local_image_tag "${src_dir}" "${distro}")}"
+    warn_unpinned_local_image "${image_tag}"
     build_local_image "${src_dir}" "${distro}" "${image_tag}"
     catalog_image="${image_tag}"
     runner_image="${image_tag}"
+    enforce_digest_pinning="false"
   else
-    catalog_image="${INFINITO_E2E_CATALOG_IMAGE:-ghcr.io/infinito-nexus/core/debian:latest}"
-    runner_image="${INFINITO_E2E_JOB_RUNNER_IMAGE:-ghcr.io/infinito-nexus/core/arch:latest}"
+    catalog_image="${INFINITO_E2E_CATALOG_IMAGE:-${CI_CATALOG_IMAGE_DEFAULT}}"
+    runner_image="${INFINITO_E2E_JOB_RUNNER_IMAGE:-${CI_RUNNER_IMAGE_DEFAULT}}"
     echo "→ Pulling Infinito.Nexus catalog image (${catalog_image})"
     docker pull "${catalog_image}"
     echo "→ Pulling Infinito.Nexus runner image (${runner_image})"
     docker pull "${runner_image}"
   fi
+
+  ensure_state_dir_access "${catalog_image}"
+
+  mapfile -t repo_cache_paths < <(prepare_local_repo_cache)
+  test_repo_mirror_host_path="${repo_cache_paths[0]}"
+  test_repo_seed_host_path="${repo_cache_paths[1]}"
+  test_image_cache_host_path="$(prepare_local_image_cache)"
+  echo "→ Using optional hermetic E2E caches for local repos/images when available"
+  echo "  WARN: these caches are infrastructure optimization only, not a fix for network failures."
+  echo "  If a registry, Git, DNS, TLS, routing, or Docker connectivity failure appears, diagnose the affected host/container/runtime layer directly."
 
   local api_port="${E2E_API_PORT}"
   local web_port="${E2E_WEB_PORT}"
@@ -101,19 +192,29 @@ render_env_file() {
   local ldapsm_shim_host
   ldapsm_shim_host="$(resolve_dir "${SCRIPT_DIR}")/controller-ldapsm-shim.sh"
   chmod +x "${ldapsm_shim_host}" || true
+  docker_socket_path="$(resolve_docker_socket_path)"
+  docker_socket_gid="$(resolve_docker_socket_gid)"
 
   cat "${ENV_SOURCE}" >"${target_file}"
   cat >>"${target_file}" <<EOF
 STATE_HOST_PATH=$(resolve_dir "${STATE_DIR}")
+STATE_HOST_UID=$(id -u)
+STATE_HOST_GID=$(id -g)
+DOCKER_SOCKET_PATH=${docker_socket_path}
+DOCKER_SOCKET_GID=${docker_socket_gid}
 JOB_RUNNER_REPO_DIR=/opt/src/infinito
 JOB_RUNNER_WORKDIR=/workspace
 JOB_RUNNER_DOCKER_ARGS=-v ${ldapsm_shim_host}:/usr/bin/ldapsm:ro -e DNS_IP=${INFINITO_E2E_TARGET_DNS_IP:-172.28.0.10}
 JOB_RUNNER_SKIP_CLEANUP=false
 JOB_RUNNER_SKIP_BUILD=false
-JOB_RUNNER_ANSIBLE_ARGS=-e '{"TLS_ENABLED": true, "TLS_MODE": "self_signed"}' -e SYS_SVC_SSHD_PASSWORD_AUTHENTICATION=true -e MASK_CREDENTIALS_IN_LOGS=false -e '{"MAILU_IP4_PUBLIC": "{{ ansible_default_ipv4.address }}"}' -e TEST_E2E_PLAYWRIGHT_STAGE_BASE_DIR=/var/lib/test-e2e-playwright
+JOB_RUNNER_ANSIBLE_ARGS=-e '{"TLS_ENABLED": true, "TLS_MODE": "self_signed"}' -e SYS_SVC_SSHD_PASSWORD_AUTHENTICATION=true -e '{"MAILU_IP4_PUBLIC": "{{ ansible_default_ipv4.address }}"}' -e TEST_E2E_PLAYWRIGHT_STAGE_BASE_DIR=/var/lib/test-e2e-playwright
+INFINITO_ENFORCE_DIGEST_PINNING=${enforce_digest_pinning}
 CORS_ALLOW_ORIGINS=http://127.0.0.1:${web_port},http://localhost:${web_port}
+NEXT_PUBLIC_API_BASE_URL=
+NEXT_PUBLIC_API_STREAM_BASE_URL=http://127.0.0.1:${api_port}
 INFINITO_NEXUS_IMAGE=${catalog_image}
 JOB_RUNNER_IMAGE=${runner_image}
+POSTGRES_IMAGE=${INFINITO_E2E_POSTGRES_IMAGE:-${CI_POSTGRES_IMAGE_DEFAULT}}
 INFINITO_REPO_MOUNT_TYPE=volume
 INFINITO_REPO_MOUNT_SOURCE=infinito_repo
 JOB_RUNNER_REPO_HOST_PATH=
@@ -121,6 +222,9 @@ API_PORT=${api_port}
 API_APP_PORT=${api_port}
 WEB_PORT=${web_port}
 API_PROXY_TARGET=${api_proxy_target}
+TEST_REPO_MIRROR_HOST_PATH=${test_repo_mirror_host_path}
+TEST_REPO_SEED_HOST_PATH=${test_repo_seed_host_path}
+TEST_IMAGE_CACHE_HOST_PATH=${test_image_cache_host_path}
 EOF
 }
 
@@ -155,6 +259,9 @@ trap cleanup EXIT
 
 render_env_file "${TMP_ENV_FILE}"
 
+echo "→ Resetting any existing dashboard E2E stack"
+compose down -v --remove-orphans || true
+
 echo "→ Starting dashboard E2E stack"
 compose up -d --build --wait
 STACK_STARTED=1
@@ -179,4 +286,4 @@ echo "→ Ensuring Chromium is installed for Playwright"
 npx playwright install chromium
 
 echo "→ Running real dashboard deploy E2E"
-npx playwright test -c playwright.dashboard.config.ts
+npx playwright test -c playwright.dashboard.config.ts tests/dashboard_deploy_real.spec.ts

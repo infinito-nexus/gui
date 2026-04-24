@@ -239,6 +239,7 @@ export default function RoleListView({
             <div
               key={role.id}
               data-role-id={role.id}
+              data-testid="role-tile"
               className={`${styles.listGrid} ${styles.listRow} ${
                 selectedState ? styles.listRowSelected : styles.listRowDefault
               } ${isDeselectionFlashing ? styles.listRowDeselectedFlash : ""}`}

@@ -85,7 +85,7 @@ export default function BundleColumnView({
 
   const laneRandomPerItemSeconds = useMemo(
     () => buildLaneRandomDurations(lanes.length),
-    [lanes.length, variant]
+    [lanes.length]
   );
 
   const {

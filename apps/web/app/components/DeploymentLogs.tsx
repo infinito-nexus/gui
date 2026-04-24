@@ -150,7 +150,22 @@ function AnsiLine({ line }: { line: string }) {
   );
 }
 
-export default function DeploymentLogs({ baseUrl }: { baseUrl: string }) {
+function resolveStreamBaseUrl(baseUrl: string, streamBaseUrl?: string): string {
+  const explicit = String(streamBaseUrl || "").trim();
+  if (explicit) {
+    return explicit;
+  }
+  const configured = String(process.env.NEXT_PUBLIC_API_STREAM_BASE_URL || "").trim();
+  return configured || baseUrl;
+}
+
+export default function DeploymentLogs({
+  baseUrl,
+  streamBaseUrl,
+}: {
+  baseUrl: string;
+  streamBaseUrl?: string;
+}) {
   const [jobId, setJobId] = useState("");
   const [lines, setLines] = useState<string[]>([]);
   const [status, setStatus] = useState<StatusPayload | null>(null);
@@ -159,6 +174,10 @@ export default function DeploymentLogs({ baseUrl }: { baseUrl: string }) {
 
   const esRef = useRef<EventSource | null>(null);
   const tailRef = useRef<HTMLDivElement | null>(null);
+  const resolvedStreamBaseUrl = useMemo(
+    () => resolveStreamBaseUrl(baseUrl, streamBaseUrl),
+    [baseUrl, streamBaseUrl]
+  );
 
   useEffect(() => {
     return () => {
@@ -185,7 +204,9 @@ export default function DeploymentLogs({ baseUrl }: { baseUrl: string }) {
     setStatus(null);
     setConnected(true);
 
-    const es = new EventSource(`${baseUrl}/api/deployments/${trimmed}/logs`);
+    const es = new EventSource(
+      `${resolvedStreamBaseUrl}/api/deployments/${trimmed}/logs`
+    );
     esRef.current = es;
 
     es.addEventListener("log", (evt) => {

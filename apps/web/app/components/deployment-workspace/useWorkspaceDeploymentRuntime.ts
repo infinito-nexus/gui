@@ -110,6 +110,9 @@ export function useWorkspaceDeploymentRuntime({
 
     lastDeploymentSelectionRef.current = Array.from(deploySelection);
     setDeploying(true);
+    setDeployViewTab("terminal");
+    setLiveError(null);
+    setLiveJobId("");
     try {
       const postDeployment = async (payload: Record<string, unknown>) =>
         fetch(`${baseUrl}/api/deployments`, {
@@ -156,8 +159,6 @@ export function useWorkspaceDeploymentRuntime({
       const created = String(data?.job_id ?? "");
       if (created) {
         setLiveJobId(created);
-        setLiveError(null);
-        setDeployViewTab("terminal");
         setConnectRequestKey((prev) => prev + 1);
         onJobCreated?.(created);
       }

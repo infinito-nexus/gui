@@ -25,6 +25,18 @@ import { useRoleDashboardFiltering } from "./role-dashboard/useRoleDashboardFilt
 import { useRoleDashboardSelection } from "./role-dashboard/useRoleDashboardSelection";
 import styles from "./RoleDashboard.module.css";
 
+function initialSoftwareScope(): SoftwareScope {
+  if (typeof window === "undefined") {
+    return "bundles";
+  }
+  const scopeParam = String(
+    new URLSearchParams(window.location.search).get("sw_scope") || ""
+  )
+    .trim()
+    .toLowerCase();
+  return scopeParam === "apps" || scopeParam === "bundles" ? scopeParam : "bundles";
+}
+
 export default function RoleDashboard({
   baseUrl,
   roles,
@@ -59,7 +71,7 @@ export default function RoleDashboard({
   const [tagFilter, setTagFilter] = useState<Set<string>>(new Set());
   const [categoryDraft, setCategoryDraft] = useState("");
   const [tagDraft, setTagDraft] = useState("");
-  const [softwareScope, setSoftwareScope] = useState<SoftwareScope>("bundles");
+  const [softwareScope, setSoftwareScope] = useState<SoftwareScope>(initialSoftwareScope);
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [page, setPage] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("detail");

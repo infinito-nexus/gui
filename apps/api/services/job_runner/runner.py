@@ -4,6 +4,7 @@ import os
 import signal
 import subprocess
 import threading
+import time
 from pathlib import Path
 from typing import Dict, Iterable, Optional
 
@@ -64,7 +65,9 @@ echo "No command provided. Set RUNNER_CMD or pass a command to this script."
 exit 1
 """
     atomic_write_text(path, script)
-    path.chmod(0o700)
+    # The runner-manager process executes this script via the shared
+    # infinito-manager group, while the file itself is created by the API user.
+    path.chmod(0o750)
 
 
 def runner_env() -> Dict[str, str]:
@@ -138,10 +141,11 @@ def start_process(
 
         def _emit(raw_line: str) -> None:
             masked = mask_secrets(raw_line, secrets_list)
-            log_fh.write(masked + "\n")
+            prefixed = f"[RX:{int(time.time() * 1000)}] {masked}"
+            log_fh.write(prefixed + "\n")
             if on_line is not None:
                 try:
-                    on_line(masked)
+                    on_line(prefixed)
                 except Exception:
                     pass
 

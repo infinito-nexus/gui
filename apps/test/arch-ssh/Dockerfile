@@ -1,8 +1,12 @@
 FROM archlinux:latest
 
 RUN pacman -Syu --noconfirm --needed \
+    ansible-core \
+    inetutils \
     openssh \
     python \
+    python-pip \
+    python-yaml \
     sudo \
   && useradd -m -s /bin/bash deploy \
   && echo "deploy:deploy" | chpasswd \

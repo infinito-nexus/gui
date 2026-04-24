@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import RoleDashboard from "../RoleDashboard";
 import DeploymentCredentialsForm from "../DeploymentCredentialsForm";
 import WorkspacePanel from "../WorkspacePanel";
+import AuditLogsPanel from "../AuditLogsPanel";
 import styles from "../DeploymentWorkspace.module.css";
 import IntroPanel from "./panels/IntroPanel";
 import DomainPanel from "./panels/DomainPanel";
@@ -24,6 +25,7 @@ import type {
 
 type BuildDeploymentWorkspacePanelsProps = {
   baseUrl: string;
+  streamBaseUrl?: string;
   roles: Role[];
   rolesLoading: boolean;
   rolesError: string | null;
@@ -162,6 +164,7 @@ type BuildDeploymentWorkspacePanelsProps = {
 
 export function buildDeploymentWorkspacePanels({
   baseUrl,
+  streamBaseUrl,
   roles,
   rolesLoading,
   rolesError,
@@ -373,11 +376,17 @@ export function buildDeploymentWorkspacePanels({
       ),
     },
     {
+      key: "audit",
+      title: "Audit Logs",
+      content: <AuditLogsPanel baseUrl={baseUrl} workspaceId={workspaceId} />,
+    },
+    {
       key: "deploy",
       title: "Setup",
       content: (
         <DeployPanel
           baseUrl={baseUrl}
+          streamBaseUrl={streamBaseUrl}
           deployViewTab={deployViewTab}
           onDeployViewTabChange={onDeployViewTabChange}
           deployError={deployError}

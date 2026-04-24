@@ -8,6 +8,7 @@ import type { ConnectionResult, ServerState } from "../deployment-credentials/ty
 
 type UseDeploymentWorkspaceEffectsProps = {
   baseUrl: string;
+  initialRolesLoaded: boolean;
   setRoles: Dispatch<SetStateAction<Role[]>>;
   setRolesLoading: Dispatch<SetStateAction<boolean>>;
   setRolesError: Dispatch<SetStateAction<string | null>>;
@@ -72,6 +73,7 @@ type UseDeploymentWorkspaceEffectsProps = {
 
 export function useDeploymentWorkspaceEffects({
   baseUrl,
+  initialRolesLoaded,
   setRoles,
   setRolesLoading,
   setRolesError,
@@ -154,7 +156,9 @@ export function useDeploymentWorkspaceEffects({
     let alive = true;
 
     const load = async () => {
-      setRolesLoading(true);
+      if (!initialRolesLoaded) {
+        setRolesLoading(true);
+      }
       setRolesError(null);
       try {
         const res = await fetch(`${baseUrl}/api/roles`, {
@@ -169,10 +173,12 @@ export function useDeploymentWorkspaceEffects({
         }
       } catch (err: any) {
         if (alive) {
-          setRolesError(err?.message ?? "failed to load roles");
+          if (!initialRolesLoaded) {
+            setRolesError(err?.message ?? "failed to load roles");
+          }
         }
       } finally {
-        if (alive) setRolesLoading(false);
+        if (alive && !initialRolesLoaded) setRolesLoading(false);
       }
     };
 
@@ -180,7 +186,7 @@ export function useDeploymentWorkspaceEffects({
     return () => {
       alive = false;
     };
-  }, [baseUrl, setRoles, setRolesError, setRolesLoading]);
+  }, [baseUrl, initialRolesLoaded, setRoles, setRolesError, setRolesLoading]);
 
   useEffect(() => {
     if (!activeAlias && servers.length > 0) {

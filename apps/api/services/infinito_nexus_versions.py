@@ -310,5 +310,8 @@ def resolve_infinito_nexus_record(version: str | None) -> InfinitoNexusVersionRe
 
 
 def resolve_job_runner_image(version: str | None, *, base_image: str) -> str:
-    record = resolve_infinito_nexus_record(version)
+    normalized = normalize_infinito_nexus_version(version)
+    if "@" in str(base_image or "") and normalized == "latest":
+        return str(base_image).strip()
+    record = resolve_infinito_nexus_record(normalized)
     return _replace_image_tag(base_image, record.image_tag)

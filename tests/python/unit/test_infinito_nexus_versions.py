@@ -69,6 +69,17 @@ class TestInfinitoNexusVersions(unittest.TestCase):
             "ghcr.io/infinito-nexus/core/debian:v5.2.0",
         )
 
+    def test_resolve_job_runner_image_keeps_digest_pinned_latest_image(self) -> None:
+        image = versions.resolve_job_runner_image(
+            "latest",
+            base_image="ghcr.io/infinito-nexus/core/debian@sha256:" + ("a" * 64),
+        )
+
+        self.assertEqual(
+            image,
+            "ghcr.io/infinito-nexus/core/debian@sha256:" + ("a" * 64),
+        )
+
     @patch("services.infinito_nexus_versions._fetch_package_tags")
     def test_latest_falls_back_to_highest_semver_when_latest_tag_is_missing(
         self, m_fetch

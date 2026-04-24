@@ -9,7 +9,10 @@ from .providers import router as providers_router
 from .roles import router as roles_router
 from .server_requirements import router as server_requirements_router
 from .users import router as users_router
+from .workspace_logs import router as workspace_logs_router
 from .workspaces import router as workspaces_router
+from . import workspaces_history_routes as _workspaces_history_routes  # noqa: F401
+from . import workspaces_management_routes as _workspaces_management_routes  # noqa: F401
 
 router = APIRouter()
 router.include_router(roles_router)
@@ -18,6 +21,7 @@ router.include_router(infinito_nexus_router)
 router.include_router(inventories_router)
 router.include_router(deployments_router)
 router.include_router(workspaces_router)
+router.include_router(workspace_logs_router)
 router.include_router(server_requirements_router)
 router.include_router(pricing_router)
 router.include_router(providers_router)

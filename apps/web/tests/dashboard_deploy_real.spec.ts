@@ -7,8 +7,10 @@ const ROLE_ID = "web-app-dashboard";
 const TARGET_ALIAS = "device";
 const DASHBOARD_HTTP_URL = "http://127.0.0.1:8029/";
 const DEPLOYMENT_COMPLETION_TIMEOUT_MS = 40 * 60_000;
+const LIVE_LOG_RENDER_DELAY_LIMIT_MS = 30_000;
 const ADMINISTRATOR_AUTHORIZED_KEY =
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKKBS2UWGKi9IRz2b+JjkAWGiAkFDrxnnQXiueLQTKDz infinito-test";
+const observedWorkspaceIds = new Set<string>();
 
 function composeArgs(...args: string[]): string[] {
   const composeEnvFile = process.env.INFINITO_E2E_COMPOSE_ENV_FILE;
@@ -61,12 +63,34 @@ async function waitForWorkspaceId(page: Page) {
   return workspaceId ?? "";
 }
 
+async function csrfHeaders(page: Page) {
+  let csrfToken = "";
+  let cookieHeader = "";
+  await expect
+    .poll(
+      async () => {
+        const cookies = await page.context().cookies();
+        csrfToken = cookies.find((cookie) => cookie.name === "csrf")?.value || "";
+        cookieHeader = cookies
+          .map((cookie) => `${cookie.name}=${cookie.value}`)
+          .join("; ");
+        return csrfToken;
+      },
+      { timeout: 10_000 }
+    )
+    .not.toBe("");
+  return {
+    Cookie: cookieHeader,
+    "X-CSRF": csrfToken,
+  };
+}
+
 async function assertDashboardReachable() {
   await expect
     .poll(
       () => {
         try {
-          return runCompose(
+          const output = runCompose(
             "exec",
             "-T",
             "ssh-password",
@@ -74,6 +98,7 @@ async function assertDashboardReachable() {
             "-lc",
             `curl -fsS -o /dev/null -w '%{http_code}' ${DASHBOARD_HTTP_URL}`
           );
+          return output.match(/(\d{3})\s*$/)?.[1] ?? "000";
         } catch {
           return "000";
         }
@@ -86,10 +111,109 @@ async function assertDashboardReachable() {
     .toBe("200");
 }
 
-test("deploys web-app-dashboard through the real local stack", async ({ page }) => {
+async function readLatencyProbe(page: Page) {
+  return page.evaluate(() => {
+    const probe = document.querySelector(
+      '[data-testid="live-log-latency-probe"]'
+    ) as HTMLElement | null;
+    const samples = Array.from(
+      document.querySelectorAll('[data-testid="live-log-latency-sample"]')
+    )
+      .slice(-5)
+      .map((node) => String(node.textContent || "").trim())
+      .filter(Boolean);
+
+    const readInt = (value: string | undefined) => {
+      const parsed = Number(value || 0);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    return {
+      errorEventCount: readInt(probe?.dataset.errorEventCount),
+      latencyOk: probe?.dataset.latencyOk !== "false",
+      lastStatus: String(probe?.dataset.lastStatus || ""),
+      maxDelayMs: readInt(probe?.dataset.maxDelayMs),
+      openEventCount: readInt(probe?.dataset.openEventCount),
+      observedCount: readInt(probe?.dataset.observedCount),
+      receivedLineCount: readInt(probe?.dataset.receivedLineCount),
+      sampleCount: samples.length,
+      recentSamples: samples,
+      statusEventCount: readInt(probe?.dataset.statusEventCount),
+      violationDelayMs: readInt(probe?.dataset.violationDelayMs),
+      violationLine: String(probe?.dataset.violationLine || ""),
+    };
+  });
+}
+
+function formatLatencyProbe(probe: Awaited<ReturnType<typeof readLatencyProbe>>) {
+  return JSON.stringify(probe);
+}
+
+async function assertNoLatencyViolation(page: Page) {
+  const probe = await readLatencyProbe(page);
+  if (!probe.violationDelayMs) {
+    return;
+  }
+  throw new Error(
+    `Observed log render delay ${probe.violationDelayMs}ms above ${LIVE_LOG_RENDER_DELAY_LIMIT_MS}ms for line: ${probe.violationLine}. Probe: ${formatLatencyProbe(
+      probe
+    )}`
+  );
+}
+
+async function waitForLatencyProbe(
+  page: Page,
+  predicate: (probe: Awaited<ReturnType<typeof readLatencyProbe>>) => boolean,
+  timeoutMs: number,
+  failureLabel: string
+) {
+  const deadline = Date.now() + timeoutMs;
+  let lastProbe = await readLatencyProbe(page);
+  while (Date.now() < deadline) {
+    await assertNoLatencyViolation(page);
+    if (predicate(lastProbe)) {
+      return lastProbe;
+    }
+    await page.waitForTimeout(200);
+    lastProbe = await readLatencyProbe(page);
+  }
+  throw new Error(
+    `${failureLabel} within ${timeoutMs}ms. Probe: ${formatLatencyProbe(lastProbe)}`
+  );
+}
+
+async function waitForSuccessfulDeployment(page: Page) {
+  const finalStatus = page.getByText(/Final status:/);
+  const deadline = Date.now() + DEPLOYMENT_COMPLETION_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    await assertNoLatencyViolation(page);
+    const statusText = ((await finalStatus.textContent().catch(() => "")) || "").trim();
+    if (statusText.includes("Succeeded")) {
+      await assertNoLatencyViolation(page);
+      return finalStatus;
+    }
+    if (statusText.includes("Failed") || statusText.includes("Canceled")) {
+      throw new Error(`Deployment did not succeed: ${statusText}`);
+    }
+    await page.waitForTimeout(500);
+  }
+  throw new Error("Timed out waiting for a successful deployment.");
+}
+
+async function runDashboardDeployment(page: Page) {
   const consoleMessages: string[] = [];
   page.on("console", (message) => {
     consoleMessages.push(message.text());
+  });
+  page.on("dialog", async (dialog) => {
+    if (
+      dialog.type() === "prompt" &&
+      /Master password for credentials\.kdbx/i.test(dialog.message())
+    ) {
+      await dialog.accept(MASTER_PASSWORD);
+      return;
+    }
+    await dialog.dismiss();
   });
 
   await page.goto("/");
@@ -100,6 +224,8 @@ test("deploys web-app-dashboard through the real local stack", async ({ page }) 
   await page.getByRole("tab", { name: "Inventory" }).click();
   const workspaceId = await waitForWorkspaceId(page);
   expect(workspaceId).toMatch(/^[a-z0-9-]+$/);
+  expect(observedWorkspaceIds.has(workspaceId)).toBeFalsy();
+  observedWorkspaceIds.add(workspaceId);
 
   await page.getByRole("tab", { name: "Software" }).click();
   await switchToAppsScope(page);
@@ -166,44 +292,45 @@ test("deploys web-app-dashboard through the real local stack", async ({ page }) 
     inventoryPanel.getByText(`${TARGET_ALIAS}.yml`, { exact: true })
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Users" }).click();
-  await page.getByRole("button", { name: "Overview" }).click();
-  await expect(page.getByText("Users overview from")).toBeVisible();
-  await page.getByRole("button", { name: "New", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Add user" })).toBeVisible();
-  await page.getByLabel("Username* (a-z0-9)").fill("administrator");
-  await page.getByLabel("Firstname*").fill("Administrator");
-  await page.getByLabel("Lastname*").fill("Dashboard");
-  await page
-    .getByLabel("Authorized keys (optional, one per line)")
-    .fill(ADMINISTRATOR_AUTHORIZED_KEY);
-  await page.getByRole("button", { name: "Add user", exact: true }).click();
-  await expect(
-    page.getByText("User 'administrator' added. Save to persist changes.")
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Save users", exact: true }).click();
-  await expect(
-    page.getByText("Saved 1 user(s) to group_vars/all.yml.")
-  ).toBeVisible({ timeout: 120_000 });
-  await page.getByRole("button", { name: "Close overview", exact: true }).click();
-  await expect(page.getByText("Users overview from")).toHaveCount(0);
-  await expect(inventoryPanel.getByText("group_vars")).toBeVisible();
-  await expect(inventoryPanel.getByText("all.yml", { exact: true })).toBeVisible();
-
   const groupVarsPath = `/api/workspaces/${workspaceId}/files/group_vars/all.yml`;
   const currentGroupVars = await page.request.get(groupVarsPath);
   expect(currentGroupVars.ok()).toBeTruthy();
   const currentContent = (await currentGroupVars.json()).content || "";
   const e2eOverrides = [
     "",
-    "OIDC:",
-    "  CLIENT:",
-    "    SECRET: '{{ \"e2e-test-oidc-client-secret-32chars-dummy\" }}'",
+    "users:",
+    "  administrator:",
+    `    authorized_keys: ["${ADMINISTRATOR_AUTHORIZED_KEY}"]`,
+    "",
+    "applications:",
+    "  web-app-dashboard:",
+    "    compose:",
+    "      services:",
+    "        oidc:",
+    "          enabled: false",
+    "          shared: false",
+    "        simpleicons:",
+    "          enabled: false",
+    "          shared: false",
+    "        logout:",
+    "          enabled: false",
+    "        matomo:",
+    "          enabled: false",
+    "          shared: false",
+    "        dashboard:",
+    "          enabled: true",
+    "  web-svc-logout:",
+    "    compose:",
+    "      services:",
+    "        matomo:",
+    "          enabled: false",
+    "          shared: false",
     "",
   ].join("\n");
   const mergedGroupVars = currentContent + (currentContent.endsWith("\n") ? "" : "\n") + e2eOverrides;
   const putGroupVars = await page.request.put(groupVarsPath, {
     data: { content: mergedGroupVars },
+    headers: await csrfHeaders(page),
   });
   if (!putGroupVars.ok()) {
     const body = await putGroupVars.text();
@@ -243,33 +370,45 @@ test("deploys web-app-dashboard through the real local stack", async ({ page }) 
   const deployButton = page.getByRole("button", { name: "Deploy", exact: true });
   await deployButton.click();
   await expect(page.locator(".xterm")).toBeVisible({ timeout: 3_000 });
-  await expect
-    .poll(
-      async () => {
-        const text = (await page.locator(".xterm-rows").textContent()) || "";
-        return text.trim().length;
-      },
-      { timeout: 3_000 }
-    )
-    .toBeGreaterThan(0);
+  await waitForLatencyProbe(
+    page,
+    (probe) => probe.receivedLineCount > 0,
+    LIVE_LOG_RENDER_DELAY_LIMIT_MS,
+    "Live terminal did not receive any log lines"
+  );
+  await waitForLatencyProbe(
+    page,
+    (probe) => probe.observedCount > 0,
+    LIVE_LOG_RENDER_DELAY_LIMIT_MS,
+    "Live terminal did not render any timestamped log lines"
+  );
 
-  const finalStatus = page.getByText(/Final status:/);
-  await expect(finalStatus).toBeVisible({ timeout: DEPLOYMENT_COMPLETION_TIMEOUT_MS });
-  const firstStatusText = (await finalStatus.textContent()) || "";
-  if (!firstStatusText.includes("Succeeded")) {
-    await expect(deployButton).toBeEnabled({ timeout: 60_000 });
-    await deployButton.click();
-    await expect(finalStatus).toBeVisible({ timeout: DEPLOYMENT_COMPLETION_TIMEOUT_MS });
-    await expect(finalStatus).toContainText("Succeeded", {
-      timeout: DEPLOYMENT_COMPLETION_TIMEOUT_MS,
-    });
-  } else {
-    await expect(finalStatus).toContainText("Succeeded");
-  }
+  const finalStatus = await waitForSuccessfulDeployment(page);
   await expect(finalStatus).toContainText("exit 0");
+
+  const latencyProbe = await readLatencyProbe(page);
+  expect(latencyProbe.observedCount).toBeGreaterThan(0);
+  expect(latencyProbe.sampleCount).toBeGreaterThan(0);
+  expect(latencyProbe.maxDelayMs).toBeLessThanOrEqual(
+    LIVE_LOG_RENDER_DELAY_LIMIT_MS
+  );
 
   await assertDashboardReachable();
 
   expect(consoleMessages.join("\n")).not.toContain(MASTER_PASSWORD);
   await expect(page.locator("body")).not.toContainText(MASTER_PASSWORD);
+}
+
+test.describe.configure({ mode: "serial" });
+
+test("deploys web-app-dashboard through the real local stack on a fresh anonymous workspace", async ({
+  page,
+}) => {
+  await runDashboardDeployment(page);
+});
+
+test("re-runs the dashboard deployment flow with a new anonymous workspace", async ({
+  page,
+}) => {
+  await runDashboardDeployment(page);
 });

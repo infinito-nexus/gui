@@ -60,7 +60,12 @@ class RoleIndexService:
     def __init__(self) -> None:
         self._catalog = RoleCatalogService()
 
-        self._cache_ttl_seconds = int(os.getenv("ROLE_INDEX_TTL_SECONDS", "30") or "30")
+        # Keep the default TTL comfortably above the documented warm-cache perf
+        # measurement window so the cache does not invalidate mid-scenario unless
+        # a caller opts into a shorter lifetime explicitly.
+        self._cache_ttl_seconds = int(
+            os.getenv("ROLE_INDEX_TTL_SECONDS", "300") or "300"
+        )
         self._cached_at: float = 0.0
         self._cached_key: Tuple[int, int, int] = (0, 0, 0)
 

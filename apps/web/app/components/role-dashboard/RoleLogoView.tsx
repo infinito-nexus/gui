@@ -99,6 +99,7 @@ export default function RoleLogoView({
       </div>
 
       {simpleIconSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={simpleIconSrc}
           alt={role.display_name}

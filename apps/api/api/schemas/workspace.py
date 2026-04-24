@@ -2,9 +2,28 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
-from api.schemas.deployment import AuthMethod
+from api.schemas.deployment import AuthMethod, ROLE_ID_RE
+
+
+def _normalize_role_ids(values: list[str] | None) -> list[str]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for value in values or []:
+        if not isinstance(value, str):
+            continue
+        role_id = value.strip()
+        if not role_id:
+            continue
+        if not ROLE_ID_RE.match(role_id):
+            raise ValueError(
+                "selected_roles entries must match ^[a-z0-9][a-z0-9\\-_]{0,63}$"
+            )
+        if role_id not in seen:
+            cleaned.append(role_id)
+            seen.add(role_id)
+    return cleaned
 
 
 class WorkspaceCreateOut(BaseModel):
@@ -47,6 +66,11 @@ class WorkspaceGenerateIn(BaseModel):
     user: str = Field(..., min_length=1, description="SSH user")
     auth_method: Optional[AuthMethod] = None
     selected_roles: List[str] = Field(default_factory=list)
+
+    @field_validator("selected_roles")
+    @classmethod
+    def _clean_selected_roles(cls, values: List[str]) -> List[str]:
+        return _normalize_role_ids(values)
 
 
 class WorkspaceFileEntry(BaseModel):
@@ -169,6 +193,13 @@ class WorkspaceCredentialsIn(BaseModel):
     alias: Optional[str] = Field(
         default=None, min_length=1, description="Inventory host alias"
     )
+
+    @field_validator("selected_roles")
+    @classmethod
+    def _clean_selected_roles(cls, values: Optional[List[str]]) -> Optional[List[str]]:
+        if values is None:
+            return None
+        return _normalize_role_ids(values)
 
 
 class WorkspaceCredentialsOut(BaseModel):

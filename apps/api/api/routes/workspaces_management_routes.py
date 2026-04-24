@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import lru_cache
+
 from fastapi import Request
 
 from api.auth import (
@@ -13,7 +15,18 @@ from api.schemas.workspace import (
     WorkspaceGenerateOut,
     WorkspaceListOut,
 )
+from services.role_index.service import RoleIndexService
 from .workspaces import _require_workspace, _svc, router
+
+
+@lru_cache(maxsize=1)
+def _roles() -> RoleIndexService:
+    return RoleIndexService()
+
+
+def _require_known_roles(role_ids: list[str]) -> None:
+    for role_id in role_ids or []:
+        _roles().get(role_id)
 
 
 @router.get("", response_model=WorkspaceListOut)
@@ -50,6 +63,7 @@ def generate_inventory(
     workspace_id: str, req: WorkspaceGenerateIn, request: Request
 ) -> WorkspaceGenerateOut:
     _require_workspace(request, workspace_id)
+    _require_known_roles(list(req.selected_roles or []))
     _svc().generate_inventory(workspace_id, req.model_dump())
     files = _svc().list_files(workspace_id)
     return WorkspaceGenerateOut(

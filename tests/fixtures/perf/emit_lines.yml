@@ -1,0 +1,9 @@
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Emit paced performance log lines
+      ansible.builtin.debug:
+        msg: "PERF-LINE seq={{ '%03d' | format(item) }}"
+      loop: "{{ range(0, 120) | list }}"
+      loop_control:
+        pause: 0.5

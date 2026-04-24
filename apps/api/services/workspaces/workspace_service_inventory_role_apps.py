@@ -3,19 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
 from fastapi import HTTPException
 
 from services.job_runner.util import atomic_write_text
 from services.role_index.paths import repo_roles_root
 from .workspace_context import (
-    _WorkspaceYamlLoader,
     _dump_yaml_fragment,
     _dump_yaml_mapping,
     _load_meta,
     _load_yaml_mapping,
     _merge_missing,
     _sanitize_role_id,
+    load_workspace_yaml_document,
 )
 
 
@@ -107,9 +106,7 @@ class WorkspaceServiceInventoryRoleAppsMixin:
                 _section,
             ) = self._read_role_app_context(workspace_id, normalized_role_id, alias)
 
-            parsed = yaml.load(
-                (content or "").strip() or "{}", Loader=_WorkspaceYamlLoader
-            )
+            parsed = load_workspace_yaml_document((content or "").strip() or "{}")
             if parsed is None:
                 parsed = {}
             if not isinstance(parsed, dict):

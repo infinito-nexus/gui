@@ -1,13 +1,70 @@
-import DeploymentConsole from "./components/DeploymentConsole";
+export const dynamic = "force-dynamic";
 
-export default function Page() {
+import DeploymentConsole from "./components/DeploymentConsole";
+import {
+  PANEL_QUERY_TO_KEY,
+  type PanelKey,
+  type Role,
+} from "./components/deployment-workspace/types";
+
+function resolveApiServerBaseUrl() {
+  const configuredProxyTarget = String(process.env.API_PROXY_TARGET || "").trim();
+  if (configuredProxyTarget) {
+    return configuredProxyTarget.replace(/\/+$/, "");
+  }
+  const configuredPublicBaseUrl = String(process.env.NEXT_PUBLIC_API_BASE_URL || "").trim();
+  if (/^https?:\/\//i.test(configuredPublicBaseUrl)) {
+    return configuredPublicBaseUrl.replace(/\/+$/, "");
+  }
+  return "http://api:8000";
+}
+
+async function loadInitialRoles(): Promise<Role[]> {
+  try {
+    const response = await fetch(`${resolveApiServerBaseUrl()}/api/roles`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function resolveInitialPanel(
+  rawValue: string | string[] | undefined
+): PanelKey | undefined {
+  const value = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized ? PANEL_QUERY_TO_KEY[normalized] : undefined;
+}
+
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams?: Promise<SearchParams>;
+}) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const configuredBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL || "").trim();
-  const baseUrl =
-    !configuredBaseUrl || configuredBaseUrl === "http://localhost:8000"
-      ? ""
-      : configuredBaseUrl;
+  const baseUrl = configuredBaseUrl;
+  const streamBaseUrl = String(
+    process.env.NEXT_PUBLIC_API_STREAM_BASE_URL || ""
+  ).trim();
   const logoUrl =
     process.env.NEXT_PUBLIC_BRAND_LOGO_URL || "/brand-logo.png";
+  const initialRoles = await loadInitialRoles();
+  const initialPanel = resolveInitialPanel(resolvedSearchParams.ui_panel);
+  const initialWorkspaceId = (() => {
+    const value = resolvedSearchParams.workspace;
+    const first = Array.isArray(value) ? value[0] : value;
+    const normalized = String(first || "").trim();
+    return normalized || undefined;
+  })();
 
   return (
     <main
@@ -76,6 +133,7 @@ export default function Page() {
             aria-label="Infinito.Nexus logo"
           >
             {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={logoUrl}
                 alt="Infinito.Nexus logo"
@@ -104,7 +162,13 @@ export default function Page() {
         }}
       >
         <div style={{ height: "100%", overflow: "hidden" }}>
-          <DeploymentConsole baseUrl={baseUrl} />
+          <DeploymentConsole
+            baseUrl={baseUrl}
+            streamBaseUrl={streamBaseUrl}
+            initialRoles={initialRoles}
+            initialPanel={initialPanel}
+            initialWorkspaceId={initialWorkspaceId}
+          />
         </div>
       </section>
 

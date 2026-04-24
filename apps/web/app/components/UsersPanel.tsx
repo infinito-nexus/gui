@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import styles from "./UsersPanel.module.css";
 
 type UsersPanelProps = {
@@ -61,7 +61,7 @@ export default function UsersPanel({ baseUrl, workspaceId }: UsersPanelProps) {
     [status.reachable_servers]
   );
 
-  const loadStatus = async () => {
+  const loadStatus = useCallback(async () => {
     if (!workspaceId) return;
     setStatusLoading(true);
     setStatusError(null);
@@ -90,9 +90,9 @@ export default function UsersPanel({ baseUrl, workspaceId }: UsersPanelProps) {
     } finally {
       setStatusLoading(false);
     }
-  };
+  }, [baseUrl, workspaceId]);
 
-  const loadUsers = async (targetServer: string) => {
+  const loadUsers = useCallback(async (targetServer: string) => {
     if (!workspaceId || !targetServer) return;
     setUsersLoading(true);
     setUsersError(null);
@@ -127,19 +127,19 @@ export default function UsersPanel({ baseUrl, workspaceId }: UsersPanelProps) {
     } finally {
       setUsersLoading(false);
     }
-  };
+  }, [baseUrl, workspaceId]);
 
   useEffect(() => {
     setUsers([]);
     setServerId("");
     if (!workspaceId) return;
     void loadStatus();
-  }, [workspaceId, baseUrl]);
+  }, [loadStatus, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !serverId || !status.can_manage) return;
     void loadUsers(serverId);
-  }, [workspaceId, serverId, status.can_manage, baseUrl]);
+  }, [loadUsers, serverId, status.can_manage, workspaceId]);
 
   const createUser = async () => {
     if (!workspaceId || !serverId) return;

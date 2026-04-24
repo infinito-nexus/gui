@@ -39,7 +39,11 @@ export type AliasRename = { from: string; to: string };
 
 export type DeploymentWorkspaceProps = {
   baseUrl: string;
+  streamBaseUrl?: string;
   onJobCreated?: (jobId: string) => void;
+  initialRoles?: Role[];
+  initialPanel?: PanelKey;
+  initialWorkspaceId?: string;
 };
 
 export type RoleAppConfigResponse = {
@@ -76,6 +80,7 @@ export type PanelKey =
   | "domain"
   | "server"
   | "inventory"
+  | "audit"
   | "deploy"
   | "account";
 
@@ -85,6 +90,7 @@ export type PanelQueryKey =
   | "domain"
   | "hardware"
   | "inventory"
+  | "audit"
   | "setup"
   | "account"
   | "billing";
@@ -96,6 +102,7 @@ export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   hardware: "server",
   device: "server",
   inventory: "inventory",
+  audit: "audit",
   setup: "deploy",
   account: "account",
   billing: "account",
@@ -107,6 +114,7 @@ export const PANEL_KEY_TO_QUERY: Record<PanelKey, PanelQueryKey> = {
   domain: "domain",
   server: "hardware",
   inventory: "inventory",
+  audit: "audit",
   deploy: "setup",
   account: "account",
 };
@@ -117,6 +125,7 @@ export const PANEL_ICON_BY_KEY: Record<PanelKey, string> = {
   domain: "fa-globe",
   server: "fa-server",
   inventory: "fa-box-archive",
+  audit: "fa-clipboard-list",
   deploy: "fa-screwdriver-wrench",
   account: "fa-user",
 };

@@ -13,8 +13,8 @@ license = { text = "All rights reserved by Kevin Veen-Birkenbach" }
 urls = { Homepage = "https://github.com/kevinveenbirkenbach/infinito-deployer" }
 
 dependencies = [
-    "fastapi>=0.110",
-    "python-multipart>=0.0.9",
+    "fastapi>=0.135.3",
+    "python-multipart>=0.0.26",
     "pydantic>=2.0",
     "PyYAML>=6.0",
     "ansible>=9.0.0",

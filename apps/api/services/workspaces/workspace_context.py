@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +19,11 @@ WORKSPACE_META_FILENAME = "workspace.json"
 INVENTORY_FILENAME = "inventory.yml"
 
 _HIDDEN_FILES = {WORKSPACE_META_FILENAME, ".git"}
-_ID_RE = re.compile(r"^[a-z0-9]{6,32}$")
-_ROLE_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_LEGACY_ID_RE = re.compile(r"^[a-z0-9]{6,32}$")
+_UUID4_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
+_ROLE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9\-_]{0,63}$")
 _VAULT_BLOCK_START_RE = re.compile(r"^([ \t]*).*!vault\s*\|.*$")
 _WORKSPACE_STATES = {"draft", "deployed", "finished"}
 
@@ -78,6 +82,14 @@ _WorkspaceYamlLoader.add_constructor(None, _construct_unknown_yaml_tag)
 _WorkspaceYamlDumper.add_representer(_TaggedYamlValue, _represent_tagged_yaml_value)
 
 
+def load_workspace_yaml_document(raw: str) -> Any:
+    loader = _WorkspaceYamlLoader(raw or "")
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
+
+
 def _now_iso() -> str:
     return utc_iso()
 
@@ -88,9 +100,15 @@ def _ensure_workspace_root() -> None:
 
 def _sanitize_workspace_id(raw: str) -> str:
     workspace_id = (raw or "").strip().lower()
-    if not workspace_id or not _ID_RE.match(workspace_id):
+    if not workspace_id or not (
+        _LEGACY_ID_RE.match(workspace_id) or _UUID4_RE.match(workspace_id)
+    ):
         raise HTTPException(status_code=400, detail="invalid workspace id")
     return workspace_id
+
+
+def _new_workspace_id() -> str:
+    return str(uuid.uuid4())
 
 
 def _meta_path(root: Path) -> Path:
@@ -112,11 +130,13 @@ def _write_meta(root: Path, data: dict[str, Any]) -> None:
 
 
 def _safe_resolve(root: Path, rel_path: str) -> Path:
-    rel = (rel_path or "").strip().lstrip("/")
-    if not rel:
+    raw = (rel_path or "").strip()
+    if not raw:
         raise HTTPException(status_code=400, detail="path required")
+    if Path(raw).is_absolute():
+        raise HTTPException(status_code=400, detail="invalid path")
 
-    candidate = (root / rel).resolve()
+    candidate = (root / raw).resolve()
     root_resolved = root.resolve()
     if candidate == root_resolved or root_resolved not in candidate.parents:
         raise HTTPException(status_code=400, detail="invalid path")
@@ -222,9 +242,8 @@ def _load_yaml_mapping(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
     try:
-        loaded = yaml.load(
-            path.read_text(encoding="utf-8", errors="replace"),
-            Loader=_WorkspaceYamlLoader,
+        loaded = load_workspace_yaml_document(
+            path.read_text(encoding="utf-8", errors="replace")
         )
     except Exception as exc:
         raise HTTPException(

@@ -133,10 +133,9 @@ For each role:
 * [x] **Filters are combinable**
   → Logical **AND** across filter groups, **OR** within each filter (CSV semantics)
 
-* [~] **API response time < 200ms for cached index**
-  → In-memory cache with TTL and mtime-based invalidation is implemented
-  → Response time is expected to be <200ms on a warm cache
-  → Not strictly guaranteed without runtime measurement or prewarming
+* [x] **API response time < 200ms for cached index**
+  → Warm-cache performance is measured and asserted by `make test-perf`
+  → `GET /api/roles` p95 stays below 200 ms over the documented sample window
 
 * [x] **Invalid filters return empty results, not errors**
   → Invalid `status` or `deploy_target` values return `[]`
@@ -428,8 +427,8 @@ For each job:
 
 **A/C**
 
-* [~] Dashboard loads < 1s on warm cache
-* [~] Multiple concurrent viewers do not crash API
+* [x] Dashboard loads < 1s on warm cache
+* [x] Multiple concurrent viewers do not crash API
 
 ---
 
@@ -441,5 +440,5 @@ For each job:
 
 **A/C**
 
-* [~] Secrets never appear in logs or browser devtools
+* [x] Secrets never appear in logs or browser devtools
 * [x] API rejects malformed or malicious input

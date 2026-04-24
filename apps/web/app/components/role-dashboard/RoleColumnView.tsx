@@ -70,7 +70,7 @@ export default function RoleColumnView({
 
   const laneRandomPerItemSeconds = useMemo(
     () => buildLaneRandomDurations(lanes.length),
-    [lanes.length, variant]
+    [lanes.length]
   );
 
   const {
@@ -191,6 +191,7 @@ export default function RoleColumnView({
                         return (
                           <article
                             key={`${laneIndex}-${segmentIndex}-${cardIndex}-${role.id}`}
+                            data-testid="role-tile"
                             className={`${styles.cardBase} ${styles.columnCard} ${
                               variant === "row" ? styles.columnCardRow : styles.columnCardColumn
                             } ${selectedState ? styles.cardSelected : styles.cardDefault} ${

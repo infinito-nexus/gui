@@ -3,7 +3,7 @@ services:
   # Database (PostgreSQL)
   # ---------------------------------------------------------
   db:
-    image: postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
     container_name: ${POSTGRES_CONTAINER_NAME:-infinito-deployer-db}
 
     env_file:
@@ -17,6 +17,11 @@ services:
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+    security_opt:
+      - no-new-privileges:true
 
     healthcheck:
       test:
@@ -43,19 +48,28 @@ services:
     environment:
       INFINITO_REPO_PATH: ${INFINITO_REPO_PATH}
       STATE_DIR: ${STATE_DIR}
-      CATALOG_DIR: ${CATALOG_DIR}
+      CATALOG_DIR: ${STATE_DIR}/catalog
 
     volumes:
       - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
         source: ${INFINITO_REPO_MOUNT_SOURCE:-infinito_repo}
         target: ${INFINITO_REPO_PATH}
       - ${STATE_HOST_PATH}:${STATE_DIR}
+    group_add:
+      - "10900"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
     entrypoint: ["sh", "-lc"]
     command:
       - |
         set -euo pipefail
-        mkdir -p "${CATALOG_DIR}/roles"
+        mkdir -p "$${CATALOG_DIR}/roles"
         repo_src="${INFINITO_SRC_DIR:-/opt/src/infinito}"
         repo_dst="${INFINITO_REPO_PATH}"
         if [ ! -d "$${repo_dst}/roles" ] || [ -z "$$(find "$${repo_dst}/roles" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]; then
@@ -63,28 +77,82 @@ services:
           mkdir -p "$${repo_dst}"
           cp -a "$${repo_src}/." "$${repo_dst}/"
         fi
+        pythonpath_prefix=""
         if ! python3 -c "import yaml" >/dev/null 2>&1; then
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update -qq
-          apt-get install -y --no-install-recommends python3-yaml >/dev/null
+          catalog_pylib="/tmp/catalog-pylib"
+          rm -rf "$${catalog_pylib}"
+          python3 -m pip install --disable-pip-version-check --no-cache-dir --target "$${catalog_pylib}" pyyaml >/dev/null
+          pythonpath_prefix="$${catalog_pylib}:"
         fi
         cd "$${repo_dst}"
-        echo "→ Generating invokable roles list into ${CATALOG_DIR}/roles/list.json"
-        PYTHONPATH="$${repo_dst}" python3 -m cli.meta.applications.invokable --format json \
-          > "${CATALOG_DIR}/roles/list.json"
+        echo "→ Generating invokable roles list into $${CATALOG_DIR}/roles/list.json"
+        PYTHONPATH="$${pythonpath_prefix}$${repo_dst}" python3 -m cli.meta.applications.invokable --format json \
+          > "$${CATALOG_DIR}/roles/list.json"
         echo "✔ Catalog generated."
         tail -f /dev/null
 
     healthcheck:
       test:
         - CMD-SHELL
-        - test -s "${CATALOG_DIR}/roles/list.json"
+        - test -s "$$CATALOG_DIR/roles/list.json"
       interval: 15s
       timeout: 3s
       retries: 5
       start_period: 5s
 
     restart: ${RESTART_POLICY}
+
+  init-manager-token:
+    build:
+      context: ${API_BUILD_CONTEXT}
+      dockerfile: ${API_DOCKERFILE}
+
+    command:
+      - sh
+      - -lc
+      - |
+        set -euo pipefail
+        install -d -o 10003 -g 10900 -m 0750 /auth
+        token="$$(openssl rand -hex 32)"
+        printf '%s\n' "$${token}" > /auth/token
+        chown 10003:10900 /auth/token
+        chmod 0440 /auth/token
+
+    user: "0:0"
+    volumes:
+      - manager_auth:/auth
+
+    restart: "no"
+
+  init-state-perms:
+    build:
+      context: ${API_BUILD_CONTEXT}
+      dockerfile: ${API_DOCKERFILE}
+
+    environment:
+      STATE_DIR: ${STATE_DIR}
+      STATE_HOST_UID: ${STATE_HOST_UID:-}
+      STATE_HOST_GID: ${STATE_HOST_GID:-}
+
+    command:
+      - sh
+      - -lc
+      - |
+        set -euo pipefail
+        state_uid="$${STATE_HOST_UID:-$$(stat -c '%u' "$${STATE_DIR}")}"
+        state_gid="$${STATE_HOST_GID:-$$(stat -c '%g' "$${STATE_DIR}")}"
+        install -d -o "$${state_uid}" -g "$${state_gid}" -m 0755 "$${STATE_DIR}"
+        install -d -o 10001 -g 10900 -m 2770 \
+          "$${STATE_DIR}/workspaces" \
+          "$${STATE_DIR}/jobs"
+        install -d -o 10001 -g 10900 -m 0755 \
+          "$${STATE_DIR}/catalog"
+
+    user: "0:0"
+    volumes:
+      - ${STATE_HOST_PATH}:${STATE_DIR}
+
+    restart: "no"
 
   # ---------------------------------------------------------
   # API
@@ -109,6 +177,7 @@ services:
       APP_HOST: ${API_APP_HOST}
       APP_PORT: ${API_APP_PORT}
 
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS}
       POSTGRES_HOST: ${POSTGRES_HOST:-db}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -116,7 +185,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-infinito}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-infinito}
 
-      ROLE_CATALOG_LIST_JSON: ${ROLE_CATALOG_LIST_JSON}
+      ROLE_CATALOG_LIST_JSON: ${STATE_DIR}/catalog/roles/list.json
       ROLE_CATALOG_CATEGORIES_YML: ${ROLE_CATALOG_CATEGORIES_YML}
 
       JOB_RUNNER_IMAGE: ${JOB_RUNNER_IMAGE}
@@ -128,6 +197,9 @@ services:
       JOB_RUNNER_SKIP_CLEANUP: ${JOB_RUNNER_SKIP_CLEANUP:-false}
       JOB_RUNNER_SKIP_BUILD: ${JOB_RUNNER_SKIP_BUILD:-false}
       DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME}
+      RUNNER_MANAGER_URL: ${RUNNER_MANAGER_URL:-http://runner-manager:8001}
+      MANAGER_TOKEN_FILE: ${MANAGER_TOKEN_FILE:-/run/manager/token}
+      INFINITO_ENFORCE_DIGEST_PINNING: ${INFINITO_ENFORCE_DIGEST_PINNING:-}
 
     volumes:
       - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
@@ -135,9 +207,21 @@ services:
         target: ${INFINITO_REPO_PATH}
         read_only: true
       - ${STATE_HOST_PATH}:${STATE_DIR}
+      - manager_auth:/run/manager:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
-      # Required for containerized deployment jobs
-      - ${DOCKER_SOCKET_PATH}:/var/run/docker.sock
+    command:
+      - sh
+      - -lc
+      - umask 0002 && exec uvicorn main:app --host 0.0.0.0 --port "${API_APP_PORT:-8000}"
+
+    user: "10001:10900"
 
     ports:
       - "${API_PORT}:${API_APP_PORT}"
@@ -147,22 +231,90 @@ services:
         condition: service_healthy
       catalog:
         condition: service_started
+      init-manager-token:
+        condition: service_completed_successfully
+      init-state-perms:
+        condition: service_completed_successfully
 
     healthcheck:
       test:
-        - CMD
-        - python
-        - -c
+        - CMD-SHELL
         - >
-          import os,urllib.request;
-          p=os.environ.get("API_APP_PORT","8000");
-          urllib.request.urlopen(f"http://127.0.0.1:{p}/health", timeout=2).read();
-          print("ok")
+          curl -fsS "http://127.0.0.1:${API_APP_PORT:-8000}/health" >/dev/null
       interval: ${API_HEALTHCHECK_INTERVAL}
       timeout: ${API_HEALTHCHECK_TIMEOUT}
       retries: ${API_HEALTHCHECK_RETRIES}
 
 
+
+    restart: ${RESTART_POLICY}
+
+  runner-manager:
+    build:
+      context: ${API_BUILD_CONTEXT}
+      dockerfile: ${API_DOCKERFILE}
+
+    container_name: infinito-deployer-runner-manager
+
+    env_file:
+      - path: .env
+        required: false
+
+    environment:
+      STATE_DIR: ${STATE_DIR}
+      STATE_HOST_PATH: ${STATE_HOST_PATH}
+      JOB_RUNNER_IMAGE: ${JOB_RUNNER_IMAGE}
+      JOB_RUNNER_REPO_DIR: ${JOB_RUNNER_REPO_DIR:-/opt/src/infinito}
+      JOB_RUNNER_WORKDIR: ${JOB_RUNNER_WORKDIR:-/workspace}
+      JOB_RUNNER_REPO_HOST_PATH: ${JOB_RUNNER_REPO_HOST_PATH:-}
+      JOB_RUNNER_DOCKER_ARGS: ${JOB_RUNNER_DOCKER_ARGS:-}
+      JOB_RUNNER_ANSIBLE_ARGS: ${JOB_RUNNER_ANSIBLE_ARGS:-}
+      JOB_RUNNER_SKIP_CLEANUP: ${JOB_RUNNER_SKIP_CLEANUP:-false}
+      JOB_RUNNER_SKIP_BUILD: ${JOB_RUNNER_SKIP_BUILD:-false}
+      DOCKER_NETWORK_NAME: ${DOCKER_NETWORK_NAME}
+      MANAGER_TOKEN_FILE: ${MANAGER_TOKEN_FILE:-/run/manager/token}
+
+    command:
+      - sh
+      - -lc
+      - umask 0002 && exec uvicorn manager_main:app --host 0.0.0.0 --port 8001
+
+    user: "10003:${DOCKER_SOCKET_GID:-10900}"
+    group_add:
+      - "10900"
+
+    volumes:
+      - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
+        source: ${INFINITO_REPO_MOUNT_SOURCE:-infinito_repo}
+        target: ${INFINITO_REPO_PATH}
+        read_only: true
+      - ${STATE_HOST_PATH}:${STATE_DIR}
+      - ${DOCKER_SOCKET_PATH}:/var/run/docker.sock
+      - manager_auth:/run/manager:ro
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+    depends_on:
+      init-manager-token:
+        condition: service_completed_successfully
+      init-state-perms:
+        condition: service_completed_successfully
+      catalog:
+        condition: service_started
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          curl -fsS "http://127.0.0.1:8001/health" >/dev/null
+      interval: ${API_HEALTHCHECK_INTERVAL}
+      timeout: ${API_HEALTHCHECK_TIMEOUT}
+      retries: ${API_HEALTHCHECK_RETRIES}
 
     restart: ${RESTART_POLICY}
 
@@ -173,6 +325,9 @@ services:
     build:
       context: ${WEB_BUILD_CONTEXT}
       dockerfile: ${WEB_DOCKERFILE}
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_API_STREAM_BASE_URL: ${NEXT_PUBLIC_API_STREAM_BASE_URL}
 
     container_name: ${WEB_CONTAINER_NAME}
 
@@ -183,7 +338,15 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      NEXT_PUBLIC_API_STREAM_BASE_URL: ${NEXT_PUBLIC_API_STREAM_BASE_URL}
       API_PROXY_TARGET: ${API_PROXY_TARGET:-http://api:8000}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
     ports:
       - "${WEB_PORT}:3000"
@@ -239,7 +402,18 @@ services:
       dockerfile: Dockerfile
 
     container_name: infinito-deployer-ssh-password
-    privileged: true
+    # Nested Docker fails to configure inner veth links when the outer DinD
+    # namespace starts with IPv6 disabled. Keep IPv6 proc sysctls writable and
+    # enabled here so the inner daemon can deterministically manage them.
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 0
+      net.ipv6.conf.default.disable_ipv6: 0
+      net.ipv6.conf.lo.disable_ipv6: 0
+    cap_add:
+      - ALL
+    security_opt:
+      - apparmor=unconfined
+      - seccomp=unconfined
     cgroup: host
     dns:
       - 1.1.1.1
@@ -256,6 +430,21 @@ services:
         source: ${INFINITO_REPO_MOUNT_SOURCE:-infinito_repo}
         target: ${JOB_RUNNER_REPO_DIR:-/opt/src/infinito}
         read_only: true
+      - type: bind
+        source: ${TEST_REPO_MIRROR_HOST_PATH:-/tmp/infinito-deployer-e2e/repo-mirrors}
+        target: /opt/e2e/repo-mirrors
+        read_only: true
+      - type: bind
+        source: ${TEST_REPO_SEED_HOST_PATH:-/tmp/infinito-deployer-e2e/repo-seeds}
+        target: /opt/e2e/repo-seeds
+        read_only: true
+      - type: bind
+        source: ${TEST_IMAGE_CACHE_HOST_PATH:-/tmp/infinito-deployer-e2e/image-cache}
+        target: /opt/e2e/image-cache
+        read_only: true
+      # Optional hermetic E2E caches. These mounts improve reproducibility and
+      # iteration speed, but they are not meant to hide real host/container
+      # network problems.
 
     depends_on:
       catalog:
@@ -271,7 +460,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - systemctl is-active sshd.service docker.service >/dev/null
+        - "systemctl is-active sshd.service docker.service >/dev/null"
       interval: 10s
       timeout: 3s
       retries: 18
@@ -304,6 +493,11 @@ services:
 networks:
   default:
     name: ${DOCKER_NETWORK_NAME}
+    # Nested DinD HTTPS pulls from the ssh-password E2E target stall during
+    # TLS handshakes at MTU 1500 in this environment. Pin the outer compose
+    # bridge MTU lower so registry client hellos fit without PMTU blackholes.
+    driver_opts:
+      com.docker.network.driver.mtu: "1400"
     ipam:
       config:
         - subnet: ${DOCKER_NETWORK_SUBNET:-172.28.0.0/24}
@@ -311,3 +505,4 @@ networks:
 volumes:
   infinito_repo:
   postgres_data:
+  manager_auth:

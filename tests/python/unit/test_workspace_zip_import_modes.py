@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import io
 import os
+import stat
 import unittest
 import zipfile
 from tempfile import TemporaryDirectory
 
+from fastapi import HTTPException
 import yaml
 
 from services.workspaces import WorkspaceService
@@ -35,6 +37,15 @@ class TestWorkspaceZipImportModes(unittest.TestCase):
         with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             for path, content in entries.items():
                 archive.writestr(path, content)
+        return buffer.getvalue()
+
+    def _zip_with_info(self, path: str, content: str, *, mode: int) -> bytes:
+        buffer = io.BytesIO()
+        info = zipfile.ZipInfo(path)
+        info.create_system = 3
+        info.external_attr = mode << 16
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(info, content)
         return buffer.getvalue()
 
     def test_list_zip_entries_filters_invalid_members(self) -> None:
@@ -116,6 +127,40 @@ class TestWorkspaceZipImportModes(unittest.TestCase):
         self.assertEqual(service.read_file(workspace_id, "notes.txt"), "old text\n")
         self.assertEqual(summary["merged_files"], 0)
         self.assertEqual(summary["skipped_files"], 1)
+
+    def test_load_zip_rejects_symlink_entries(self) -> None:
+        service = WorkspaceService()
+        workspace_id = str(service.create(owner_id="user-1")["workspace_id"])
+
+        with self.assertRaises(HTTPException) as ctx:
+            service.load_zip(
+                workspace_id,
+                self._zip_with_info(
+                    "host_vars/link.yml",
+                    "target",
+                    mode=stat.S_IFLNK | 0o777,
+                ),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("symlink", str(ctx.exception.detail))
+
+    def test_load_zip_rejects_group_or_world_writable_entries(self) -> None:
+        service = WorkspaceService()
+        workspace_id = str(service.create(owner_id="user-1")["workspace_id"])
+
+        with self.assertRaises(HTTPException) as ctx:
+            service.load_zip(
+                workspace_id,
+                self._zip_with_info(
+                    "group_vars/all.yml",
+                    "value: insecure\n",
+                    mode=stat.S_IFREG | 0o666,
+                ),
+            )
+
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn("writable", str(ctx.exception.detail))
 
 
 if __name__ == "__main__":

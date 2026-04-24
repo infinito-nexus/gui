@@ -43,6 +43,8 @@ from api.schemas.workspace import (
     WorkspaceVaultPasswordResetIn,
     WorkspaceVaultPasswordResetOut,
 )
+from services.role_index.service import RoleIndexService
+from services.rate_limits import RateLimitService
 from services.workspaces import WorkspaceService
 from .workspaces_zip_utils import ensure_zip_upload, parse_upload_modes
 
@@ -54,8 +56,26 @@ def _svc() -> WorkspaceService:
     return WorkspaceService()
 
 
+@lru_cache(maxsize=1)
+def _roles() -> RoleIndexService:
+    return RoleIndexService()
+
+
 def _require_workspace(request: Request, workspace_id: str) -> None:
     ensure_workspace_access(request, workspace_id, _svc())
+
+
+def _require_known_role(role_id: str) -> str:
+    known = _roles().get(role_id)
+    return known.id
+
+
+def _require_known_roles(role_ids: list[str] | None) -> list[str]:
+    return [_require_known_role(role_id) for role_id in role_ids or []]
+
+
+def _rate_limits(request: Request) -> RateLimitService:
+    return getattr(request.app.state, "rate_limits", None) or RateLimitService()
 
 
 @router.get("/{workspace_id}/files", response_model=WorkspaceFileListOut)
@@ -126,6 +146,7 @@ def read_role_app_config(
     workspace_id: str, role_id: str, request: Request, alias: str | None = None
 ) -> WorkspaceRoleAppConfigOut:
     _require_workspace(request, workspace_id)
+    _require_known_role(role_id)
     data = _svc().read_role_app_config(
         workspace_id=workspace_id,
         role_id=role_id,
@@ -146,6 +167,7 @@ def write_role_app_config(
     alias: str | None = None,
 ) -> WorkspaceRoleAppConfigOut:
     _require_workspace(request, workspace_id)
+    _require_known_role(role_id)
     data = _svc().write_role_app_config(
         workspace_id=workspace_id,
         role_id=role_id,
@@ -163,6 +185,7 @@ def import_role_app_defaults(
     workspace_id: str, role_id: str, request: Request, alias: str | None = None
 ) -> WorkspaceRoleAppConfigImportOut:
     _require_workspace(request, workspace_id)
+    _require_known_role(role_id)
     data = _svc().import_role_app_defaults(
         workspace_id=workspace_id,
         role_id=role_id,
@@ -209,6 +232,7 @@ def generate_credentials(
     workspace_id: str, payload: WorkspaceCredentialsIn, request: Request
 ) -> WorkspaceCredentialsOut:
     _require_workspace(request, workspace_id)
+    _require_known_roles(payload.selected_roles)
     _svc().generate_credentials(
         workspace_id=workspace_id,
         master_password=payload.master_password,
@@ -355,6 +379,7 @@ def test_connection(
     workspace_id: str, payload: WorkspaceConnectionTestIn, request: Request
 ) -> WorkspaceConnectionTestOut:
     _require_workspace(request, workspace_id)
+    _rate_limits(request).enforce_test_connection(request, workspace_id)
     data = _svc().test_connection(
         host=payload.host,
         port=payload.port,

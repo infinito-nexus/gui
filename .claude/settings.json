@@ -87,7 +87,8 @@
       "Bash(ruff*)",
       "Bash(shfmt*)",
       "Bash(.venv/bin/*)",
-      "Bash(echo*)"
+      "Bash(echo*)",
+      "Bash(date -Iseconds)"
     ],
     "deny": [
       "Bash(git push --force*)",

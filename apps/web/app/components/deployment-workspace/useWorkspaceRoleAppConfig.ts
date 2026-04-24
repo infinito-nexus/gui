@@ -5,6 +5,7 @@ import type { Dispatch, SetStateAction } from "react";
 import YAML from "yaml";
 import { parseApiError } from "./helpers";
 import type { RoleAppConfigResponse } from "./types";
+import { resolvePersistedRolePlanId } from "../../lib/role_app_config_plan.js";
 
 type UseWorkspaceRoleAppConfigProps = {
   baseUrl: string;
@@ -79,7 +80,12 @@ export function useWorkspaceRoleAppConfig({
       if (!targetAlias || !targetRole) return;
 
       const normalizedPlan = planId ? String(planId || "").trim() : null;
-      const resolvedPlan = normalizedPlan || defaultPlanForRole(targetRole);
+      const defaultPlanId = defaultPlanForRole(targetRole);
+      const resolvedPlan = normalizedPlan || defaultPlanId;
+      const persistedPlanId = resolvePersistedRolePlanId(
+        normalizedPlan,
+        defaultPlanId
+      );
 
       setSelectedByAlias((prev) => {
         const next: Record<string, Set<string>> = { ...prev };
@@ -115,7 +121,11 @@ export function useWorkspaceRoleAppConfig({
           } catch {
             parsed = {};
           }
-          parsed.plan_id = normalizedPlan ? resolvedPlan : null;
+          if (persistedPlanId) {
+            parsed.plan_id = persistedPlanId;
+          } else {
+            delete parsed.plan_id;
+          }
           await saveRoleAppConfig(targetRole, YAML.stringify(parsed), targetAlias);
         } catch {
           // keep UI responsive; inventory write errors are surfaced in the config editor flow

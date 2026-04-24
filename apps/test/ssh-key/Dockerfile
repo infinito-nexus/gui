@@ -1,6 +1,7 @@
 FROM archlinux:latest
 
 RUN pacman -Syu --noconfirm --needed \
+    inetutils \
     openssh \
     sudo \
   && useradd -m -s /bin/bash deploy \

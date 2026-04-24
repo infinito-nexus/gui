@@ -21,6 +21,54 @@ jobs:
           set -euo pipefail
           ./scripts/check-max-lines.sh
 
+  supply-chain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install pip-audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install pip-audit
+
+      - name: Audit locked Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          pip-audit -r apps/api/requirements.lock --desc off
+
+      - name: Install frontend dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/web
+          npm ci
+
+      - name: Audit frontend dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/web
+          npm audit --audit-level=critical
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -121,9 +169,19 @@ jobs:
           set -euo pipefail
           npm run test:e2e -- workspace_history.spec.ts
 
+      - name: Run audit logs e2e
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run test:e2e -- audit_logs.spec.ts
+
   web-dashboard-deploy-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      INFINITO_E2E_CATALOG_IMAGE: ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
+      INFINITO_E2E_JOB_RUNNER_IMAGE: ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb
+      INFINITO_E2E_POSTGRES_IMAGE: postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
 
     steps:
       - name: Checkout
@@ -141,3 +199,56 @@ jobs:
         run: |
           set -euo pipefail
           make e2e-dashboard-ci
+
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      INFINITO_NEXUS_IMAGE: ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
+      JOB_RUNNER_IMAGE: ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb
+      POSTGRES_IMAGE: postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
+      INFINITO_ENFORCE_DIGEST_PINNING: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install frontend dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/web
+          npm ci
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          make install
+
+      - name: Run perf harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          make test-perf
+
+      - name: Upload perf artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-016-artifacts
+          path: state/perf/016
+          if-no-files-found: ignore

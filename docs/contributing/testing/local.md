@@ -87,6 +87,14 @@ Deployments run in a dedicated container per job. Requirements:
 
 For stronger isolation, the job runner can be moved into a separate service that owns the Docker socket.
 
+## OAuth2 Proxy Expectations
+
+When the stack runs behind OAuth2 Proxy, the proxy remains responsible for the authenticated session cookie.
+
+- The upstream session cookie MUST be configured with `Secure`, `HttpOnly`, and `SameSite=Strict`.
+- Anonymous mode keeps using the deployer's `csrf` session cookie plus the `X-CSRF` header for double-submit protection.
+- OAuth2 Proxy mode does not require an additional API-side CSRF token beyond the hardened proxy session cookie.
+
 ## Stack Commands
 
 | Command | What it does |
