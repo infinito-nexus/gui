@@ -5,3 +5,41 @@
 - For markdown/reST-only changes you MAY skip `make test` unless the user explicitly requires it.
 - You MUST NOT commit without explicit user confirmation. You MUST always ask.
 - If validation warns about a staged file or component, you MUST ask the user whether to fix the warning first. You MUST keep the follow-up scoped to the staged files.
+
+## Iteration-Loop Commit Gate 🛑
+
+Loop = any of:
+- user prompt matches `/iteriere/`, `/iterate/`, `/until (green|all (pass|fixed))/`, `/fix (all|both|the) (failing|remaining) /`
+- active session is in `/loop` self-pacing mode
+- TodoWrite list has ≥ 2 `pending` or `in_progress` items the agent itself enqueued for the current request
+
+While Loop is active:
+
+- The agent MUST NOT call `git commit` (no `git add` + `git commit`, no `--amend`, no PR-creating commands).
+- The agent MUST hold every diff in the working tree (or staged-only is fine, just no commit).
+- The agent MUST NOT push, MUST NOT create PRs, MUST NOT tag.
+
+Loop exits (commit gate opens) when ALL are true:
+
+- Every TodoWrite item is `completed`.
+- The closing verification is green:
+  - default: `make e2e-dashboard-local` (see [iteration.md](iteration.md))
+  - or whatever the user pinned for this loop ("until perf is green", "until all 3 CI jobs pass")
+- The user has not redirected the loop in the most recent turn.
+
+After exit:
+
+- ONE batched commit covering the whole iteration. Same pre-commit rules as above (autoformat, test on non-doc changes, ask).
+- Multiple commits MAY be created only if the staged tree splits cleanly along independent concerns AND each split commit is itself green against the closing verification.
+
+Hard overrides (commit gate opens immediately, named scope only):
+
+- User says `commite` / `commit now` / `commit jetzt` / `commite die gestagten dateien` → commit current staging only.
+- User explicitly phases the work ("first fix X, commit, then fix Y") → commit at each named phase boundary.
+- Destructive cleanup is required to unblock the loop (e.g. branch reset). Surface and ask.
+
+Self-check before any `git commit`:
+
+1. Am I inside a Loop as defined above? If yes and no override fired → STOP, do not commit.
+2. Did I just say "passes locally" without running the closing verification on the final state? If yes → STOP, run it first.
+3. Is the staged diff strictly smaller than the working tree? If yes and the working-tree-only changes are part of the same loop → STOP, integrate them or unstage the partial commit.

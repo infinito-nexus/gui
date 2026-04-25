@@ -28,3 +28,25 @@
 ## Debugging 🐞
 
 - On failure, you MUST switch to [debug.md](debug.md). For the local retry loop you MUST follow [iteration.md](iteration.md).
+
+## Inline-Script Extraction Rule 📜
+
+`*.yml` (CI workflows, GitHub Actions, docker-compose) and `Makefile` files MUST stay thin glue. They MUST NOT carry substantive shell, python, or other scripting logic inline.
+
+Trigger: an inline `run:` / Makefile recipe / compose `command:` block contains ANY of:
+
+- more than 5 non-blank, non-comment lines, OR
+- a `for` / `while` / `case` block, OR
+- a multi-statement `if`/`elif`/`else` chain, OR
+- shell-quoting that needs `$$`, `\\`, or nested heredocs, OR
+- inline python / awk / sed scripts longer than one line.
+
+When the trigger fires:
+
+- Shell logic MUST be extracted to a file under `scripts/<area>/<verb>.sh` (e.g. `scripts/ci/dump-container-logs.sh`, `scripts/workspace-perms/repair.sh`). The script MUST start with `#!/usr/bin/env bash`, `set -euo pipefail`, and a usage header comment.
+- Python logic MUST be extracted to a file under `scripts/<area>/<verb>.py` OR into the relevant `apps/api/` package and called via the existing CLI / `python -m` entry point.
+- The `*.yml` / `Makefile` site MUST then call the extracted script with one line (`bash scripts/<area>/<verb>.sh "$ARG"`), passing arguments explicitly. No re-implementing the same logic in two places.
+
+The extracted script MUST be tracked, executable, and covered by `make lint` (shellcheck + shfmt for `.sh`, ruff for `.py`).
+
+This rule overrides any temptation to keep "just one quick `for` loop" inline. Two callers ⇒ shared script. One caller now ⇒ shared script anyway, because shellcheck/shfmt does not run on inline yml/Make blocks.
