@@ -205,6 +205,10 @@ services:
       ROLE_CATALOG_CATEGORIES_YML: ${ROLE_CATALOG_CATEGORIES_YML}
 
       JOB_RUNNER_IMAGE: ${JOB_RUNNER_IMAGE}
+      # Fallback source when JOB_RUNNER_IMAGE is empty: container_runner.py
+      # already does `os.getenv("JOB_RUNNER_IMAGE") or os.getenv("INFINITO_NEXUS_IMAGE")`,
+      # so passing the catalog image through makes that fallback actually work.
+      INFINITO_NEXUS_IMAGE: ${INFINITO_NEXUS_IMAGE}
       JOB_RUNNER_REPO_DIR: ${JOB_RUNNER_REPO_DIR:-/opt/src/infinito}
       JOB_RUNNER_WORKDIR: ${JOB_RUNNER_WORKDIR:-/workspace}
       JOB_RUNNER_REPO_HOST_PATH: ${JOB_RUNNER_REPO_HOST_PATH:-}
@@ -280,6 +284,10 @@ services:
       STATE_DIR: ${STATE_DIR}
       STATE_HOST_PATH: ${STATE_HOST_PATH}
       JOB_RUNNER_IMAGE: ${JOB_RUNNER_IMAGE}
+      # Fallback source when JOB_RUNNER_IMAGE is empty: container_runner.py
+      # already does `os.getenv("JOB_RUNNER_IMAGE") or os.getenv("INFINITO_NEXUS_IMAGE")`,
+      # so passing the catalog image through makes that fallback actually work.
+      INFINITO_NEXUS_IMAGE: ${INFINITO_NEXUS_IMAGE}
       JOB_RUNNER_REPO_DIR: ${JOB_RUNNER_REPO_DIR:-/opt/src/infinito}
       JOB_RUNNER_WORKDIR: ${JOB_RUNNER_WORKDIR:-/workspace}
       JOB_RUNNER_REPO_HOST_PATH: ${JOB_RUNNER_REPO_HOST_PATH:-}

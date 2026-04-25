@@ -72,6 +72,17 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The integration tests in tests/python/integration/ bring up the full
+    # docker-compose stack via `make test-up`, so the API needs the same
+    # pinned-digest images the perf job uses. Without these the API
+    # container reads JOB_RUNNER_IMAGE='' from env.example and 500s
+    # `JOB_RUNNER_IMAGE (or INFINITO_NEXUS_IMAGE) must be set for container
+    # runner` on the first POST /api/deployments.
+    env:
+      INFINITO_NEXUS_IMAGE: ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
+      JOB_RUNNER_IMAGE: ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb
+      POSTGRES_IMAGE: postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
+      INFINITO_ENFORCE_DIGEST_PINNING: "true"
 
     steps:
       - name: Checkout
