@@ -28,6 +28,16 @@ class TestEnsureLocalRunnerImageScript(unittest.TestCase):
             env = dict(os.environ)
             env["PATH"] = f"{tmp_path}:{env.get('PATH', '')}"
             env["DOCKER_LOG"] = str(docker_log)
+            # ensure-local-runner-image.sh prefers process-env values over the
+            # --env-file argument (`local value="${!key:-}"` short-circuits
+            # before the awk fallback). Strip the relevant vars from the
+            # subprocess env so the env_body driven by the test is the only
+            # source of truth, otherwise CI workflows that set
+            # JOB_RUNNER_IMAGE/INFINITO_NEXUS_IMAGE in their `env:` block
+            # silently bypass the script logic and the assertions fire on an
+            # empty docker.log.
+            env.pop("JOB_RUNNER_IMAGE", None)
+            env.pop("INFINITO_NEXUS_IMAGE", None)
 
             completed = subprocess.run(
                 ["bash", str(self.script_path), str(env_file)],
