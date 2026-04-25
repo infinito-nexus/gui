@@ -5,6 +5,7 @@ import os
 import shlex
 import shutil
 import subprocess  # noqa: F401 - re-exported for test patchability
+import time  # noqa: F401 - re-exported for runtime module via _root()
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional

@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-ci lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -219,8 +219,53 @@ e2e-dashboard-local:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@INFINITO_NEXUS_SRC_DIR="$(INFINITO_NEXUS_SRC_DIR)" ./scripts/e2e/dashboard/run.sh local
 
+# Fully reproducible e2e run with no host dependencies other than Docker.
+# Builds the stack via the regular local flow but runs Playwright inside a
+# locally-built Microsoft Playwright + docker-cli image that is attached to
+# the docker-compose network. Useful when the host cannot publish/reach
+# docker port mappings (sandboxed/network-namespaced terminals, restricted
+# CI runners) or has a glibc that does not match the playwright image.
+#
+# The first run builds infinito-deployer-playwright:latest from
+# apps/test/playwright/Dockerfile (~1 min). Subsequent runs reuse the image.
+#
+# Usage:
+#   make e2e-dashboard-local-docker INFINITO_NEXUS_SRC_DIR=/abs/path/to/infinito-nexus
+#
+# Optional overrides:
+#   INFINITO_E2E_PLAYWRIGHT_BASE_IMAGE  (default: mcr.microsoft.com/playwright:v1.55.1-jammy)
+#   INFINITO_E2E_PLAYWRIGHT_IMAGE       (default: infinito-deployer-playwright:latest)
+e2e-dashboard-local-docker:
+	@$(MAKE) --no-print-directory warn-local-unpinned-images
+	@INFINITO_NEXUS_SRC_DIR="$(INFINITO_NEXUS_SRC_DIR)" \
+		INFINITO_E2E_PLAYWRIGHT_DOCKER=1 \
+		./scripts/e2e/dashboard/run.sh local
+
 e2e-dashboard-ci:
 	@./scripts/e2e/dashboard/run.sh ci
+
+# CI variant of e2e-dashboard-local-docker: pulls the registry-pinned
+# Infinito.Nexus images instead of building from source, but otherwise runs
+# the same Playwright-in-docker flow so it works in sandboxed/network-namespaced
+# terminals where the host cannot reach docker port mappings.
+#
+# Usage:
+#   make e2e-dashboard-ci-docker
+e2e-dashboard-ci-docker:
+	@INFINITO_E2E_PLAYWRIGHT_DOCKER=1 \
+		./scripts/e2e/dashboard/run.sh ci
+
+# Build the Playwright + docker-cli image used by e2e-dashboard-local-docker.
+# Override base image or output tag via:
+#   make playwright-build PLAYWRIGHT_BASE=mcr.microsoft.com/playwright:v1.55.1-jammy PLAYWRIGHT_IMAGE=infinito-deployer-playwright:latest
+PLAYWRIGHT_BASE  ?= mcr.microsoft.com/playwright:v1.55.1-jammy
+PLAYWRIGHT_IMAGE ?= infinito-deployer-playwright:latest
+playwright-build:
+	@echo "→ Building Playwright+docker-cli image ($(PLAYWRIGHT_IMAGE)) from $(PLAYWRIGHT_BASE)"
+	@docker build \
+		--build-arg "PLAYWRIGHT_BASE=$(PLAYWRIGHT_BASE)" \
+		-t "$(PLAYWRIGHT_IMAGE)" \
+		apps/test/playwright
 
 # Lint = check-only, fails on any issue or formatting drift.
 # Autoformat = applies autofix and reformatting in place.

@@ -39,7 +39,7 @@ __all__ = [
 
 class JobRunnerServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        self._tmp = TemporaryDirectory()
+        self._tmp = TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(self._tmp.cleanup)
 
         self._old_state_dir = os.environ.get("STATE_DIR")

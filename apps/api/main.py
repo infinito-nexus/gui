@@ -135,7 +135,7 @@ def _request_external_origins(request: Request) -> list[str]:
 def _csrf_cookie_secure(request: Request) -> bool:
     for raw_origin in _request_external_origins(request):
         parsed = urlparse(raw_origin)
-        if parsed.scheme.lower() == "http" and _is_loopback_host(parsed.hostname):
+        if parsed.scheme.lower() == "http":
             return False
     return True
 

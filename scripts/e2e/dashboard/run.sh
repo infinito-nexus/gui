@@ -81,6 +81,20 @@ resolve_docker_socket_gid() {
     exit 1
   fi
 
+  # Some sandboxed hosts translate UIDs/GIDs differently inside containers
+  # than on the host (e.g. user-namespaced docker, rootless setups). Probe
+  # from inside a throwaway container so the GID matches what the actual
+  # runner-manager sees.
+  local probe_gid
+  probe_gid="$(docker run --rm \
+    -v "${socket_path}:/var/run/docker.sock" \
+    alpine:latest \
+    stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
+  if [[ "${probe_gid}" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "${probe_gid}"
+    return 0
+  fi
+
   stat -c '%g' "${socket_path}"
 }
 
@@ -194,6 +208,22 @@ render_env_file() {
   chmod +x "${ldapsm_shim_host}" || true
   docker_socket_path="$(resolve_docker_socket_path)"
   docker_socket_gid="$(resolve_docker_socket_gid)"
+  # Re-export so docker compose's ${DOCKER_SOCKET_GID:-...} substitution uses
+  # the probed-from-container value instead of any stale value the parent
+  # Makefile may have exported from a host-side `stat` call (which does not
+  # always match the GID containers actually see in user-namespaced setups).
+  export DOCKER_SOCKET_PATH="${docker_socket_path}"
+  export DOCKER_SOCKET_GID="${docker_socket_gid}"
+
+  local stream_base_url="http://127.0.0.1:${api_port}"
+  local cors_allow_origins="http://127.0.0.1:${web_port},http://localhost:${web_port}"
+  if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
+    # Playwright runs inside the docker network, so 127.0.0.1 inside the browser
+    # container is the browser itself, not the host. Use relative URLs so SSE
+    # goes through the web container's Next.js rewrite to api:8000.
+    stream_base_url=""
+    cors_allow_origins="${cors_allow_origins},http://web:${web_port}"
+  fi
 
   cat "${ENV_SOURCE}" >"${target_file}"
   cat >>"${target_file}" <<EOF
@@ -209,9 +239,9 @@ JOB_RUNNER_SKIP_CLEANUP=false
 JOB_RUNNER_SKIP_BUILD=false
 JOB_RUNNER_ANSIBLE_ARGS=-e '{"TLS_ENABLED": true, "TLS_MODE": "self_signed"}' -e SYS_SVC_SSHD_PASSWORD_AUTHENTICATION=true -e '{"MAILU_IP4_PUBLIC": "{{ ansible_default_ipv4.address }}"}' -e TEST_E2E_PLAYWRIGHT_STAGE_BASE_DIR=/var/lib/test-e2e-playwright
 INFINITO_ENFORCE_DIGEST_PINNING=${enforce_digest_pinning}
-CORS_ALLOW_ORIGINS=http://127.0.0.1:${web_port},http://localhost:${web_port}
+CORS_ALLOW_ORIGINS=${cors_allow_origins}
 NEXT_PUBLIC_API_BASE_URL=
-NEXT_PUBLIC_API_STREAM_BASE_URL=http://127.0.0.1:${api_port}
+NEXT_PUBLIC_API_STREAM_BASE_URL=${stream_base_url}
 INFINITO_NEXUS_IMAGE=${catalog_image}
 JOB_RUNNER_IMAGE=${runner_image}
 POSTGRES_IMAGE=${INFINITO_E2E_POSTGRES_IMAGE:-${CI_POSTGRES_IMAGE_DEFAULT}}
@@ -270,20 +300,65 @@ cd "${APPS_WEB_DIR}"
 export INFINITO_E2E_COMPOSE_ENV_FILE="${TMP_ENV_FILE}"
 export INFINITO_E2E_COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml"
 export INFINITO_E2E_MODE="${MODE}"
-export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${E2E_WEB_PORT}}"
 
-if [[ ! -d "${APPS_WEB_DIR}/node_modules" ]]; then
-  echo "→ Installing frontend dependencies for Playwright"
-  npm ci
+# Wipe the test-results directory before the run so a previous container-mode
+# run that wrote files as a different uid does not block this run with EACCES.
+docker run --rm -v "${APPS_WEB_DIR}/test-results:/work" alpine:latest \
+  sh -c 'find /work -mindepth 1 -delete 2>/dev/null || true' >/dev/null 2>&1 || true
+
+if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
+  playwright_base="${INFINITO_E2E_PLAYWRIGHT_BASE_IMAGE:-mcr.microsoft.com/playwright:v1.55.1-jammy}"
+  playwright_image="${INFINITO_E2E_PLAYWRIGHT_IMAGE:-infinito-deployer-playwright:latest}"
+
+  if ! docker image inspect "${playwright_image}" >/dev/null 2>&1; then
+    make -C "${REPO_ROOT}" playwright-build \
+      PLAYWRIGHT_BASE="${playwright_base}" \
+      PLAYWRIGHT_IMAGE="${playwright_image}"
+  fi
+
+  network_name="$(docker inspect \
+    -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
+    infinito-deployer-web 2>/dev/null | awk 'NF{print; exit}' || true)"
+  network_name="${network_name:-infinito-deployer}"
+
+  echo "→ Running real dashboard deploy E2E inside docker (network=${network_name}, image=${playwright_image})"
+  # The dashboard reachability assertion in the spec calls
+  # 'docker compose exec ssh-password curl ...' to probe the deployed app
+  # inside its target container. The custom image bundles docker.io +
+  # docker-compose-v2; mount the docker socket + generated compose env file
+  # so 'docker compose exec' works from inside the playwright container.
+  docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    --group-add "${DOCKER_SOCKET_GID}" \
+    --network "${network_name}" \
+    -v "${APPS_WEB_DIR}:/work" \
+    -v "${REPO_ROOT}:${REPO_ROOT}:ro" \
+    -v "${DOCKER_SOCKET_PATH}:/var/run/docker.sock" \
+    -v "${TMP_ENV_FILE}:${TMP_ENV_FILE}:ro" \
+    -w /work \
+    -e PLAYWRIGHT_BASE_URL="http://web:${E2E_WEB_PORT}" \
+    -e INFINITO_E2E_MODE="${MODE}" \
+    -e INFINITO_E2E_COMPOSE_ENV_FILE="${TMP_ENV_FILE}" \
+    -e INFINITO_E2E_COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml" \
+    -e HOME=/tmp \
+    "${playwright_image}" \
+    npx playwright test -c playwright.dashboard.config.ts tests/dashboard_deploy_real.spec.ts
+else
+  export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${E2E_WEB_PORT}}"
+
+  if [[ ! -d "${APPS_WEB_DIR}/node_modules" ]]; then
+    echo "→ Installing frontend dependencies for Playwright"
+    npm ci
+  fi
+
+  if ! npx playwright --version >/dev/null 2>&1; then
+    echo "✖ Playwright CLI is unavailable after dependency install." >&2
+    exit 1
+  fi
+
+  echo "→ Ensuring Chromium is installed for Playwright"
+  npx playwright install chromium
+
+  echo "→ Running real dashboard deploy E2E"
+  npx playwright test -c playwright.dashboard.config.ts tests/dashboard_deploy_real.spec.ts
 fi
-
-if ! npx playwright --version >/dev/null 2>&1; then
-  echo "✖ Playwright CLI is unavailable after dependency install." >&2
-  exit 1
-fi
-
-echo "→ Ensuring Chromium is installed for Playwright"
-npx playwright install chromium
-
-echo "→ Running real dashboard deploy E2E"
-npx playwright test -c playwright.dashboard.config.ts tests/dashboard_deploy_real.spec.ts

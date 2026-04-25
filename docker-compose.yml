@@ -41,6 +41,10 @@ services:
     image: ${INFINITO_NEXUS_IMAGE}
     container_name: infinito-deployer-catalog
 
+    depends_on:
+      init-state-perms:
+        condition: service_completed_successfully
+
     env_file:
       - path: .env
         required: false
@@ -145,7 +149,7 @@ services:
         install -d -o 10001 -g 10900 -m 2770 \
           "$${STATE_DIR}/workspaces" \
           "$${STATE_DIR}/jobs"
-        install -d -o 10001 -g 10900 -m 0755 \
+        install -d -o 10001 -g 10900 -m 2775 \
           "$${STATE_DIR}/catalog"
 
     user: "0:0"

@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // Disable Next.js built-in gzip compression so proxied Server-Sent Events
+  // (text/event-stream) reach the browser as a true byte-stream instead of
+  // being buffered into gzip frames that EventSource cannot parse incrementally.
+  compress: false,
   experimental: {
     proxyTimeout: 600000,
   },

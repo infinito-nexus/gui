@@ -108,7 +108,7 @@ class TestDockerComposeSecurityTopology(unittest.TestCase):
         self.assertIn("install -d -o 10001 -g 10900 -m 2770", command)
         self.assertIn('"$${STATE_DIR}/workspaces"', command)
         self.assertIn('"$${STATE_DIR}/jobs"', command)
-        self.assertIn("install -d -o 10001 -g 10900 -m 0755", command)
+        self.assertIn("install -d -o 10001 -g 10900 -m 2775", command)
         self.assertIn('"$${STATE_DIR}/catalog"', command)
 
         self.assertEqual(
