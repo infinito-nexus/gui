@@ -26,3 +26,4 @@ One iteration = one attempted change, from the first edit to the closing verific
 
 - Before you redeploy, you MUST complete all available inspections first. You MUST check the live local output (`make logs`), container logs, and current application state so the original state stays visible.
 - To inspect files or run commands inside a running container, you MUST use `docker compose exec <service> bash` or `docker compose exec -T <service> sh -c '<cmd>'`.
+- To compare workspace permissions inside the `api` container vs on the host filesystem, you MUST use `make debug-workspace-perms WORKSPACE_ID=<id>` instead of running raw `docker exec` + `docker run -v ... alpine` pairs by hand.

@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -99,6 +99,31 @@ db-wait:
 
 db-psql:
 	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" exec db sh -lc 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+# Compare workspace permissions inside the api container vs on the host
+# filesystem. Helps diagnose "Inventory sync failed: HTTP 500".
+# Usage: make debug-workspace-perms WORKSPACE_ID=<id>
+debug-workspace-perms:
+	@if [ -z "$(WORKSPACE_ID)" ]; then echo "✖ WORKSPACE_ID is required (e.g. make debug-workspace-perms WORKSPACE_ID=a8bb35e5adc8)"; exit 2; fi
+	@DOCKER_COMPOSE="$(DOCKER_COMPOSE)" COMPOSE_FILE="$(COMPOSE_FILE)" ENV_FILE="$(ENV_FILE)" \
+		bash scripts/workspace-perms/debug.sh "$(WORKSPACE_ID)"
+
+# Test-only: deliberately corrupt one workspace dir back to the
+# pre-hardening root:root mode 0755 state so we can verify init-state-perms
+# (or `make repair-workspace-perms`) self-heals it on the next stack start.
+# Usage: make break-workspace-perms WORKSPACE_ID=<id>
+break-workspace-perms:
+	@if [ -z "$(WORKSPACE_ID)" ]; then echo "✖ WORKSPACE_ID is required (e.g. make break-workspace-perms WORKSPACE_ID=a8bb35e5adc8)"; exit 2; fi
+	@bash scripts/workspace-perms/break.sh "$(WORKSPACE_ID)"
+
+# One-shot migration: re-own any workspace directory that is still root-owned
+# (created before the api container was hardened to non-root user) so the api
+# (uid 10001, gid 10900) can write atomic temp files into it again. Otherwise
+# the inventory PUT endpoint loops with HTTP 500
+# `[Errno 13] Permission denied: .inventory.yml.<hash>.tmp`.
+# Idempotent: only touches dirs not already owned by 10001:10900.
+repair-workspace-perms:
+	@bash scripts/workspace-perms/repair.sh
 
 requirements-init: db-up db-wait
 	@echo "→ Ensuring requirements tables exist"

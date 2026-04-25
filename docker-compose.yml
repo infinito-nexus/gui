@@ -151,6 +151,18 @@ services:
           "$${STATE_DIR}/jobs"
         install -d -o 10001 -g 10900 -m 2775 \
           "$${STATE_DIR}/catalog"
+        # Heal pre-hardening workspace dirs that were created when the api
+        # ran as root. Without this the api (uid 10001) cannot create the
+        # atomic temp files that PUT /api/workspaces/<id>/files/... uses,
+        # which manifests in the UI as "Inventory sync failed: HTTP 500".
+        for d in "$${STATE_DIR}/workspaces"/*/; do
+          [ -d "$$d" ] || continue
+          owner="$$(stat -c '%u:%g' "$$d")"
+          if [ "$$owner" != "10001:10900" ]; then
+            chown -R 10001:10900 "$$d"
+            find "$$d" -type d -exec chmod 2770 {} +
+          fi
+        done
 
     user: "0:0"
     volumes:
