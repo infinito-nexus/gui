@@ -15,3 +15,4 @@ examples/workspace-import.zip
 *.egg-info
 !apps/api/requirements.lock
 apps/web/test-results/
+*.tmp
