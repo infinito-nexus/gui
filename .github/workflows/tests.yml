@@ -177,7 +177,11 @@ jobs:
 
   web-dashboard-deploy-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Local runs of `make e2e-dashboard-local-docker` (2 tests) take 14–22 min.
+    # GitHub-hosted runners are slower (~2× CPU) and Playwright's per-spec
+    # timeout is 50 min, so the workflow needs >50 min to surface a real
+    # failure instead of being killed by the workflow timeout itself.
+    timeout-minutes: 75
     env:
       INFINITO_E2E_CATALOG_IMAGE: ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
       INFINITO_E2E_JOB_RUNNER_IMAGE: ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb

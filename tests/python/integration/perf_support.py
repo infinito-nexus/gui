@@ -114,13 +114,24 @@ def wait_for_http_ready(url: str, *, timeout_seconds: float = 60.0) -> None:
     raise RuntimeError(f"timed out waiting for {url}: {last_error}")
 
 
+def _compose_env_file() -> Path:
+    """Mirror the Makefile's EFFECTIVE_ENV_FILE: prefer .env, fall back to
+    env.example so CI checkouts (which don't ship a .env) can still render
+    docker-compose.yml without "strconv.Atoi: parsing ''" interpolation
+    errors on healthcheck.retries and similar int-typed defaults."""
+    env_file = REPO_ROOT / ".env"
+    if env_file.is_file():
+        return env_file
+    return REPO_ROOT / "env.example"
+
+
 def compose_ps_quiet(service: str) -> str:
     output = subprocess.check_output(
         [
             "docker",
             "compose",
             "--env-file",
-            str(REPO_ROOT / ".env"),
+            str(_compose_env_file()),
             "-f",
             str(REPO_ROOT / "docker-compose.yml"),
             "--profile",
