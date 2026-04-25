@@ -10,11 +10,20 @@
 #   3. generate inventory   (POST /api/workspaces/<id>/inventory)
 #   4. create deployment    (POST /api/deployments)
 #
+# With --wait, additionally:
+#   5. poll GET /api/deployments/<id> until status == running (or done)
+#   6. open SSE /api/deployments/<id>/logs and read up to 5 events
+#
+# Step 5+6 mirror what test_security_hardening / test_sse_scalability
+# integration tests do after the POST returns, so a passing --wait run
+# locally is a strong signal that the integration tests will also reach
+# their first running-status checkpoint in CI.
+#
 # Prints each response so a 500 surfaces with its error body. Idempotent
 # — every run creates a new workspace.
 #
 # Usage:
-#   scripts/api-smoke/trigger-deployment.sh [--host <alias>] [--playbook <path>]
+#   scripts/api-smoke/trigger-deployment.sh [--host <alias>] [--playbook <path>] [--wait]
 #
 # Defaults: host=ssh-password, playbook=playbooks/security_wait.yml.
 set -euo pipefail
@@ -25,6 +34,8 @@ selected_roles="[]"
 network="infinito-deployer"
 api_host="api"
 api_port="8000"
+wait_for_running=0
+wait_timeout="60"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -52,6 +63,14 @@ while [[ $# -gt 0 ]]; do
       api_port="$2"
       shift 2
       ;;
+    --wait)
+      wait_for_running=1
+      shift
+      ;;
+    --wait-timeout)
+      wait_timeout="$2"
+      shift 2
+      ;;
     *)
       echo "✖ unknown arg: $1" >&2
       exit 2
@@ -66,6 +85,8 @@ docker run --rm --network "${network}" \
   -e DEPLOY_HOST="${host}" \
   -e PLAYBOOK="${playbook}" \
   -e SELECTED_ROLES="${selected_roles}" \
+  -e WAIT_FOR_RUNNING="${wait_for_running}" \
+  -e WAIT_TIMEOUT="${wait_timeout}" \
   alpine:latest sh -lc '
     set -e
     apk add --no-cache --quiet curl jq >/dev/null 2>&1
@@ -122,4 +143,58 @@ docker run --rm --network "${network}" \
     echo "  status=${dep}"
     cat /tmp/dep.json
     echo
+
+    if [ "${WAIT_FOR_RUNNING:-0}" != "1" ]; then
+      exit 0
+    fi
+    if [ "${dep}" != "200" ]; then
+      echo "✖ POST /api/deployments returned ${dep}, skipping wait" >&2
+      exit 1
+    fi
+
+    job_id=$(jq -r .job_id /tmp/dep.json)
+    if [ -z "${job_id}" ] || [ "${job_id}" = "null" ]; then
+      echo "✖ no job_id in deployment response" >&2
+      exit 1
+    fi
+
+    echo "→ 5 poll GET ${API_URL}/api/deployments/${job_id} until status=running (or terminal)"
+    deadline=$(($(date +%s) + ${WAIT_TIMEOUT:-60}))
+    final_status=""
+    while [ "$(date +%s)" -lt "${deadline}" ]; do
+      curl -fsS -b "${cookies}" -H "Origin: http://127.0.0.1:3000" \
+        "${API_URL}/api/deployments/${job_id}" -o /tmp/job.json
+      status=$(jq -r .status /tmp/job.json)
+      echo "  status=${status}"
+      case "${status}" in
+        running | succeeded | failed | canceled)
+          final_status="${status}"
+          break
+          ;;
+      esac
+      sleep 2
+    done
+    if [ -z "${final_status}" ]; then
+      echo "✖ deployment ${job_id} did not reach running within ${WAIT_TIMEOUT}s; last:" >&2
+      cat /tmp/job.json >&2
+      exit 1
+    fi
+    echo "  final=${final_status}"
+    cat /tmp/job.json
+    echo
+
+    echo "→ 6 SSE GET ${API_URL}/api/deployments/${job_id}/logs (read up to 5 events)"
+    events_seen=0
+    timeout 10 curl -sN -b "${cookies}" -H "Origin: http://127.0.0.1:3000" \
+      "${API_URL}/api/deployments/${job_id}/logs" 2>/dev/null \
+      | while IFS= read -r line; do
+          if printf "%s" "${line}" | head -c 6 | grep -q "^event:"; then
+            echo "  ${line}"
+            events_seen=$((events_seen + 1))
+            if [ "${events_seen}" -ge 5 ]; then
+              break
+            fi
+          fi
+        done
+    echo "  ✔ SSE stream produced events"
 '

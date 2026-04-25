@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -30,6 +30,15 @@ export PYTHONPATH := $(PWD)/apps/api
 
 # Keep state in repo-local directory for tests (no /state permission issues)
 TEST_STATE_DIR := $(PWD)/state
+# Always export STATE_HOST_PATH as an absolute path: the API container
+# resolves it via Path(host_path).is_absolute() and 500s on relative
+# values. env.example ships `./state` (relative) so a CI run that has no
+# .env override would otherwise hit
+#   POST /api/deployments → 500
+#   {"detail":"STATE_HOST_PATH must be an absolute path for containerized jobs"}
+# on the first deployment. Compose env vars beat --env-file values, so
+# this overrides whatever env.example/.env have.
+export STATE_HOST_PATH := $(TEST_STATE_DIR)
 EXAMPLE_WORKSPACE_DIR ?= examples/workspace
 EXAMPLE_WORKSPACE_ZIP ?= examples/workspace-import.zip
 
@@ -141,6 +150,14 @@ HOST     ?= ssh-password
 PLAYBOOK ?= playbooks/security_wait.yml
 api-smoke-deployment:
 	@bash scripts/api-smoke/trigger-deployment.sh --host "$(HOST)" --playbook "$(PLAYBOOK)"
+
+# Like api-smoke-deployment but also waits for the deployment to reach
+# `running` and reads a few SSE events. Mirrors what test_security_hardening
+# and test_sse_scalability do post-POST, so a green local run is a strong
+# signal CI integration tests will reach the same checkpoint.
+# Usage: make api-smoke-deployment-full [HOST=ssh-password PLAYBOOK=playbooks/security_wait.yml]
+api-smoke-deployment-full:
+	@bash scripts/api-smoke/trigger-deployment.sh --host "$(HOST)" --playbook "$(PLAYBOOK)" --wait
 
 requirements-init: db-up db-wait
 	@echo "→ Ensuring requirements tables exist"
