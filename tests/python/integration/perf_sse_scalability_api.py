@@ -15,15 +15,33 @@ from .perf_sse_scalability_support import (
 )
 
 
+def _raise_for_status_verbose(response: httpx.Response) -> None:
+    """raise_for_status that surfaces the response body in the error.
+
+    Same diagnostic helper as test_security_hardening uses — without it,
+    a 500 here looks like a bare status line on CI and the actual error
+    detail is lost when tearDownClass tears the stack down before the
+    workflow's dump-on-failure step can capture container logs.
+    """
+    if response.is_success:
+        return
+    body = (response.text or "")[:4000]
+    raise httpx.HTTPStatusError(
+        f"{response.status_code} {response.request.method} {response.request.url}\nbody: {body}",
+        request=response.request,
+        response=response,
+    )
+
+
 class PerfSseScalabilityApiMixin:
     async def _warm_role_index(self, client: httpx.AsyncClient) -> None:
         for _ in range(5):
             response = await client.get("/api/roles")
-            response.raise_for_status()
+            _raise_for_status_verbose(response)
 
     async def _prime_csrf(self, client: httpx.AsyncClient) -> dict[str, str]:
         response = await client.get("/health")
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         token = str(client.cookies.get("csrf") or "").strip()
         self.assertTrue(token, "anonymous perf client must receive a csrf cookie")
         return {"X-CSRF": token, "Cookie": f"csrf={token}"}
@@ -31,7 +49,7 @@ class PerfSseScalabilityApiMixin:
     async def _create_workspace(self, client: httpx.AsyncClient) -> str:
         csrf_headers = await self._prime_csrf(client)
         response = await client.post("/api/workspaces", headers=csrf_headers)
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         workspace_id = str(response.json().get("workspace_id") or "").strip()
         self.assertTrue(workspace_id, "workspace creation must return an id")
         return workspace_id
@@ -48,7 +66,7 @@ class PerfSseScalabilityApiMixin:
             json={"content": playbook_text},
             headers=csrf_headers,
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
 
     async def _generate_inventory(
         self, client: httpx.AsyncClient, workspace_id: str
@@ -66,7 +84,7 @@ class PerfSseScalabilityApiMixin:
             },
             headers=csrf_headers,
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
 
     async def _create_fixture_deployment(
         self, client: httpx.AsyncClient, workspace_id: str
@@ -86,7 +104,7 @@ class PerfSseScalabilityApiMixin:
             },
             headers=csrf_headers,
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         job_id = str(response.json().get("job_id") or "").strip()
         self.assertTrue(job_id, "deployment creation must return job_id")
         return job_id
@@ -101,7 +119,7 @@ class PerfSseScalabilityApiMixin:
                 started_at = time.perf_counter()
                 response = await client.get("/api/roles")
                 elapsed_ms = (time.perf_counter() - started_at) * 1000
-                response.raise_for_status()
+                _raise_for_status_verbose(response)
                 samples.append(
                     {
                         "name": "GET /api/roles under load",

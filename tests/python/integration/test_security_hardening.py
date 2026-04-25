@@ -28,6 +28,23 @@ RUNNER_PLAYBOOK = """\
 SECRET_VALUE = "IntegrationSecret-4f3d2c1b0a"
 
 
+def _raise_for_status_verbose(response: httpx.Response) -> None:
+    """raise_for_status that surfaces the response body in the error.
+
+    The default httpx.HTTPStatusError only shows the status line, which
+    swallows API error details on CI runs where containers are torn down
+    before the workflow's dump-on-failure step can capture logs.
+    """
+    if response.is_success:
+        return
+    body = (response.text or "")[:4000]
+    raise httpx.HTTPStatusError(
+        f"{response.status_code} {response.request.method} {response.request.url}\nbody: {body}",
+        request=response.request,
+        response=response,
+    )
+
+
 def _run_make(*args: str) -> None:
     subprocess.run(
         ["make", *args],
@@ -91,14 +108,14 @@ class TestSecurityHardening(unittest.TestCase):
 
     def _prime_csrf(self, client: httpx.Client) -> dict[str, str]:
         response = client.get("/health")
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         token = str(client.cookies.get("csrf") or "").strip()
         self.assertTrue(token, "csrf cookie must be issued for anonymous sessions")
         return {"X-CSRF": token, "Cookie": f"csrf={token}"}
 
     def _create_workspace(self, client: httpx.Client) -> str:
         response = client.post("/api/workspaces", headers=self._prime_csrf(client))
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         workspace_id = str(response.json().get("workspace_id") or "").strip()
         self.assertTrue(workspace_id)
         return workspace_id
@@ -115,7 +132,7 @@ class TestSecurityHardening(unittest.TestCase):
             json={"content": content},
             headers=self._prime_csrf(client),
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
 
     def _generate_inventory(self, client: httpx.Client, workspace_id: str) -> None:
         response = client.post(
@@ -130,7 +147,7 @@ class TestSecurityHardening(unittest.TestCase):
             },
             headers=self._prime_csrf(client),
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
 
     def _create_deployment(self, client: httpx.Client, workspace_id: str) -> str:
         response = client.post(
@@ -147,7 +164,7 @@ class TestSecurityHardening(unittest.TestCase):
             },
             headers=self._prime_csrf(client),
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         job_id = str(response.json().get("job_id") or "").strip()
         self.assertTrue(job_id)
         return job_id
@@ -157,11 +174,11 @@ class TestSecurityHardening(unittest.TestCase):
             f"/api/deployments/{job_id}/cancel",
             headers=self._prime_csrf(client),
         )
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
 
     def _deployment(self, client: httpx.Client, job_id: str) -> dict[str, Any]:
         response = client.get(f"/api/deployments/{job_id}")
-        response.raise_for_status()
+        _raise_for_status_verbose(response)
         payload = response.json()
         self.assertIsInstance(payload, dict)
         return payload
@@ -215,7 +232,7 @@ class TestSecurityHardening(unittest.TestCase):
                 f"/api/deployments/{job_id}/logs",
                 headers={"Accept": "text/event-stream"},
             ) as response:
-                response.raise_for_status()
+                _raise_for_status_verbose(response)
                 buffer = ""
                 for chunk in response.iter_text():
                     buffer += chunk.replace("\r\n", "\n").replace("\r", "\n")
@@ -408,7 +425,7 @@ class TestSecurityHardening(unittest.TestCase):
     def test_csrf_cors_and_csp_controls_are_enforced(self) -> None:
         with httpx.Client(base_url=api_base_url(), timeout=30.0) as api_client:
             priming = api_client.get("/health")
-            priming.raise_for_status()
+            _raise_for_status_verbose(priming)
             set_cookie = priming.headers.get("set-cookie", "").lower()
             self.assertIn("csrf=", set_cookie)
             self.assertIn("secure", set_cookie)
@@ -422,7 +439,7 @@ class TestSecurityHardening(unittest.TestCase):
                 "/api/workspaces",
                 headers=self._prime_csrf(api_client),
             )
-            allowed.raise_for_status()
+            _raise_for_status_verbose(allowed)
 
             cors = api_client.options(
                 "/api/workspaces",
@@ -438,9 +455,9 @@ class TestSecurityHardening(unittest.TestCase):
 
         with httpx.Client(base_url=web_base_url(), timeout=30.0) as web_client:
             response_a = web_client.get("/")
-            response_a.raise_for_status()
+            _raise_for_status_verbose(response_a)
             response_b = web_client.get("/")
-            response_b.raise_for_status()
+            _raise_for_status_verbose(response_b)
 
         nonce_a = response_a.headers.get("x-nonce", "")
         nonce_b = response_b.headers.get("x-nonce", "")
