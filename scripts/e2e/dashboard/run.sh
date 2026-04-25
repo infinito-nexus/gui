@@ -81,21 +81,9 @@ resolve_docker_socket_gid() {
     exit 1
   fi
 
-  # Some sandboxed hosts translate UIDs/GIDs differently inside containers
-  # than on the host (e.g. user-namespaced docker, rootless setups). Probe
-  # from inside a throwaway container so the GID matches what the actual
-  # runner-manager sees.
-  local probe_gid
-  probe_gid="$(docker run --rm \
-    -v "${socket_path}:/var/run/docker.sock" \
-    alpine:latest \
-    stat -c '%g' /var/run/docker.sock 2>/dev/null || true)"
-  if [[ "${probe_gid}" =~ ^[0-9]+$ ]]; then
-    printf '%s\n' "${probe_gid}"
-    return 0
-  fi
-
-  stat -c '%g' "${socket_path}"
+  # Centralised probe: resolves to the gid containers actually see, falling
+  # back to host stat if the docker daemon / alpine pull is unavailable.
+  bash "${REPO_ROOT}/scripts/util/resolve-docker-socket-gid.sh" "${socket_path}"
 }
 
 require_src_dir() {

@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -7,7 +7,14 @@ COMPOSE_FILE   ?= docker-compose.yml
 ENV_FILE       ?= .env
 EFFECTIVE_ENV_FILE = $(if $(wildcard $(ENV_FILE)),$(ENV_FILE),env.example)
 DOCKER_SOCKET_PATH ?= /var/run/docker.sock
-export DOCKER_SOCKET_GID ?= $(shell stat -c '%g' "$(DOCKER_SOCKET_PATH)" 2>/dev/null || printf '10900')
+# Resolve the docker.sock GID via a throwaway container probe so the value
+# matches what every other container sees on user-namespaced / sandboxed
+# docker setups. Host-side `stat` returns a translated gid (e.g. 65534)
+# there, while compose hands `user: 10003:${DOCKER_SOCKET_GID}` to
+# runner-manager — a mismatched primary gid breaks docker.sock access and
+# surfaces as `POST /api/deployments → 500 permission denied while trying
+# to connect to the docker API at unix:///var/run/docker.sock`.
+export DOCKER_SOCKET_GID ?= $(shell bash scripts/util/resolve-docker-socket-gid.sh "$(DOCKER_SOCKET_PATH)")
 CI_INFINITO_NEXUS_IMAGE ?= ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
 CI_JOB_RUNNER_IMAGE ?= ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb
 CI_POSTGRES_IMAGE ?= postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
@@ -124,6 +131,16 @@ break-workspace-perms:
 # Idempotent: only touches dirs not already owned by 10001:10900.
 repair-workspace-perms:
 	@bash scripts/workspace-perms/repair.sh
+
+# Smoke-test POST /api/deployments end-to-end against the currently running
+# stack from inside the docker-compose network. Useful when the host shell
+# cannot reach 127.0.0.1:8000 (sandboxed/network-namespaced terminals)
+# and you need the actual error body of a 500 to debug it.
+# Usage: make api-smoke-deployment [HOST=ssh-password PLAYBOOK=playbooks/security_wait.yml]
+HOST     ?= ssh-password
+PLAYBOOK ?= playbooks/security_wait.yml
+api-smoke-deployment:
+	@bash scripts/api-smoke/trigger-deployment.sh --host "$(HOST)" --playbook "$(PLAYBOOK)"
 
 requirements-init: db-up db-wait
 	@echo "→ Ensuring requirements tables exist"
