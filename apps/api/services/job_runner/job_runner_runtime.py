@@ -263,15 +263,16 @@ class JobRunnerServiceRuntimeMixin:
                 self._secret_store.pop(rid, None)
             return ok
 
+        meta["status"] = "canceled"
+        meta["finished_at"] = root.utc_iso()
+        root.write_meta(paths.meta_path, meta)
+
         pid = meta.get("pid")
         root.terminate_process_group(pid if isinstance(pid, int) else None)
         container_id = meta.get("container_id")
         if isinstance(container_id, str) and container_id.strip():
             root.stop_container(container_id)
 
-        meta["status"] = "canceled"
-        meta["finished_at"] = root.utc_iso()
-        root.write_meta(paths.meta_path, meta)
         self._cleanup_secret_material(paths)
         with self._secret_lock:
             self._secret_store.pop(rid, None)

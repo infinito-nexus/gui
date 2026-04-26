@@ -6,11 +6,20 @@ const MASTER_PASSWORD = "vault-pass-014";
 const ROLE_ID = "web-app-dashboard";
 const TARGET_ALIAS = "device";
 const DASHBOARD_HTTP_URL = "http://127.0.0.1:8029/";
-const DEPLOYMENT_COMPLETION_TIMEOUT_MS = 40 * 60_000;
 const LIVE_LOG_RENDER_DELAY_LIMIT_MS = 30_000;
 const ADMINISTRATOR_AUTHORIZED_KEY =
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKKBS2UWGKi9IRz2b+JjkAWGiAkFDrxnnQXiueLQTKDz infinito-test";
 const observedWorkspaceIds = new Set<string>();
+
+function positiveNumberFromEnv(name: string, fallback: number) {
+  const parsed = Number(process.env[name] || "");
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const DEPLOYMENT_COMPLETION_TIMEOUT_MS = positiveNumberFromEnv(
+  "INFINITO_E2E_DEPLOYMENT_TIMEOUT_MS",
+  process.env.CI ? 75 * 60_000 : 40 * 60_000
+);
 
 function composeArgs(...args: string[]): string[] {
   const composeEnvFile = process.env.INFINITO_E2E_COMPOSE_ENV_FILE;

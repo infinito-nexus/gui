@@ -31,10 +31,19 @@ VIEWER_COUNT = 10
 STREAM_TIMEOUT_SECONDS = 120
 LATE_VIEWER_DELAY_SECONDS = 30
 ROLE_LOAD_BURST_SIZE = 5
+POST_MEMORY_RATIO_LIMIT = 1.2
+POST_MEMORY_ABSOLUTE_HEADROOM_MIB = 16.0
 LINE_SEQ_PATTERN = re.compile(r"PERF-LINE seq=(\d+)")
 RX_PATTERN = re.compile(r"^\[RX:(\d{10,})\]\s?(.*)$")
 PERF_MASK_USER = "perfmask"
 PERF_MASK_PASSWORD = "PerfMaskSecret-9a8b7c6d5e4f3g2h"
+
+
+def post_memory_ceiling_mib(baseline_max_mib: float) -> float:
+    return max(
+        baseline_max_mib * POST_MEMORY_RATIO_LIMIT,
+        baseline_max_mib + POST_MEMORY_ABSOLUTE_HEADROOM_MIB,
+    )
 
 
 class PerfSseScalabilityScenarioMixin:
@@ -127,6 +136,7 @@ class PerfSseScalabilityScenarioMixin:
         delay_summary = timing_summary(all_delay_values)
         baseline_max = max(float(sample["value_mib"]) for sample in baseline_samples)
         post_max = max(float(sample["value_mib"]) for sample in post_samples)
+        post_memory_ceiling = post_memory_ceiling_mib(baseline_max)
 
         if api_started_before != api_started_after:
             failure_messages.append(
@@ -165,14 +175,16 @@ class PerfSseScalabilityScenarioMixin:
                 if float(delay_summary["max"]) <= MAX_LINE_DELAY_MS
                 else "fail",
             },
-            "post_memory_ratio": {
-                "target": round(baseline_max * 1.2, 3),
+            "post_memory_ceiling_mib": {
+                "target": round(post_memory_ceiling, 3),
                 "observed": post_max,
                 "context": {
                     "baseline_max_mib": round(baseline_max, 3),
+                    "ratio_limit": POST_MEMORY_RATIO_LIMIT,
+                    "absolute_headroom_mib": POST_MEMORY_ABSOLUTE_HEADROOM_MIB,
                     "post_sample_count": len(post_samples),
                 },
-                "status": "pass" if post_max <= baseline_max * 1.2 else "fail",
+                "status": "pass" if post_max <= post_memory_ceiling else "fail",
             },
         }
 

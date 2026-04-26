@@ -35,6 +35,7 @@ from .container_runner import (  # noqa: F401 - re-exported for mixins via _root
     build_container_command,
     load_container_config,
     resolve_host_mount_source,
+    stop_container,
 )
 from .job_runner_args import JobRunnerServiceArgsMixin
 from .job_runner_runtime import JobRunnerServiceRuntimeMixin

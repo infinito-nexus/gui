@@ -19,6 +19,7 @@ ENV_SOURCE="${REPO_ROOT}/.env"
 CI_CATALOG_IMAGE_DEFAULT="ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023"
 CI_RUNNER_IMAGE_DEFAULT="ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb"
 CI_POSTGRES_IMAGE_DEFAULT="postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2"
+E2E_DIAGNOSTIC_IMAGE=""
 
 if [[ ! -f "${ENV_SOURCE}" ]]; then
   ENV_SOURCE="${REPO_ROOT}/env.example"
@@ -176,6 +177,7 @@ render_env_file() {
     echo "→ Pulling Infinito.Nexus runner image (${runner_image})"
     docker pull "${runner_image}"
   fi
+  E2E_DIAGNOSTIC_IMAGE="${catalog_image}"
 
   ensure_state_dir_access "${catalog_image}"
 
@@ -250,12 +252,49 @@ compose() {
   docker compose --env-file "${TMP_ENV_FILE}" -f "${REPO_ROOT}/docker-compose.yml" --profile test "$@"
 }
 
+capture_dashboard_e2e_diagnostics() {
+  local diagnostic_image="${E2E_DIAGNOSTIC_IMAGE:-${CI_CATALOG_IMAGE_DEFAULT}}"
+
+  echo "→ Capturing recent dashboard E2E job diagnostics"
+  docker run --rm \
+    -v "${STATE_DIR}:/state:ro" \
+    "${diagnostic_image}" \
+    sh -lc '
+      set -eu
+      if [ ! -d /state/jobs ]; then
+        echo "  no /state/jobs directory"
+        exit 0
+      fi
+      find /state/jobs -maxdepth 2 -name job.json -exec stat -c "%Y %n" {} + 2>/dev/null |
+        sort -nr |
+        head -5 |
+        while read -r _ meta_path; do
+          job_dir="${meta_path%/job.json}"
+          job_id="${job_dir##*/}"
+          echo
+          echo "### job ${job_id}"
+          cat "${meta_path}" || true
+          echo
+          if [ -f "${job_dir}/job.log" ]; then
+            echo "--- tail job.log (${job_id}) ---"
+            tail -200 "${job_dir}/job.log" || true
+          else
+            echo "  no job.log"
+          fi
+        done
+    ' || true
+
+  echo "→ Capturing target-container Docker state"
+  compose exec -T ssh-password sh -lc 'docker ps -a || true' || true
+}
+
 cleanup() {
   local exit_code="$?"
   if [[ "${STACK_STARTED:-0}" == "1" ]]; then
     if [[ "${exit_code}" -ne 0 ]]; then
       echo "→ Capturing recent compose logs after failure"
       compose logs --tail=200 || true
+      capture_dashboard_e2e_diagnostics
     fi
     if [[ "${INFINITO_E2E_KEEP_STACK:-0}" == "1" && "${exit_code}" -ne 0 ]]; then
       echo "→ INFINITO_E2E_KEEP_STACK=1: leaving stack up for inspection"

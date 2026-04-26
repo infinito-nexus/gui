@@ -248,3 +248,42 @@ class TestJobRunnerServicePart2(JobRunnerServiceTestCase):
         self.assertTrue(ok)
         m_client.assert_called_once_with()
         runner_manager.cancel_job.assert_called_once_with(job_id)
+
+    @patch("services.job_runner.service.stop_container")
+    @patch("services.job_runner.service.terminate_process_group")
+    def test_cancel_marks_job_canceled_before_stopping_runtime(
+        self,
+        m_terminate,
+        m_stop_container,
+    ) -> None:
+        from services.job_runner import JobRunnerService  # noqa: WPS433
+
+        job_id = "123e4567-e89b-42d3-a456-426614174333"
+        job_dir = Path(self._tmp.name) / "jobs" / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        meta_path = job_dir / "job.json"
+        meta_path.write_text(
+            json.dumps(
+                {
+                    "job_id": job_id,
+                    "status": "running",
+                    "pid": 1234,
+                    "container_id": "container-123",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def assert_canceled_before_terminate(_pid):
+            self.assertEqual(
+                json.loads(meta_path.read_text(encoding="utf-8"))["status"],
+                "canceled",
+            )
+
+        m_terminate.side_effect = assert_canceled_before_terminate
+
+        ok = JobRunnerService().cancel(job_id)
+
+        self.assertTrue(ok)
+        m_terminate.assert_called_once_with(1234)
+        m_stop_container.assert_called_once_with("container-123")
