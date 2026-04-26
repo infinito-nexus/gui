@@ -30,15 +30,25 @@ export PYTHONPATH := $(PWD)/apps/api
 
 # Keep state in repo-local directory for tests (no /state permission issues)
 TEST_STATE_DIR := $(PWD)/state
-# Always export STATE_HOST_PATH as an absolute path: the API container
-# resolves it via Path(host_path).is_absolute() and 500s on relative
-# values. env.example ships `./state` (relative) so a CI run that has no
-# .env override would otherwise hit
+# Stack-spawning targets must export STATE_HOST_PATH as an absolute path:
+# the API container resolves it via Path(host_path).is_absolute() and 500s
+# on relative values. env.example ships `./state` (relative) so a CI run
+# that has no .env override would otherwise hit
 #   POST /api/deployments → 500
 #   {"detail":"STATE_HOST_PATH must be an absolute path for containerized jobs"}
 # on the first deployment. Compose env vars beat --env-file values, so
 # this overrides whatever env.example/.env have.
-export STATE_HOST_PATH := $(TEST_STATE_DIR)
+#
+# Scope MUST stay target-specific: a global `export` would leak into
+# `make test`, where tests/python/unit/test_job_runner_service_part3.py
+# only overrides STATE_DIR=<tmpdir> and relies on STATE_HOST_PATH being
+# unset. A leaked STATE_HOST_PATH causes resolve_host_job_dir() to mix
+# the test tmpdir (STATE_DIR) with the real repo path (STATE_HOST_PATH)
+# and produce wrong host paths in spec.secrets_dir.
+STACK_TARGETS := test-up test-env-up test-perf \
+                 e2e-dashboard-local-docker e2e-dashboard-ci-docker \
+                 api-smoke-deployment api-smoke-deployment-full
+$(STACK_TARGETS): export STATE_HOST_PATH := $(TEST_STATE_DIR)
 EXAMPLE_WORKSPACE_DIR ?= examples/workspace
 EXAMPLE_WORKSPACE_ZIP ?= examples/workspace-import.zip
 
