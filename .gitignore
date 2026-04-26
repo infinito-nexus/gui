@@ -16,3 +16,20 @@ examples/workspace-import.zip
 !apps/api/requirements.lock
 apps/web/test-results/
 *.tmp
+
+# Per-developer dotfiles and IDE/agent configs that may sit in the
+# worktree but must never be tracked.
+.bash_profile
+.bashrc
+.claude/agents
+.claude/commands
+.claude/skills
+.gitconfig
+.gitmodules
+.idea
+.mcp.json
+.profile
+.ripgreprc
+.vscode
+.zprofile
+.zshrc
