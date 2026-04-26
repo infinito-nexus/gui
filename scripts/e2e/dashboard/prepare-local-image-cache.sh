@@ -41,7 +41,16 @@ image_specs=(
   # Base image for locally buildable services like web-svc-simpleicons.
   "node:latest"
   "openresty/openresty:alpine"
+  # Dashboard primary image. Keep BOTH versions cached: 1.1.0 is what the
+  # current web-app-dashboard role pulls (roles/web-app-dashboard/meta/services.yml
+  # → services.dashboard.version=1.1.0), 1.0.0 stays for backwards-compat with
+  # tests/branches that still pin the older version. Whichever the live role
+  # references is short-circuited by docker-wrapper.sh from the cache, so the
+  # ssh-password DinD never has to round-trip ghcr.io during compose pull.
+  # Run 24961002019 timed out in CI because only 1.0.0 was cached, the role
+  # used 1.1.0, and the live pull from inside DinD got stuck for 10 retries.
   "ghcr.io/kevinveenbirkenbach/port-ui:1.0.0"
+  "ghcr.io/kevinveenbirkenbach/port-ui:1.1.0"
   "ghcr.io/kevinveenbirkenbach/universal-logout:latest"
 )
 
