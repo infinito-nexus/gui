@@ -83,7 +83,9 @@ exit 0
         self.assertIn("image inspect custom-runner", log_text)
         self.assertNotIn("build -t custom-runner", log_text)
 
-    def test_ignores_digest_pinned_runner_images(self) -> None:
+    def test_skips_pull_when_digest_pinned_runner_image_already_present(
+        self,
+    ) -> None:
         completed, log_text = self._run_script(
             env_body=(
                 "JOB_RUNNER_IMAGE=ghcr.io/infinito-nexus/core/arch@sha256:"
@@ -93,9 +95,38 @@ exit 0
             docker_script="""#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' "$*" >> "${DOCKER_LOG}"
+if [[ "$1" == "image" && "$2" == "inspect" ]]; then
+  exit 0
+fi
 exit 0
 """,
         )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertEqual(log_text, "")
+        self.assertIn(
+            "image inspect ghcr.io/infinito-nexus/core/arch@sha256:", log_text
+        )
+        self.assertNotIn("pull ghcr.io/infinito-nexus/core/arch", log_text)
+
+    def test_pulls_digest_pinned_runner_image_when_absent(self) -> None:
+        completed, log_text = self._run_script(
+            env_body=(
+                "JOB_RUNNER_IMAGE=ghcr.io/infinito-nexus/core/arch@sha256:"
+                + ("a" * 64)
+                + "\n"
+            ),
+            docker_script="""#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "${DOCKER_LOG}"
+if [[ "$1" == "image" && "$2" == "inspect" ]]; then
+  exit 1
+fi
+exit 0
+""",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(
+            "image inspect ghcr.io/infinito-nexus/core/arch@sha256:", log_text
+        )
+        self.assertIn("pull ghcr.io/infinito-nexus/core/arch@sha256:", log_text)
