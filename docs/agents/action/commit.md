@@ -43,3 +43,37 @@ Self-check before any `git commit`:
 1. Am I inside a Loop as defined above? If yes and no override fired → STOP, do not commit.
 2. Did I just say "passes locally" without running the closing verification on the final state? If yes → STOP, run it first.
 3. Is the staged diff strictly smaller than the working tree? If yes and the working-tree-only changes are part of the same loop → STOP, integrate them or unstage the partial commit.
+
+## Local Verification Gate 🔬
+
+Trigger (any one):
+- commit message would contain `fix`, `bug`, `regress`, `fail`
+- change references a CI run URL or a failing test name
+- user prompt matches `/fix|behebe|löse|solve|debug/`
+
+Sequence — MUST run in order; `git commit` blocked until all steps emit a recorded outcome.
+
+1. Run the exact failing scenario locally with the fix applied → MUST observe pass.
+   - unit/integration: run the named test (`python -m unittest <module.Class.test>`) — it MUST be green.
+   - CI-only failure: simulate CI conditions before running — `mv .env .env.bak`; `export <pinned *_IMAGE vars from workflow>`; `docker rmi <image CI pulls fresh>`; then run the equivalent local target (`make test`, `make api-smoke-deployment-full`, etc.).
+   - local run blocked (sandbox netns, ARM-only, missing hardware) → MUST record the exact block in the commit body; MAY skip step 1 for that block only.
+
+2. Run regression scope:
+   - Makefile / shared script → `make test`.
+   - stack/compose/runner → `make api-smoke-deployment-full` against fresh stack.
+   - workflow `.yml` → structural check (`make -np | grep <var>`, `make -n <target>`).
+
+3. Commit body MUST contain a `Verified locally:` block. Format:
+   ```
+   Verified locally:
+     - <fix-applied scenario cmd> → OK
+     - <regression cmd> → <count> OK
+   ```
+   Reader MUST be able to re-run from the commit alone.
+
+Self-check — answer all "yes" or STOP:
+- Ran the exact failing scenario with fix applied and observed pass? (or sandbox-block recorded)
+- Ran regression scope?
+- `Verified locally:` block in commit body re-runnable?
+
+Override: user types `commite` / `commit now` / `commite trotzdem` AFTER this gate fires → commit allowed, body MUST list each skipped step and why.
