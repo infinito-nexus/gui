@@ -38,7 +38,19 @@ load_cached_image() {
   "${REAL_DOCKER}" load -i "${CACHE_DIR}/${manifest_archive}" >/dev/null
   if ! "${REAL_DOCKER}" image inspect "${image_ref}" >/dev/null 2>&1; then
     if [ "${manifest_loaded}" != "${image_ref}" ] && "${REAL_DOCKER}" image inspect "${manifest_loaded}" >/dev/null 2>&1; then
-      "${REAL_DOCKER}" tag "${manifest_loaded}" "${image_ref}" >/dev/null
+      # `docker tag` rejects targets that contain `@sha256:...` (digest refs
+      # are not tags). When the manifest_image is a digest reference (e.g.
+      # `python:3.12-slim@sha256:...`) the loaded image is already content-
+      # addressable by that digest after `docker load`; skip the retag and
+      # rely on the friendly tag already attached to the load.
+      case "${image_ref}" in
+        *@sha256:*)
+          :
+          ;;
+        *)
+          "${REAL_DOCKER}" tag "${manifest_loaded}" "${image_ref}" >/dev/null
+          ;;
+      esac
     fi
   fi
   "${REAL_DOCKER}" image inspect "${image_ref}" >/dev/null 2>&1
@@ -60,7 +72,15 @@ load_all_cached_images() {
     [ -s "${CACHE_DIR}/${manifest_archive}" ] || continue
     "${REAL_DOCKER}" load -i "${CACHE_DIR}/${manifest_archive}" >/dev/null
     if [ "${manifest_loaded}" != "${manifest_image}" ] && "${REAL_DOCKER}" image inspect "${manifest_loaded}" >/dev/null 2>&1; then
-      "${REAL_DOCKER}" tag "${manifest_loaded}" "${manifest_image}" >/dev/null
+      # See load_cached_image: skip retag when the target is a digest ref.
+      case "${manifest_image}" in
+        *@sha256:*)
+          :
+          ;;
+        *)
+          "${REAL_DOCKER}" tag "${manifest_loaded}" "${manifest_image}" >/dev/null
+          ;;
+      esac
     fi
   done <"${MANIFEST_PATH}"
 }

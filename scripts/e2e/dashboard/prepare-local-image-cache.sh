@@ -36,8 +36,16 @@ image_specs=(
   # Exact base images for locally buildable services in the E2E stack and the
   # dashboard target host. These are cached so local builds can stay hermetic
   # instead of resolving fresh registry metadata during the deployment flow.
-  "python:3.12-slim@sha256:520153e2deb359602c9cffd84e491e3431d76e7bf95a3255c9ce9433b76ab99a"
-  "node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293"
+  #
+  # We MUST retag to the friendly un-pinned name (third column) before save:
+  # `docker save <ref>@sha256:<digest>` produces an OCI archive with
+  # `RepoTags: null`, so `docker load` adds the layers but assigns NO tag.
+  # Dockerfiles like `FROM python:3.12-slim` then can't resolve the image
+  # locally, fall back to a live registry pull, and time out in CI's
+  # rate-limited DinD network (CI run 24968576122 spent 80 min retrying
+  # `compose pull` because of exactly this gap).
+  "python:3.12-slim@sha256:520153e2deb359602c9cffd84e491e3431d76e7bf95a3255c9ce9433b76ab99a|python:3.12-slim@sha256:520153e2deb359602c9cffd84e491e3431d76e7bf95a3255c9ce9433b76ab99a|python:3.12-slim"
+  "node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293|node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293|node:20-alpine"
   # Base image for locally buildable services like web-svc-simpleicons.
   "node:latest"
   "openresty/openresty:alpine"
