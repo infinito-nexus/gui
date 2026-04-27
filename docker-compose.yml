@@ -434,11 +434,25 @@ services:
     profiles: ["test"]
     image: rpardini/docker-registry-proxy:0.6.5
     container_name: infinito-deployer-registry-cache
+    # GitHub-Actions runners have no IPv6 connectivity, but the upstream
+    # registries (docker.io etc.) return AAAA records. nginx inside the
+    # proxy resolves both A and AAAA, attempts the IPv6 address first,
+    # gets "Network unreachable", and marks the upstream as "temporarily
+    # disabled" without falling back to A — every blob pull stalls
+    # forever (CI run 25000929344 timed out 80 min on `compose pull`
+    # for matomo blobs because of this exact pattern). Forcing IPv6 off
+    # at the kernel level inside this container makes nginx see only A
+    # records.
+    sysctls:
+      net.ipv6.conf.all.disable_ipv6: 1
+      net.ipv6.conf.default.disable_ipv6: 1
+      net.ipv6.conf.lo.disable_ipv6: 1
     environment:
       ENABLE_MANIFEST_CACHE: "true"
       REGISTRIES: "ghcr.io quay.io registry.k8s.io k8s.gcr.io"
       AUTH_REGISTRIES: ""
       CACHE_MAX_SIZE: "32g"
+      DISABLE_IPV6: "true"
     volumes:
       - type: bind
         source: ${TEST_REGISTRY_CACHE_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache}
