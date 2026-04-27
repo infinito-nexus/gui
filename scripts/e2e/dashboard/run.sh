@@ -286,6 +286,41 @@ capture_dashboard_e2e_diagnostics() {
 
   echo "→ Capturing target-container Docker state"
   compose exec -T ssh-password sh -lc 'docker ps -a || true' || true
+
+  echo "→ Capturing target-container Docker image inventory (what the cache loaded)"
+  compose exec -T ssh-password sh -lc 'docker images --digests || true' || true
+
+  echo "→ Capturing dashboard compose definition rendered into the target"
+  # shellcheck disable=SC2016
+  compose exec -T ssh-password sh -lc '
+    set +e
+    instance_dir=/opt/compose/dashboard
+    if [ ! -d "${instance_dir}" ]; then
+      echo "  no rendered compose dir at ${instance_dir}"
+      exit 0
+    fi
+    echo "--- ${instance_dir} contents ---"
+    ls -la "${instance_dir}" || true
+    for f in compose.yml compose.override.yml .env/env; do
+      if [ -f "${instance_dir}/${f}" ]; then
+        echo "--- ${instance_dir}/${f} ---"
+        cat "${instance_dir}/${f}" || true
+      fi
+    done
+    echo "--- docker compose config --images (resolved image refs the role would pull) ---"
+    cd "${instance_dir}"
+    project_name=dashboard
+    cmd="docker compose -p ${project_name}"
+    [ -f compose.yml ] && cmd="${cmd} -f compose.yml"
+    [ -f compose.override.yml ] && cmd="${cmd} -f compose.override.yml"
+    [ -f .env/env ] && cmd="${cmd} --env-file .env/env"
+    eval "${cmd} config --images" || true
+    echo "--- live docker compose pull dry-run (surfaces the actual stderr the Ansible retry hides) ---"
+    eval "timeout 60 ${cmd} pull 2>&1 | tail -100" || true
+  ' || true
+
+  echo "→ Capturing target-container inner Docker daemon journal (last 200 lines)"
+  compose exec -T ssh-password sh -lc 'journalctl --no-pager -u docker.service -n 200 || true' || true
 }
 
 cleanup() {
