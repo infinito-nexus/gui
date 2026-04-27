@@ -34,6 +34,11 @@
       "Bash(make e2e-dashboard-local *)",
       "Bash(docker exec *)",
       "Bash(docker run --rm --network infinito-deployer alpine:latest *)",
+      "Bash(docker run --rm -v *)",
+      "Bash(docker rm -f *)",
+      "Bash(docker network prune*)",
+      "Bash(docker stop *)",
+      "Bash(make *)",
       "Skill(update-config)",
       "Skill(update-config:*)"
     ],
@@ -49,7 +54,6 @@
       "Bash(curl*)",
       "Bash(docker build*)",
       "Bash(docker push*)",
-      "Bash(docker run *)",
       "Bash(git commit*)",
       "Bash(git push*)"
     ],

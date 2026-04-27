@@ -419,6 +419,43 @@ services:
   # ---------------------------------------------------------
   # Test targets (password/key SSH)
   # ---------------------------------------------------------
+
+  # Single dynamic registry pull-through cache for the e2e test stack.
+  # rpardini's MITM proxy intercepts ALL outbound docker registry traffic
+  # from ssh-password's inner DinD daemon and caches blobs/manifests in
+  # ./state/e2e/registry-cache. No per-registry config, no hardcoded image
+  # list — the first request to any registry (docker.io, ghcr.io, quay.io,
+  # registry.k8s.io, ...) is fetched and persisted; re-requests are served
+  # from cache. Replaces the previous `prepare-local-image-cache.sh`
+  # save/load mechanism that broke when digest-pinned `docker save` produced
+  # OCI archives with `RepoTags: null`, leaving image refs unresolvable
+  # locally and forcing live registry pulls in CI (run 24968576122).
+  registry-cache:
+    profiles: ["test"]
+    image: rpardini/docker-registry-proxy:0.6.5
+    container_name: infinito-deployer-registry-cache
+    environment:
+      ENABLE_MANIFEST_CACHE: "true"
+      REGISTRIES: "ghcr.io quay.io registry.k8s.io k8s.gcr.io"
+      AUTH_REGISTRIES: ""
+      CACHE_MAX_SIZE: "32g"
+    volumes:
+      - type: bind
+        source: ${TEST_REGISTRY_CACHE_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache}
+        target: /docker_mirror_cache
+      - type: bind
+        source: ${TEST_REGISTRY_CACHE_CA_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache-ca}
+        target: /ca
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://127.0.0.1:3128/ca.crt >/dev/null 2>&1"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 30s
+    restart: ${RESTART_POLICY}
+
   ssh-password:
     profiles: ["test"]
     build:
@@ -463,15 +500,19 @@ services:
         target: /opt/e2e/repo-seeds
         read_only: true
       - type: bind
-        source: ${TEST_IMAGE_CACHE_HOST_PATH:-/tmp/infinito-deployer-e2e/image-cache}
-        target: /opt/e2e/image-cache
+        source: ${TEST_REGISTRY_CACHE_CA_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache-ca}
+        target: /opt/e2e/registry-cache-ca
         read_only: true
-      # Optional hermetic E2E caches. These mounts improve reproducibility and
-      # iteration speed, but they are not meant to hide real host/container
-      # network problems.
+      # Optional hermetic E2E repo caches improve reproducibility and
+      # iteration speed but are not meant to hide real host/container
+      # network problems. The registry-cache-ca bind delivers the
+      # registry-cache MITM CA certificate to ssh-password's docker
+      # daemon at startup so HTTPS pulls through the proxy validate.
 
     depends_on:
       catalog:
+        condition: service_healthy
+      registry-cache:
         condition: service_healthy
 
     networks:

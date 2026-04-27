@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -323,6 +323,16 @@ e2e-dashboard-ci:
 e2e-dashboard-ci-docker:
 	@INFINITO_E2E_PLAYWRIGHT_DOCKER=1 \
 		./scripts/e2e/dashboard/run.sh ci
+
+# Manual recovery: clears state/jobs, state/workspaces, state/audit_logs,
+# state/secrets after a killed mid-run leaves leftover data that would
+# break the next dashboard e2e (the spec asserts `workspace-switcher`
+# starts with zero entries). Normally the e2e teardown does this
+# automatically — this target is for the cancelled-mid-run case.
+# Registry-cache, repo-cache, perf artefacts, and unrelated runner
+# state are NOT touched.
+e2e-dashboard-wipe-state:
+	@bash scripts/e2e/dashboard/wipe-state.sh
 
 # Build the Playwright + docker-cli image used by e2e-dashboard-local-docker.
 # Override base image or output tag via:

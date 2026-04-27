@@ -142,10 +142,11 @@ prepare_local_repo_cache() {
   printf '%s\n%s\n' "${cache_output[0]}" "${cache_output[1]}"
 }
 
-prepare_local_image_cache() {
-  local cache_dir="${STATE_DIR}/e2e/image-cache"
-  mkdir -p "${cache_dir}"
-  bash "${SCRIPT_DIR}/prepare-local-image-cache.sh" "${cache_dir}"
+prepare_registry_cache_dirs() {
+  local cache_dir="${STATE_DIR}/e2e/registry-cache"
+  local ca_dir="${STATE_DIR}/e2e/registry-cache-ca"
+  mkdir -p "${cache_dir}" "${ca_dir}"
+  printf '%s\n%s\n' "${cache_dir}" "${ca_dir}"
 }
 
 render_env_file() {
@@ -157,7 +158,8 @@ render_env_file() {
   local docker_socket_gid
   local test_repo_mirror_host_path
   local test_repo_seed_host_path
-  local test_image_cache_host_path
+  local test_registry_cache_host_path
+  local test_registry_cache_ca_host_path
 
   if [[ "${MODE}" == "local" ]]; then
     local src_dir distro image_tag
@@ -184,10 +186,12 @@ render_env_file() {
   mapfile -t repo_cache_paths < <(prepare_local_repo_cache)
   test_repo_mirror_host_path="${repo_cache_paths[0]}"
   test_repo_seed_host_path="${repo_cache_paths[1]}"
-  test_image_cache_host_path="$(prepare_local_image_cache)"
-  echo "→ Using optional hermetic E2E caches for local repos/images when available"
-  echo "  WARN: these caches are infrastructure optimization only, not a fix for network failures."
-  echo "  If a registry, Git, DNS, TLS, routing, or Docker connectivity failure appears, diagnose the affected host/container/runtime layer directly."
+  mapfile -t registry_cache_paths < <(prepare_registry_cache_dirs)
+  test_registry_cache_host_path="${registry_cache_paths[0]}"
+  test_registry_cache_ca_host_path="${registry_cache_paths[1]}"
+  echo "→ Using hermetic E2E repo cache + dynamic registry-cache (rpardini proxy)"
+  echo "  Container registry traffic from ssh-password's DinD is transparently"
+  echo "  cached per-blob; no per-image hardcoded list needed."
 
   local api_port="${E2E_API_PORT}"
   local web_port="${E2E_WEB_PORT}"
@@ -244,7 +248,8 @@ WEB_PORT=${web_port}
 API_PROXY_TARGET=${api_proxy_target}
 TEST_REPO_MIRROR_HOST_PATH=${test_repo_mirror_host_path}
 TEST_REPO_SEED_HOST_PATH=${test_repo_seed_host_path}
-TEST_IMAGE_CACHE_HOST_PATH=${test_image_cache_host_path}
+TEST_REGISTRY_CACHE_HOST_PATH=${test_registry_cache_host_path}
+TEST_REGISTRY_CACHE_CA_HOST_PATH=${test_registry_cache_ca_host_path}
 EOF
 }
 
@@ -338,6 +343,7 @@ cleanup() {
     fi
     echo "→ Tearing down dashboard E2E stack"
     compose down -v --remove-orphans || true
+    INFINITO_E2E_STATE_DIR="${STATE_DIR}" bash "${SCRIPT_DIR}/wipe-state.sh"
   fi
   rm -f "${TMP_ENV_FILE}"
   exit "${exit_code}"

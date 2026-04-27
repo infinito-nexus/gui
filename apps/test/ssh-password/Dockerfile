@@ -54,6 +54,18 @@ RUN install -d -m 0755 /etc/systemd/system/docker.service.d \
  && printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true\n' \
     > /etc/systemd/system/docker.service.d/no-iptables.conf
 
+# Route ALL outbound docker registry traffic through the e2e
+# registry-cache MITM proxy (rpardini/docker-registry-proxy). The proxy
+# transparently caches blobs/manifests for any registry the inner DinD
+# pulls from (docker.io, ghcr.io, quay.io, ...) so re-runs and parallel
+# CI shards do not trigger live registry round-trips. The CA cert is
+# fetched from the proxy's bind mount and installed into the trust
+# store via ExecStartPre so HTTPS pulls validate the proxy's SSL bump.
+COPY install-registry-cache-ca.sh /usr/local/bin/install-registry-cache-ca.sh
+RUN chmod +x /usr/local/bin/install-registry-cache-ca.sh \
+ && printf '[Service]\nEnvironment="HTTP_PROXY=http://infinito-deployer-registry-cache:3128"\nEnvironment="HTTPS_PROXY=http://infinito-deployer-registry-cache:3128"\nEnvironment="NO_PROXY=localhost,127.0.0.1,::1,infinito-deployer-registry-cache"\nExecStartPre=/usr/local/bin/install-registry-cache-ca.sh\n' \
+    > /etc/systemd/system/docker.service.d/registry-cache-proxy.conf
+
 # Prevent pacman -Syu (run by Ansible's update-pacman role) from upgrading
 # openssh while the E2E target is live.
 RUN sed -i 's|^#IgnorePkg.*|IgnorePkg = openssh|' /etc/pacman.conf \
@@ -88,17 +100,6 @@ COPY git-wrapper.sh /usr/local/bin/git
 RUN mv /usr/bin/git /usr/bin/git.actual \
  && chmod +x /usr/local/bin/git \
  && ln -sf /usr/local/bin/git /usr/bin/git
-
-COPY docker-wrapper.sh /usr/local/bin/docker
-RUN mv /usr/bin/docker /usr/bin/docker.actual \
- && chmod +x /usr/local/bin/docker \
- && ln -sf /usr/local/bin/docker /usr/bin/docker \
- && ln -sf /usr/local/bin/docker /usr/bin/docker.real
-
-COPY docker-compose-wrapper.sh /usr/local/bin/docker-compose
-RUN chmod +x /usr/local/bin/docker-compose \
- && rm -f /usr/bin/docker-compose \
- && ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
