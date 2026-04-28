@@ -22,8 +22,11 @@ class TestApiImageSupplyChain(unittest.TestCase):
             self.dockerfile,
         )
         self.assertIn("COPY requirements.lock /app/requirements.lock", self.dockerfile)
+        # Per req 018 the pip install is preceded by an optional conditional
+        # that points pip at the local cache when INFINITO_CACHE_PIP_INDEX_URL
+        # is set. The hash-locked install command itself is unchanged.
         self.assertIn(
-            "RUN pip install --no-cache-dir --require-hashes -r /app/requirements.lock",
+            "pip install --no-cache-dir --require-hashes -r /app/requirements.lock",
             self.dockerfile,
         )
         self.assertNotIn("-r /app/requirements.txt", self.dockerfile)

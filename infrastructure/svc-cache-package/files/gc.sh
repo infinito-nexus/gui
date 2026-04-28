@@ -42,11 +42,11 @@ to_bytes() {
   local unit
   unit="$(printf '%s' "${input}" | tr '[:upper:]' '[:lower:]' | sed 's/[0-9.]//g')"
   case "${unit}" in
-    g|gb|"") awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024*1024}' ;;
-    m|mb)    awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024}' ;;
-    k|kb)    awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024}' ;;
-    b)       echo "${num%.*}" ;;
-    *)       echo "0" ;;
+    g | gb | "") awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024*1024}' ;;
+    m | mb) awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024}' ;;
+    k | kb) awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024}' ;;
+    b) echo "${num%.*}" ;;
+    *) echo "0" ;;
   esac
 }
 

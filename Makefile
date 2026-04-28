@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker e2e-dashboard-ci-docker-oidc lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -322,6 +322,13 @@ e2e-dashboard-ci:
 #   make e2e-dashboard-ci-docker
 e2e-dashboard-ci-docker:
 	@INFINITO_E2E_PLAYWRIGHT_DOCKER=1 \
+		./scripts/e2e/dashboard/run.sh ci
+
+# Same as e2e-dashboard-ci-docker, but routes Playwright through the
+# oauth2-proxy + oidc-mock pair (req 020) instead of the header-mock
+# fast path. Slower; intended for the dedicated OIDC verification job.
+e2e-dashboard-ci-docker-oidc:
+	@INFINITO_E2E_PLAYWRIGHT_DOCKER=1 INFINITO_E2E_AUTH_MODE=oidc-mock \
 		./scripts/e2e/dashboard/run.sh ci
 
 # Manual recovery: clears state/jobs, state/workspaces, state/audit_logs,

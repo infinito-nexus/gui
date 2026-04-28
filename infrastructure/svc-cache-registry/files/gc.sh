@@ -37,8 +37,8 @@ REGISTRY_DATA_DIR="${REGISTRY_DATA_DIR:-/var/lib/registry/docker}"
 CACHE_REGISTRY_MAX_SIZE="${CACHE_REGISTRY_MAX_SIZE:-16g}"
 S6_SERVICE_DIR="${S6_SERVICE_DIR:-/run/service/registry}"
 
-CHECK_INTERVAL_OVER="${CACHE_REGISTRY_GC_INTERVAL_OVER:-1800}"   # 30 min
-CHECK_INTERVAL_OK="${CACHE_REGISTRY_GC_INTERVAL_OK:-86400}"      # 24 h
+CHECK_INTERVAL_OVER="${CACHE_REGISTRY_GC_INTERVAL_OVER:-1800}" # 30 min
+CHECK_INTERVAL_OK="${CACHE_REGISTRY_GC_INTERVAL_OK:-86400}"    # 24 h
 
 to_bytes() {
   local input="$1"
@@ -46,11 +46,11 @@ to_bytes() {
   local unit
   unit="$(printf '%s' "${input}" | tr '[:upper:]' '[:lower:]' | sed 's/[0-9.]//g')"
   case "${unit}" in
-    g|gb|"") echo "$(awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024*1024}')" ;;
-    m|mb)    echo "$(awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024}')" ;;
-    k|kb)    echo "$(awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024}')" ;;
-    b)       echo "${num%.*}" ;;
-    *)       echo "0" ;;
+    g | gb | "") awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024*1024}' ;;
+    m | mb) awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024*1024}' ;;
+    k | kb) awk -v n="${num}" 'BEGIN{printf "%.0f", n*1024}' ;;
+    b) echo "${num%.*}" ;;
+    *) echo "0" ;;
   esac
 }
 

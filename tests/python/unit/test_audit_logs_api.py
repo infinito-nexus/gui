@@ -52,7 +52,9 @@ class _FakeWorkspaceService:
         self.calls: list[tuple[str, str | None]] = []
         self.rejected: set[str] = set()
 
-    def assert_workspace_access(self, workspace_id: str, user_id: str | None):
+    def assert_workspace_access(
+        self, workspace_id: str, user_id: str | None, email: str | None = None
+    ):
         self.calls.append((workspace_id, user_id))
         if workspace_id in self.rejected:
             raise HTTPException(status_code=404, detail="workspace not found")

@@ -636,6 +636,126 @@ services:
 
     restart: ${RESTART_POLICY}
 
+  # oidc-mock: dummy OpenID Connect provider used by the e2e auth flow.
+  # Seeds two test users (e2e-owner@example.com, e2e-member@example.com)
+  # and a single client. Test-profile only; never runs in `make up`.
+  # See docs/requirements/020-oidc-e2e-via-dummy-provider.md.
+  # NOTE: secrets below are clearly marked TEST-ONLY; never reuse in prod.
+  oidc-mock:
+    profiles: ["test"]
+    image: ghcr.io/soluto/oidc-server-mock@sha256:57306baa91e81defee1974e3821516f40b5a6592cb9b072ab48018d3d73c9254
+    container_name: infinito-deployer-oidc-mock
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: "http://+:8089"
+      SERVER_OPTIONS_INLINE: |
+        {
+          "AccessTokenJwtType": "JWT",
+          "Discovery": { "ShowKeySet": true },
+          "Authentication": { "CookieSameSiteMode": "Lax" },
+          "IssuerUri": "http://oidc-mock:8089"
+        }
+      CLIENTS_CONFIGURATION_INLINE: |
+        [
+          {
+            "ClientId":     "infinito-deployer-e2e",
+            "ClientSecrets": ["e2e-client-secret-TEST-ONLY"],
+            "AllowedGrantTypes": ["authorization_code"],
+            "RedirectUris": ["http://localhost:4180/oauth2/callback"],
+            "PostLogoutRedirectUris": ["http://localhost:4180/"],
+            "AllowedScopes": ["openid", "profile", "email"],
+            "RequirePkce": false,
+            "RequireClientSecret": true
+          }
+        ]
+      USERS_CONFIGURATION_INLINE: |
+        [
+          {
+            "SubjectId": "e2e-owner",
+            "Username":  "e2e-owner",
+            "Password":  "e2e-owner-secret-TEST-ONLY",
+            "Claims": [
+              {"Type": "email",          "Value": "e2e-owner@example.com"},
+              {"Type": "email_verified", "Value": "true",  "ValueType": "boolean"},
+              {"Type": "name",           "Value": "E2E Owner"}
+            ]
+          },
+          {
+            "SubjectId": "e2e-member",
+            "Username":  "e2e-member",
+            "Password":  "e2e-member-secret-TEST-ONLY",
+            "Claims": [
+              {"Type": "email",          "Value": "e2e-member@example.com"},
+              {"Type": "email_verified", "Value": "true",  "ValueType": "boolean"},
+              {"Type": "name",           "Value": "E2E Member"}
+            ]
+          }
+        ]
+    networks:
+      default:
+        ipv4_address: ${TEST_OIDC_MOCK_IP:-172.28.0.40}
+    cpus: '0.5'
+    mem_reservation: 128m
+    mem_limit: 256m
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://127.0.0.1:8089/.well-known/openid-configuration >/dev/null 2>&1 || curl -fsS http://127.0.0.1:8089/.well-known/openid-configuration >/dev/null 2>&1"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: ${RESTART_POLICY}
+
+  # oauth2-proxy: terminates the OIDC flow against oidc-mock and forwards
+  # to the `web` upstream with X-Auth-Request-{User,Email} headers set.
+  # Test-profile only. cookie-secret is generated per harness run by
+  # scripts/e2e/dashboard/run.sh; the placeholder below MUST be overridden.
+  # See docs/requirements/020-oidc-e2e-via-dummy-provider.md.
+  oauth2-proxy:
+    profiles: ["test"]
+    # Alpine variant (not distroless) so the compose healthcheck has a
+    # shell + wget available; the canonical `:v7.6.0` is scratch-based.
+    image: quay.io/oauth2-proxy/oauth2-proxy@sha256:b5b5c619c68592b859080af0351f1ec9193a9723eb3405215d8de3e0c17f6731
+    container_name: infinito-deployer-oauth2-proxy
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=http://oidc-mock:8089
+      - --skip-oidc-discovery=false
+      - --client-id=infinito-deployer-e2e
+      - --client-secret=e2e-client-secret-TEST-ONLY
+      - --http-address=0.0.0.0:4180
+      - --upstream=http://web:3000
+      - --redirect-url=http://localhost:4180/oauth2/callback
+      - --email-domain=*
+      - --pass-user-headers=true
+      - --set-xauthrequest=true
+      - --reverse-proxy=true
+      - --skip-provider-button=true
+      - --insecure-oidc-allow-unverified-email=false
+      - --cookie-secure=false
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET:-PLACEHOLDER-SET-BY-HARNESS}
+    ports:
+      - "${TEST_OAUTH2_PROXY_PORT:-4180}:4180"
+    networks:
+      default:
+        ipv4_address: ${TEST_OAUTH2_PROXY_IP:-172.28.0.41}
+    cpus: '0.5'
+    mem_reservation: 128m
+    mem_limit: 256m
+    depends_on:
+      oidc-mock:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://127.0.0.1:4180/ping >/dev/null 2>&1"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    restart: ${RESTART_POLICY}
+
 networks:
   default:
     name: ${DOCKER_NETWORK_NAME}

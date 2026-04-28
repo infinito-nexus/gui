@@ -213,6 +213,11 @@ render_env_file() {
 
   local stream_base_url="http://127.0.0.1:${api_port}"
   local cors_allow_origins="http://127.0.0.1:${web_port},http://localhost:${web_port}"
+  # Per-run cookie-secret for the OAuth2-Proxy test service (req 020).
+  # Always generated even in header-mock mode so the compose interpolation
+  # never fails — the proxy only consumes it when oidc-mock auth-mode runs.
+  local oauth2_proxy_cookie_secret
+  oauth2_proxy_cookie_secret="$(head -c 32 /dev/urandom | base64 | tr -d '\n=' | head -c 32)"
   if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
     # Playwright runs inside the docker network, so 127.0.0.1 inside the browser
     # container is the browser itself, not the host. Use relative URLs so SSE
@@ -255,6 +260,7 @@ TEST_CACHE_PACKAGE_HOST_PATH=${test_cache_package_host_path}
 INFINITO_CACHE_APT_PROXY=http://172.28.0.31:3142
 INFINITO_CACHE_PIP_INDEX_URL=http://172.28.0.31:3141/root/pypi/+simple/
 INFINITO_CACHE_NPM_REGISTRY=http://172.28.0.31:4873/
+OAUTH2_PROXY_COOKIE_SECRET=${oauth2_proxy_cookie_secret}
 EOF
 }
 

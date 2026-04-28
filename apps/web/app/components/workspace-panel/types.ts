@@ -85,6 +85,24 @@ export type WorkspaceListEntry = {
   created_at?: string | null;
   last_modified_at?: string | null;
   last_used?: string | null;
+  // req 019: role of the current user on this workspace.
+  role?: "owner" | "member";
+};
+
+// req 019 — workspace memberships.
+export type WorkspaceMember = {
+  user_id: string | null;
+  email: string | null;
+  role: "owner" | "member";
+  joined_at?: string | null;
+  invited_at?: string | null;
+  invited_by?: string | null;
+};
+
+export type WorkspaceMembers = {
+  owner: WorkspaceMember;
+  members: WorkspaceMember[];
+  pending: WorkspaceMember[];
 };
 
 export type UsersAction =

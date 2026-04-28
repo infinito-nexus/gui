@@ -39,14 +39,52 @@ class WorkspaceListEntryOut(BaseModel):
     state: str = "draft"
 
 
+class WorkspaceListEntryOutWithRole(WorkspaceListEntryOut):
+    role: str = "owner"
+
+
 class WorkspaceListOut(BaseModel):
     authenticated: bool = False
     user_id: Optional[str] = None
-    workspaces: List[WorkspaceListEntryOut] = Field(default_factory=list)
+    workspaces: List[WorkspaceListEntryOutWithRole] = Field(default_factory=list)
 
 
 class WorkspaceDeleteOut(BaseModel):
     ok: bool
+
+
+# req 019 — workspace RBAC: owner + member memberships.
+class WorkspaceMemberOut(BaseModel):
+    user_id: Optional[str] = None
+    email: Optional[str] = None
+    role: str = "member"
+    joined_at: Optional[str] = None
+    invited_at: Optional[str] = None
+    invited_by: Optional[str] = None
+
+
+class WorkspaceMembersOut(BaseModel):
+    owner: WorkspaceMemberOut
+    members: List[WorkspaceMemberOut] = Field(default_factory=list)
+    pending: List[WorkspaceMemberOut] = Field(default_factory=list)
+
+
+class WorkspaceMemberInviteIn(BaseModel):
+    email: str = Field(..., min_length=3, description="Email address to invite")
+
+
+class WorkspaceMemberDeleteOut(BaseModel):
+    ok: bool
+
+
+class WorkspaceTransferOwnershipIn(BaseModel):
+    new_owner_id: str = Field(..., min_length=1)
+
+
+class WorkspaceTransferOwnershipOut(BaseModel):
+    ok: bool
+    new_owner_id: str
+    previous_owner_id: str
 
 
 class WorkspaceRuntimeSettingsIn(BaseModel):

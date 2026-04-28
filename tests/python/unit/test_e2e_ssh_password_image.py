@@ -29,11 +29,17 @@ class TestE2ESshPasswordImage(unittest.TestCase):
     def test_ssh_password_image_configures_inner_docker_daemon_defaults(self) -> None:
         daemon_json = self._extract_printf_payload("/etc/docker/daemon.json")
 
+        # Per req 018, daemon.json also seeds insecure-registries with the
+        # cache-registry hostname so docker.io pulls inside the inner DinD
+        # can use the local pull-through cache over plain HTTP.
         self.assertEqual(
             json.loads(daemon_json),
             {
                 "storage-driver": "vfs",
                 "dns": ["1.1.1.1", "8.8.8.8"],
+                "insecure-registries": [
+                    "infinito-deployer-cache-registry:5000"
+                ],
             },
         )
 

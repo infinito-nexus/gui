@@ -53,7 +53,9 @@ def ensure_workspace_access(
 ) -> AuthContext:
     ctx = resolve_auth_context(request)
     request.state.audit_workspace_id = (workspace_id or "").strip() or None
-    svc.assert_workspace_access(workspace_id, ctx.user_id)
+    # Email is forwarded so claim-on-access can match a pending invite
+    # against `X-Auth-Request-Email` (req 019).
+    svc.assert_workspace_access(workspace_id, ctx.user_id, email=ctx.email)
     return ctx
 
 

@@ -24,7 +24,10 @@ class TestWebImageSupplyChain(unittest.TestCase):
             dockerfile,
         )
         self.assertIn("COPY package.json package-lock.json* /app/", dockerfile)
-        self.assertIn("RUN npm ci", dockerfile)
+        # Per req 018 the npm ci step is preceded by an optional conditional
+        # that points npm at the local cache when INFINITO_CACHE_NPM_REGISTRY
+        # is set. The lockfile-pinned install itself is unchanged.
+        self.assertIn("npm ci", dockerfile)
         self.assertIn("USER 10005:10005", dockerfile)
 
     def test_web_manifest_pins_hardened_frontend_dependencies(self) -> None:

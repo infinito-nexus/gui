@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import DeploymentConsole from "./components/DeploymentConsole";
+import LoginPrompt from "./components/LoginPrompt";
 import {
   PANEL_QUERY_TO_KEY,
   type PanelKey,
@@ -171,6 +172,16 @@ export default async function Page({
           />
         </div>
       </section>
+
+      {/*
+        LoginPrompt only mounts when auth is actually available. The e2e
+        header-mock path leaves NEXT_PUBLIC_INFINITO_AUTH_AVAILABLE unset
+        so the modal does not block existing anonymous tests; production
+        and the OIDC-mode e2e (req 020) opt in.
+      */}
+      {String(process.env.NEXT_PUBLIC_INFINITO_AUTH_AVAILABLE || "").toLowerCase() === "true" && (
+        <LoginPrompt />
+      )}
 
       <div
         style={{
