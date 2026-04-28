@@ -1,0 +1,6 @@
+#!/command/with-contenv bash
+# Periodic size-cap enforcement for the cache-registry blob store.
+# CACHE_REGISTRY_MAX_SIZE comes in via env (compose passes it through;
+# default 16g per requirement 018).
+set -e
+exec /usr/local/bin/cache-registry-gc

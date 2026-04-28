@@ -1,8 +1,16 @@
 # ---- deps ----
 FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS deps
+# Optional pull-through cache endpoint (req 018). Empty default leaves
+# npm pointed at the public registry. The e2e harness sets this via
+# compose build.args so npm ci hits cache-package's verdaccio mirror.
+ARG INFINITO_CACHE_NPM_REGISTRY=""
 WORKDIR /app
 COPY package.json package-lock.json* /app/
-RUN npm ci
+RUN if [ -n "$INFINITO_CACHE_NPM_REGISTRY" ]; then \
+        npm config set registry "$INFINITO_CACHE_NPM_REGISTRY"; \
+    fi \
+ && npm ci \
+ && rm -f /root/.npmrc /usr/local/etc/npmrc
 
 # ---- build ----
 FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS builder

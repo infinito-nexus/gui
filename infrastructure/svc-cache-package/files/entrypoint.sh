@@ -18,8 +18,8 @@ mkdir -p "${APT_DIR}" "${PIP_DIR}" "${NPM_DIR}"
 
 # Ownership is idempotent: if already correct chown is a no-op.
 chown -R apt-cacher-ng:apt-cacher-ng "${APT_DIR}"
-chown -R devpi:devpi                 "${PIP_DIR}"
-chown -R verdaccio:verdaccio         "${NPM_DIR}"
+chown -R devpi:devpi "${PIP_DIR}"
+chown -R verdaccio:verdaccio "${NPM_DIR}"
 
 # devpi-init seeds the server state. Marker file prevents re-init on
 # every container restart (would error on existing server dir).

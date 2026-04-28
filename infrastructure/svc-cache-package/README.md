@@ -12,8 +12,14 @@ test stack:
 Total host-disk footprint capped at 8 GB
 (`CACHE_PACKAGE_MAX_SIZE=8g`, see requirement
 [018](../../docs/requirements/018-local-build-cache-infrastructure.md)).
-The cap is informational; per-tool caps in this directory's config files
-are what actually constrain disk use.
+The cap is enforced by an s6-supervised `gc` longrun service running
+[`gc.sh`](files/gc.sh): every 24 h (or every 30 min when over budget)
+it sums `du -sb /state/cache-package`, and when above the cap it stops
+the s6 service that owns the largest subdir, wipes that subdir, and
+restarts the service. Re-fetch on next pull is acceptable because the
+e2e is not latency-sensitive at minute scale, and none of the three
+upstream tools (apt-cacher-ng, devpi, verdaccio) ships a built-in
+hard size cap.
 
 ## Why one container
 
@@ -36,24 +42,32 @@ published; it lives only in the local docker daemon.
 ├── `configs/`
 │   ├── `acng.conf`           apt-cacher-ng config
 │   └── `verdaccio.yaml`      verdaccio config
+├── `gc.sh`                  size-cap enforcement run by s6-rc `gc`
 └── `s6-rc.d/`                s6-overlay v3 service definitions
     ├── `apt-cacher-ng/{type,run,dependencies.d/base}`
     ├── `devpi/{type,run,dependencies.d/base}`
     ├── `verdaccio/{type,run,dependencies.d/base}`
-    └── `user/contents.d/{apt-cacher-ng,devpi,verdaccio}`  (enables them)
+    ├── `gc/{type,run,dependencies.d/base}`
+    └── `user/contents.d/{apt-cacher-ng,devpi,verdaccio,gc}`  (enables them)
 
-## How the dashboard build consumes the cache
+## How the deployer images consume the cache
 
 Build args injected by [scripts/e2e/dashboard/run.sh](../../scripts/e2e/dashboard/run.sh)
-into the rendered Compose env-file. The dashboard's Dockerfile (in the
-upstream `port-ui` repo, NOT in this repo) reads the args and rewrites
-each package manager's config when they are non-empty. See requirement
-[018](../../docs/requirements/018-local-build-cache-infrastructure.md)
-for the exact `ARG` declarations and `RUN` snippets.
+into the rendered Compose env-file. Each consumer Dockerfile in this
+repo reads the args and rewrites its package-manager config when they
+are non-empty:
 
-If the upstream Dockerfile doesn't read the args (current state — port-ui
-PR pending), the cache container still starts and stays healthy; it
-just sees no traffic.
+| consumer Dockerfile               | `INFINITO_CACHE_*` args used                       |
+|-----------------------------------|---------------------------------------------------|
+| `apps/api/Dockerfile`             | `APT_PROXY` + `PIP_INDEX_URL`                     |
+| `apps/web/Dockerfile`             | `NPM_REGISTRY`                                    |
+| `apps/test/playwright/Dockerfile` | `APT_PROXY`                                       |
+| `apps/test/{ssh-password,arch-ssh,ssh-key}/Dockerfile` | (Arch / pacman — out of scope) |
+
+The compose `build.args:` blocks of the corresponding services
+forward the env-file values into the `docker build`. Empty values are
+the production-safe default — when the cache services aren't reachable,
+the consumer Dockerfile falls through to public mirrors.
 
 ## Network
 

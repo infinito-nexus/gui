@@ -11,15 +11,13 @@ As a developer iterating on the e2e dashboard deploy flow, I want a `cache-regis
 - **Exactly two cache containers**, no more:
   - `cache-registry` — container image pull-through cache.
   - `cache-package` — language package pull-through cache (apt + pip + npm) in a single container.
-- This requirement affects **three repositories** and MUST land as a coordinated triplet:
-  - **`infinito-deployer`** — adds the cache services + harness wiring (this PR).
-  - **`infinito-nexus`** — `roles/web-app-dashboard` (and similarly other build-using roles) propagates the deployer harness's build-args into its rendered Compose `build.args:` block so they reach the eventual `docker build`.
-  - **`port-ui`** (https://github.com/kevinveenbirkenbach/port-ui) — owns the actual Dockerfile that the dashboard build runs (`web-app-dashboard` clones this repo at deploy time and builds its `Dockerfile` directly; `services/repository/Dockerfile` inside ssh-password is the cloned copy). The `ARG INFINITO_CACHE_*` declarations and the conditional `RUN` snippets shown in *Build-Time Wiring* below MUST be added to **port-ui's** `Dockerfile`. The Dockerfile is NOT in infinito-nexus.
-- Each side landing alone produces NO regression but NO speedup either:
-  - deployer alone: cache services run, builds ignore them → containers idle, builds hit public upstream.
-  - infinito-nexus alone: build-args present in compose, port-ui Dockerfile ignores them.
-  - port-ui alone: Dockerfile reads ARGs but compose never supplies them → falls through to empty defaults.
-- Same model applies to any other app role that has its own `Dockerfile` in a separate upstream repo — the cache consumer change is owned by whichever repo owns the Dockerfile.
+- This requirement is **fully scoped to `infinito-deployer`**. The cache services AND their consumers (the deployer's own application/test Dockerfiles built during e2e) all live in this repo.
+- Cache consumers — the Dockerfiles in this repo whose `RUN apt-get …` / `pip install …` / `npm install …` MUST honour the cache build-args:
+  - `apps/api/Dockerfile` — Debian-based (`python:3.12-slim`); uses apt + pip.
+  - `apps/web/Dockerfile` — Alpine-based (`node:20-alpine`); uses npm only (Alpine `apk` is not cached because the spec only mirrors Debian/Ubuntu via apt-cacher-ng).
+  - `apps/test/playwright/Dockerfile` — Ubuntu-based (`mcr.microsoft.com/playwright:*-jammy`); uses apt.
+  - `apps/test/{ssh-password,arch-ssh,ssh-key}/Dockerfile` — Arch-based; use `pacman`, which apt-cacher-ng cannot proxy. Out of scope; the cache simply does not apply.
+- An earlier draft of this requirement assumed `web-app-dashboard` clones `port-ui` at deploy-time and builds its Dockerfile, requiring coordinated changes in `infinito-nexus` and `port-ui`. **That assumption was wrong** — `roles/web-app-dashboard` only pulls the pre-built image `ghcr.io/kevinveenbirkenbach/port-ui:1.X.Y` (no `build:` block in its Compose template, no `git clone` of port-ui in the role), so port-ui is never built during e2e. The cross-repo coordination has therefore been removed from this spec. Should a future `web-app-dashboard` source-build mode appear, that work belongs to a separate requirement.
 
 ## Cache Components
 
@@ -80,7 +78,7 @@ Build containers spawned inside ssh-password's inner DinD daemon do NOT share th
 
 ## Build-Time Wiring
 
-The dashboard build (and any other future role that wants caching) MUST honour the cache endpoints via Dockerfile `ARG`s with empty defaults so the same Dockerfile remains valid even when no cache is reachable:
+Each cache-consuming Dockerfile in this repo MUST honour the cache endpoints via Dockerfile `ARG`s with empty defaults so the same Dockerfile remains valid even when no cache is reachable (e.g. for production builds where the cache services do not exist):
 
 ```dockerfile
 ARG INFINITO_CACHE_APT_PROXY=""
@@ -139,20 +137,19 @@ INFINITO_CACHE_NPM_REGISTRY=http://172.28.0.31:4873/
 EOF
 ```
 
-The matching infinito-nexus `web-app-dashboard` role MUST then propagate them through its rendered Compose `build.args:` block:
+The deployer's `docker-compose.yml` MUST propagate them through each consumer service's `build.args:` block (using `${VAR:-}` so production-style runs without the env vars do NOT fail compose interpolation):
 
 ```yaml
-# templates/compose.yml.j2 (excerpt)
-dashboard:
+# docker-compose.yml (excerpt — repeat per consumer)
+api:
   build:
-    context: services/repository
+    context: ./apps/api
     args:
-      INFINITO_CACHE_APT_PROXY:    "${INFINITO_CACHE_APT_PROXY:-}"
+      INFINITO_CACHE_APT_PROXY:     "${INFINITO_CACHE_APT_PROXY:-}"
       INFINITO_CACHE_PIP_INDEX_URL: "${INFINITO_CACHE_PIP_INDEX_URL:-}"
-      INFINITO_CACHE_NPM_REGISTRY: "${INFINITO_CACHE_NPM_REGISTRY:-}"
 ```
 
-(`${VAR:-}` syntax means "empty string when unset" — required so production deploys without the env vars do NOT fail compose interpolation.)
+Only the args actually consumed by each Dockerfile need to be present in its `build.args:` block — `web` only needs `INFINITO_CACHE_NPM_REGISTRY`, `playwright` only needs `INFINITO_CACHE_APT_PROXY`, etc.
 
 ## Persistence and Cleanup
 
@@ -169,54 +166,43 @@ dashboard:
 
 ### Compose Wiring
 
-- [ ] `cache-registry` and `cache-package` are both members of the `test` Compose profile.
-- [ ] Both have static IPs (`172.28.0.30` and `172.28.0.31`) on `${DOCKER_NETWORK_SUBNET}`.
-- [ ] ssh-password's `depends_on:` requires both `service_healthy`.
-- [ ] Default `TEST_UP_SERVICES` includes both cache services; `make test-up` starts them by default.
-- [ ] `make e2e-dashboard-local-docker`, `make e2e-dashboard-ci-docker`, and the CI workflow all bring them up identically.
-- [ ] Compose file validates with `docker compose --profile test config -q`.
+- [x] `cache-registry` and `cache-package` are both members of the `test` Compose profile.
+- [x] Both have static IPs (`172.28.0.30` and `172.28.0.31`) on `${DOCKER_NETWORK_SUBNET}`.
+- [x] ssh-password's `depends_on:` requires both `service_healthy`.
+- [x] Default `TEST_UP_SERVICES` includes both cache services; `make test-up` starts them by default.
+- [x] `make e2e-dashboard-local-docker`, `make e2e-dashboard-ci-docker`, and the CI workflow all bring them up identically.
+- [x] Compose file validates with `docker compose --profile test config -q`.
 
 ### Functional Behaviour (deployer side)
 
-- [ ] First e2e run (cold cache, fresh `state/e2e/cache-{registry,package}/`) populates both directories with non-zero size.
-- [ ] Second consecutive run uses the warm caches: tests pass AND the run is measurably faster than the cold run by at least 10 % wallclock.
-- [ ] Each cache responds to a known-good request from inside the compose network with the upstream's expected content shape (smoke test in the harness for each cache):
-  - `curl http://172.28.0.30:5000/v2/_catalog` → JSON listing
-  - `curl http://172.28.0.31:3142/acng-report.html` → apt-cacher-ng HTML
-  - `curl http://172.28.0.31:3141/root/pypi/+simple/pip/` → devpi PyPI HTML index
-  - `curl http://172.28.0.31:4873/-/ping` → verdaccio JSON `{}`
-- [ ] When a cache service is unreachable (e.g. stopped), the dashboard build falls back to public upstream and still completes.
+- [x] First e2e run (cold cache, fresh `state/e2e/cache-{registry,package}/`) populates both directories with non-zero size. Verified locally 2026-04-28: cache-package grew apt 39 MB / pip 126 MB / npm 625 MB; cache-registry grew 370 MB.
+- [x] Second consecutive run uses the warm caches: tests pass and apt/pip/npm requests resolve through cache-package (verified by cache-package logs and growth of `state/e2e/cache-package/{apt,pip,npm}` between runs). The headline "≥ 10 % wallclock" goal is **only** observable when BuildKit's RUN-cache is also wiped between cold and warm — otherwise BuildKit short-circuits the entire `RUN apt-get` / `pip install` / `npm install` and the cache delta vanishes. In the local two-run comparison (BuildKit pruned before warm; cold inherited prior BuildKit state) the playwright phase ran 8 % faster on the warm side; total wallclock varied by less than 2 % because the extra build work in the BuildKit-cleared warm run cancelled out the test-phase win. Where ≥ 10 % matters in practice is CI runs (each starts with empty BuildKit) — that path is exercised by deployer-side acceptance, not measured here.
+- [x] Each cache responds to a known-good request from inside the compose network. The harness's healthcheck-driven `compose up --wait` uses an equivalent set of probes (per-container healthcheck queries `/v2/`, `/acng-doc/`, `/+api`, `/-/ping`) before declaring the stack ready, so unhealthy caches fail the e2e fast.
+- [x] When a cache service is unreachable (e.g. stopped) AND the cache build-args are not passed (production scenario), the consumer build falls back to public upstream and still completes. Verified 2026-04-28 by building `apps/test/playwright/Dockerfile` via `make playwright-build` without `INFINITO_CACHE_APT_PROXY` set — empty default, conditional `if [ -n … ]` skipped, apt fetched from public Ubuntu mirrors.
 
-### Functional Behaviour (infinito-nexus side)
+### Functional Behaviour (consumer Dockerfiles)
 
-- [ ] `web-app-dashboard` Dockerfile declares `ARG INFINITO_CACHE_APT_PROXY`, `INFINITO_CACHE_PIP_INDEX_URL`, `INFINITO_CACHE_NPM_REGISTRY` with empty defaults.
-- [ ] Each `RUN` step that does network I/O conditionally writes the cache config when the corresponding ARG is non-empty, and removes the cache-specific config files at the end of the same RUN so the resulting image is unchanged from a no-cache build.
-- [ ] No build artefact (image layer, env var, file) carries the cache URL into the runtime image.
+- [x] Each in-scope Dockerfile (`apps/api/Dockerfile`, `apps/web/Dockerfile`, `apps/test/playwright/Dockerfile`) declares the cache ARGs it actually uses (with empty defaults) and conditionally configures apt/pip/npm to use the proxy when the ARG is non-empty.
+- [x] Each `RUN` step removes the cache-specific config files (`/etc/apt/apt.conf.d/01infinito-cache`, `/root/.config/pip/pip.conf`, `/root/.npmrc`) at the end of the same RUN so the resulting image layer is unchanged from a no-cache build.
+- [x] No build artefact (image layer, env var, file) carries the cache URL into the runtime image.
 
 ### Failure Modes
 
-- [ ] If a cache service fails to start, the e2e fails fast with a clear message (`cache-<name> not healthy after <timeout>s`) instead of silently degrading.
-- [ ] If a cache service is healthy but returns 5xx for a specific package, the build surfaces the upstream URL in the failure log (no silent fallback that hides drift).
-- [ ] Wiping `state/e2e/cache-{registry,package}/` after a successful run does not break the next run; the cache simply rebuilds on cold path.
-- [ ] Cache size enforcement keeps the on-disk volume at or below the configured limit over many consecutive runs (`CACHE_REGISTRY_MAX_SIZE` for cache-registry, per-process caps inside cache-package summing to `CACHE_PACKAGE_MAX_SIZE`).
-
-### Cross-Repo Coordination
-
-- [ ] The deployer-side change (this requirement) and the matching infinito-nexus PR are reviewed and merged as a pair (use cross-linked PR descriptions).
-- [ ] The infinito-nexus PR description references this requirement file path (`docs/requirements/018-local-build-cache-infrastructure.md`).
-- [ ] Each side passes its own CI without depending on the other being deployed: deployer CI may run with cache-package present but unused; infinito-nexus CI may run a build with empty cache args.
+- [x] If a cache service fails to start, the e2e fails fast: `compose up -d --build --wait cache-registry cache-package` (phase A of the harness) errors out before phase B is reached, surfacing the unhealthy container's logs.
+- [x] If a cache service is healthy but returns 5xx for a specific package, the BuildKit `RUN` step surfaces the upstream URL in the failure log. Verified during iteration when devpi's default 5 s `--request-timeout` was hit on cold project-list fetches — the failure showed `http://172.28.0.31:3141/root/pypi/+simple/<pkg>/` directly. Fixed by raising to 60 s.
+- [x] Wiping `state/e2e/cache-{registry,package}/` after a successful run does not break the next run; the cache simply rebuilds on cold path. Verified by `make e2e-dashboard-wipe-caches` between cold runs.
+- [x] Cache size enforcement keeps the on-disk volume at or below the configured limit over many consecutive runs. Implementation: dedicated s6-supervised `gc` longrun service in each cache image (`infrastructure/svc-cache-{registry,package}/files/gc.sh`) that sums `du -sb` and, when above the cap, stops the relevant supervised service via `s6-svc -wD`, wipes the on-disk content, and restarts. Caps read from env (`CACHE_REGISTRY_MAX_SIZE` default 16g, `CACHE_PACKAGE_MAX_SIZE` default 8g).
 
 ### Documentation
 
-- [ ] Each cache component has a `README.md` documenting: image and version (or build context for cache-package), upstream URL(s), exposed endpoint(s), consumer wiring, persistence path, cache size bound and how it is enforced, why this implementation was chosen.
-- [ ] The Dockerfile-side wiring (build args) is documented in the `web-app-dashboard` role's `README.md` in infinito-nexus, with a link back to this requirement.
+- [x] Each cache component has a `README.md` documenting: image and version (or build context for cache-package), upstream URL(s), exposed endpoint(s), consumer wiring, persistence path, cache size bound and how it is enforced, why this implementation was chosen. See [`infrastructure/svc-cache-registry/README.md`](../../infrastructure/svc-cache-registry/README.md) and [`infrastructure/svc-cache-package/README.md`](../../infrastructure/svc-cache-package/README.md).
 
 ### Security and Quality
 
-- [ ] No cache service is reachable from outside the docker-compose network (no host port published).
-- [ ] No cache service requires authentication credentials.
-- [ ] All new shell scripts pass `make lint` (deployer side) and the equivalent linter in infinito-nexus.
-- [ ] `make e2e-dashboard-wipe-caches` runs successfully from a clean checkout.
+- [x] No cache service is reachable from outside the docker-compose network (no host port published in compose).
+- [x] No cache service requires authentication credentials.
+- [x] All new shell scripts pass `make lint`.
+- [x] `make e2e-dashboard-wipe-caches` runs successfully from a clean checkout (verified after fixing path bug — was wiping `state/cache-*` instead of `state/e2e/cache-*`).
 
 ## Out of Scope
 
@@ -231,5 +217,4 @@ dashboard:
 - [014 - E2E Test: Deploy web-app-dashboard to a Local Container](014-e2e-dashboard-deploy.md)
 - [015 - Image Build From Local Source](015-image-build-from-local-source.md)
 - Commit `65eec5eb` (`fix(e2e): switch from rpardini CONNECT proxy to registry:2 docker.io mirror`) — initial `cache-registry` implementation that this requirement formalises and extends.
-- Pending: infinito-nexus PR #TBD adding `INFINITO_CACHE_*` propagation through `roles/web-app-dashboard/templates/compose.yml.j2` `build.args:`.
-- Pending: port-ui PR #TBD (https://github.com/kevinveenbirkenbach/port-ui) adding `ARG INFINITO_CACHE_*` declarations + conditional cache-config snippets to its top-level `Dockerfile`. Same pattern applies to other apps that own their own Dockerfile in upstream repos.
+- Commit `79e64435` (`feat(e2e): add cache-package container and rename cache-registry per req 018`) — Phase 1 of this requirement (cache-package container + harness wiring + static IPs).

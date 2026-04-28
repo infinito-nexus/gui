@@ -56,8 +56,14 @@ COPY configs/acng.conf            /etc/apt-cacher-ng/acng.conf
 COPY configs/verdaccio.yaml       /etc/verdaccio/config.yaml
 COPY s6-rc.d/                     /etc/s6-overlay/s6-rc.d/
 COPY entrypoint.sh                /entrypoint.sh
+COPY gc.sh                        /usr/local/bin/cache-package-gc
 
-RUN chmod +x /entrypoint.sh \
+# bash + coreutils give the GC script a portable du / awk / case (the
+# script uses associative arrays and `[[`).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends bash coreutils \
+ && rm -rf /var/lib/apt/lists/* \
+ && chmod +x /entrypoint.sh /usr/local/bin/cache-package-gc \
  && find /etc/s6-overlay/s6-rc.d -type f \( -name run -o -name up \) -exec chmod +x {} +
 
 EXPOSE 3141 3142 4873

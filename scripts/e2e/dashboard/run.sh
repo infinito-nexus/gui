@@ -365,9 +365,19 @@ render_env_file "${TMP_ENV_FILE}"
 echo "→ Resetting any existing dashboard E2E stack"
 compose down -v --remove-orphans || true
 
-echo "→ Starting dashboard E2E stack"
-compose up -d --build --wait
+# Two-phase start (req 018): cache services FIRST so the consumer image
+# builds (api/web/runner-manager/init-*) can reach cache-package at its
+# static IP 172.28.0.31 via host network. compose's single-shot
+# `up --build` builds all images in parallel BEFORE any container
+# starts, which means without this split the consumer builds would
+# attempt 172.28.0.31 while cache-package itself is still queued for
+# startup → connect timeout → build fails (verified locally).
+echo "→ Starting dashboard E2E stack (phase A: caches)"
+compose up -d --build --wait cache-registry cache-package
 STACK_STARTED=1
+
+echo "→ Starting dashboard E2E stack (phase B: rest)"
+compose up -d --build --wait
 
 cd "${APPS_WEB_DIR}"
 export INFINITO_E2E_COMPOSE_ENV_FILE="${TMP_ENV_FILE}"
@@ -384,7 +394,13 @@ if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
   playwright_image="${INFINITO_E2E_PLAYWRIGHT_IMAGE:-infinito-deployer-playwright:latest}"
 
   if ! docker image inspect "${playwright_image}" >/dev/null 2>&1; then
-    make -C "${REPO_ROOT}" playwright-build \
+    # Forward the cache-package apt endpoint so the Playwright image's
+    # apt-get install (docker.io + docker-compose-v2) goes through
+    # cache-package's apt-cacher-ng on warm runs (req 018). Empty when
+    # the cache is not in use; the Dockerfile falls back to public
+    # mirrors in that case.
+    INFINITO_CACHE_APT_PROXY="http://172.28.0.31:3142" \
+      make -C "${REPO_ROOT}" playwright-build \
       PLAYWRIGHT_BASE="${playwright_base}" \
       PLAYWRIGHT_IMAGE="${playwright_image}"
   fi

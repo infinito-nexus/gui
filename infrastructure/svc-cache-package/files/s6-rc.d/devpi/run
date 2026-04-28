@@ -6,4 +6,5 @@ exec s6-setuidgid devpi \
     --host 0.0.0.0 \
     --port 3141 \
     --restrict-modify=root \
-    --mirror-cache-expiry=1800
+    --mirror-cache-expiry=1800 \
+    --request-timeout=60

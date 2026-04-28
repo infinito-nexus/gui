@@ -1,0 +1,6 @@
+#!/command/with-contenv bash
+# Periodic size-cap enforcement across apt/pip/npm subdirs of
+# /state/cache-package. CACHE_PACKAGE_MAX_SIZE comes from compose env;
+# default 8g per requirement 018.
+set -e
+exec /usr/local/bin/cache-package-gc

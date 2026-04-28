@@ -110,6 +110,16 @@ services:
     build:
       context: ${API_BUILD_CONTEXT}
       dockerfile: ${API_DOCKERFILE}
+      # Use host network during build so apt/pip can reach cache-package
+      # at its static compose IP 172.28.0.31 — the docker bridge is
+      # routed from host, but BuildKit's default isolated network is not
+      # (req 018). Two-phase harness guarantees cache-package is healthy
+      # BEFORE this build runs; if the cache is down the conditional
+      # logic in the Dockerfile passes empty args and falls back.
+      network: host
+      args:
+        INFINITO_CACHE_APT_PROXY:     "${INFINITO_CACHE_APT_PROXY:-}"
+        INFINITO_CACHE_PIP_INDEX_URL: "${INFINITO_CACHE_PIP_INDEX_URL:-}"
 
     command:
       - sh
@@ -132,6 +142,10 @@ services:
     build:
       context: ${API_BUILD_CONTEXT}
       dockerfile: ${API_DOCKERFILE}
+      network: host
+      args:
+        INFINITO_CACHE_APT_PROXY:     "${INFINITO_CACHE_APT_PROXY:-}"
+        INFINITO_CACHE_PIP_INDEX_URL: "${INFINITO_CACHE_PIP_INDEX_URL:-}"
 
     environment:
       STATE_DIR: ${STATE_DIR}
@@ -177,6 +191,10 @@ services:
     build:
       context: ${API_BUILD_CONTEXT}
       dockerfile: ${API_DOCKERFILE}
+      network: host
+      args:
+        INFINITO_CACHE_APT_PROXY:     "${INFINITO_CACHE_APT_PROXY:-}"
+        INFINITO_CACHE_PIP_INDEX_URL: "${INFINITO_CACHE_PIP_INDEX_URL:-}"
 
     container_name: ${API_CONTAINER_NAME}
 
@@ -273,6 +291,10 @@ services:
     build:
       context: ${API_BUILD_CONTEXT}
       dockerfile: ${API_DOCKERFILE}
+      network: host
+      args:
+        INFINITO_CACHE_APT_PROXY:     "${INFINITO_CACHE_APT_PROXY:-}"
+        INFINITO_CACHE_PIP_INDEX_URL: "${INFINITO_CACHE_PIP_INDEX_URL:-}"
 
     container_name: infinito-deployer-runner-manager
 
@@ -349,9 +371,11 @@ services:
     build:
       context: ${WEB_BUILD_CONTEXT}
       dockerfile: ${WEB_DOCKERFILE}
+      network: host
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_API_STREAM_BASE_URL: ${NEXT_PUBLIC_API_STREAM_BASE_URL}
+        INFINITO_CACHE_NPM_REGISTRY: "${INFINITO_CACHE_NPM_REGISTRY:-}"
 
     container_name: ${WEB_CONTAINER_NAME}
 
@@ -442,12 +466,17 @@ services:
   # ...) — `RUN apt-get` / `pip install` / `npm install` then exits 100.
   cache-registry:
     profiles: ["test"]
-    image: registry:2
+    build:
+      context: ./infrastructure/svc-cache-registry/files
+      dockerfile: Dockerfile
     container_name: infinito-deployer-cache-registry
     environment:
       REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
       REGISTRY_LOG_ACCESSLOG_DISABLED: "false"
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      # GC sidecar: cap on-disk size; supersizing accepted (s6 cycles
+      # the registry service when above cap, see svc-cache-registry/README).
+      CACHE_REGISTRY_MAX_SIZE: ${CACHE_REGISTRY_MAX_SIZE:-16g}
     volumes:
       - type: bind
         source: ${TEST_CACHE_REGISTRY_HOST_PATH:-/tmp/infinito-deployer-e2e/cache-registry}
@@ -479,6 +508,10 @@ services:
       context: ./infrastructure/svc-cache-package/files
       dockerfile: Dockerfile
     container_name: infinito-deployer-cache-package
+    environment:
+      # GC sidecar: total cap across apt/pip/npm. When over budget the
+      # GC service prunes the largest subdir (see svc-cache-package/README).
+      CACHE_PACKAGE_MAX_SIZE: ${CACHE_PACKAGE_MAX_SIZE:-8g}
     volumes:
       - type: bind
         source: ${TEST_CACHE_PACKAGE_HOST_PATH:-/tmp/infinito-deployer-e2e/cache-package}

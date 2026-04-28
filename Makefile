@@ -347,12 +347,16 @@ e2e-dashboard-wipe-caches:
 # Build the Playwright + docker-cli image used by e2e-dashboard-local-docker.
 # Override base image or output tag via:
 #   make playwright-build PLAYWRIGHT_BASE=mcr.microsoft.com/playwright:v1.55.1-jammy PLAYWRIGHT_IMAGE=infinito-deployer-playwright:latest
+# INFINITO_CACHE_APT_PROXY is forwarded to the Dockerfile so apt-get goes
+# through cache-package's apt-cacher-ng when set (req 018).
 PLAYWRIGHT_BASE  ?= mcr.microsoft.com/playwright:v1.55.1-jammy
 PLAYWRIGHT_IMAGE ?= infinito-deployer-playwright:latest
 playwright-build:
 	@echo "→ Building Playwright+docker-cli image ($(PLAYWRIGHT_IMAGE)) from $(PLAYWRIGHT_BASE)"
 	@docker build \
+		--network host \
 		--build-arg "PLAYWRIGHT_BASE=$(PLAYWRIGHT_BASE)" \
+		--build-arg "INFINITO_CACHE_APT_PROXY=$${INFINITO_CACHE_APT_PROXY:-}" \
 		-t "$(PLAYWRIGHT_IMAGE)" \
 		apps/test/playwright
 

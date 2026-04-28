@@ -14,9 +14,9 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 STATE_DIR="${INFINITO_E2E_STATE_DIR:-${REPO_ROOT}/state}"
 
 echo "→ wipe-caches: stopping cache-registry + cache-package"
-(cd "${REPO_ROOT}" && \
-  docker compose -f docker-compose.yml --profile test stop cache-registry cache-package 2>&1 \
-  | sed 's/^/  /' || true)
+(cd "${REPO_ROOT}" &&
+  docker compose -f docker-compose.yml --profile test stop cache-registry cache-package 2>&1 |
+  sed 's/^/  /' || true)
 
 if [[ ! -d "${STATE_DIR}" ]]; then
   echo "→ wipe-caches: ${STATE_DIR} does not exist; nothing to do"
@@ -24,12 +24,14 @@ if [[ ! -d "${STATE_DIR}" ]]; then
 fi
 
 state_dir_abs="$(cd "${STATE_DIR}" && pwd -P)"
-echo "→ wipe-caches: clearing ${state_dir_abs}/{cache-registry,cache-package}"
+# The harness creates the bind dirs under state/e2e/cache-{registry,package}
+# (see prepare_cache_dirs in run.sh). Wipe must match that location.
+echo "→ wipe-caches: clearing ${state_dir_abs}/e2e/{cache-registry,cache-package}"
 
 docker run --rm \
   -v "${state_dir_abs}:/state" \
   alpine:latest \
-  sh -c 'rm -rf /state/cache-registry/* /state/cache-package/* 2>/dev/null || true' \
+  sh -c 'rm -rf /state/e2e/cache-registry/* /state/e2e/cache-package/* 2>/dev/null || true' \
   >/dev/null 2>&1 || true
 
 echo "→ wipe-caches: done"
