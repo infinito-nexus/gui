@@ -22,6 +22,27 @@ One iteration = one attempted change, from the first edit to the closing verific
 - You MAY use `make db-psql` to open an interactive psql session for ad-hoc inspection.
 - You SHOULD use `make db-logs` to tail Postgres logs when a database issue is suspected.
 
+## Long-Running Background Commands 📡
+
+When starting any command in the background that the user might want to
+follow live (e2e runs, deploys, builds taking >30s, anything started
+with `run_in_background: true`), the agent MUST in the same response
+print at least one ready-to-paste `tail -f` (or `tail -F`) command
+pointing at the command's output file or the relevant container log.
+
+- For commands started via `Bash(... run_in_background=true)`, surface
+  the path the runtime returned (`/tmp/claude-…/tasks/<id>.output` or
+  the `tee` target if one was used). Both qualify; show the friendliest.
+- For deploys that produce per-job logs, also show
+  `docker exec infinito-deployer-runner-manager sh -c 'tail -F /state/jobs/$(ls -t /state/jobs | head -1)/job.log'`
+  so the user can follow the Ansible RX stream once the runner is up.
+- For stack-touching commands, show
+  `docker logs -f <container>` for the relevant service.
+- The agent SHOULD group these under a short heading (`Live tail`).
+  One line per command, not narrative prose.
+- Skip when the user explicitly waved follow-along off (e.g. "fire and
+  forget" / "don't bother me").
+
 ## Inspect 🔎
 
 - Before you redeploy, you MUST complete all available inspections first. You MUST check the live local output (`make logs`), container logs, and current application state so the original state stays visible.

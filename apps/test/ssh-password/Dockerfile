@@ -36,7 +36,7 @@ RUN pacman -Syu --noconfirm --needed \
   && echo "deploy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
   && echo "perfmask ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
   && install -d -m 0755 /etc/docker /usr/local/bin /run/systemd/system /etc/systemd/system/multi-user.target.wants /etc/systemd/system/sshd.service.d \
-  && printf '{\n  "storage-driver": "vfs",\n  "dns": ["1.1.1.1", "8.8.8.8"]\n}\n' > /etc/docker/daemon.json \
+  && printf '{\n  "storage-driver": "vfs",\n  "dns": ["1.1.1.1", "8.8.8.8"],\n  "insecure-registries": ["infinito-deployer-registry-cache:5000"]\n}\n' > /etc/docker/daemon.json \
   && ln -sf /usr/bin/python3 /usr/local/bin/python3 \
   && ssh-keygen -A \
   && ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service \
@@ -51,20 +51,32 @@ RUN pacman -Syu --noconfirm --needed \
 # avoid IPv6 sysctl writes that fail against Docker's read-only /proc/sys
 # mount inside this DinD test target.
 RUN install -d -m 0755 /etc/systemd/system/docker.service.d \
- && printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true\n' \
+ && printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-registry-cache:5000\n' \
     > /etc/systemd/system/docker.service.d/no-iptables.conf
 
-# Route ALL outbound docker registry traffic through the e2e
-# registry-cache MITM proxy (rpardini/docker-registry-proxy). The proxy
-# transparently caches blobs/manifests for any registry the inner DinD
-# pulls from (docker.io, ghcr.io, quay.io, ...) so re-runs and parallel
-# CI shards do not trigger live registry round-trips. The CA cert is
-# fetched from the proxy's bind mount and installed into the trust
-# store via ExecStartPre so HTTPS pulls validate the proxy's SSL bump.
-COPY install-registry-cache-ca.sh /usr/local/bin/install-registry-cache-ca.sh
-RUN chmod +x /usr/local/bin/install-registry-cache-ca.sh \
- && printf '[Service]\nEnvironment="HTTP_PROXY=http://infinito-deployer-registry-cache:3128"\nEnvironment="HTTPS_PROXY=http://infinito-deployer-registry-cache:3128"\nEnvironment="NO_PROXY=localhost,127.0.0.1,::1,infinito-deployer-registry-cache"\nExecStartPre=/usr/local/bin/install-registry-cache-ca.sh\n' \
-    > /etc/systemd/system/docker.service.d/registry-cache-proxy.conf
+# Why `--registry-mirror=` (CLI flag) instead of HTTP_PROXY env or
+# containerd hosts.toml:
+#   - `Environment="HTTP_PROXY=..."` on dockerd is auto-propagated by
+#     BuildKit to every build container as implicit build args. The
+#     dashboard build's `RUN apt-get update` / `pip install` /
+#     `npm install` then CONNECTs through the registry-cache, which
+#     only allow-lists docker registries and rejects everything else
+#     — apt-get exits 100 (CI run 25006674718).
+#   - containerd `hosts.toml` requires `containerd-snapshotter` mode,
+#     which is incompatible with this DinD target's `vfs` storage
+#     driver. fuse-overlayfs / overlayfs both fail in nested DinD
+#     here (overlay mount returns EINVAL).
+#   - daemon.json `registry-mirrors` is rewritten by the Ansible
+#     sys-svc-container role during deploy. CLI flags on the systemd
+#     unit survive that rewrite the same way the network flags above
+#     do.
+#
+# Trade-off: this only caches docker.io. ghcr.io / quay.io / etc. go
+# direct from the inner DinD. That is acceptable because docker.io is
+# the only registry that has hit rate limits or upstream IPv6 issues
+# on GitHub-Actions runners in our CI history (runs 24943727751,
+# 24968576122, 25000929344, 25006674718 all on docker.io content);
+# ghcr.io has never been a problem.
 
 # Prevent pacman -Syu (run by Ansible's update-pacman role) from upgrading
 # openssh while the E2E target is live.

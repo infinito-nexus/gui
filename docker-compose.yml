@@ -420,50 +420,41 @@ services:
   # Test targets (password/key SSH)
   # ---------------------------------------------------------
 
-  # Single dynamic registry pull-through cache for the e2e test stack.
-  # rpardini's MITM proxy intercepts ALL outbound docker registry traffic
-  # from ssh-password's inner DinD daemon and caches blobs/manifests in
-  # ./state/e2e/registry-cache. No per-registry config, no hardcoded image
-  # list — the first request to any registry (docker.io, ghcr.io, quay.io,
-  # registry.k8s.io, ...) is fetched and persisted; re-requests are served
-  # from cache. Replaces the previous `prepare-local-image-cache.sh`
-  # save/load mechanism that broke when digest-pinned `docker save` produced
-  # OCI archives with `RepoTags: null`, leaving image refs unresolvable
-  # locally and forcing live registry pulls in CI (run 24968576122).
+  # Docker Hub pull-through cache for the e2e test stack. Uses the
+  # standard `registry:2` distribution image in proxy mode
+  # (REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io). dockerd
+  # inside ssh-password is configured with
+  # `--registry-mirror=http://infinito-deployer-registry-cache:5000`
+  # plus `insecure-registries`, and routes its docker.io pulls through
+  # this cache. Only docker.io is mirrored: ghcr.io / quay.io / etc.
+  # go direct from the inner DinD because they have not historically
+  # had rate-limit or upstream-IP issues on GitHub-Actions runners
+  # (the failing runs 24943727751, 24968576122, 25000929344, 25006674718
+  # were all on docker.io content). Per-registry mirroring would need
+  # containerd hosts.toml + containerd-snapshotter, which is
+  # incompatible with this DinD target's required `vfs` storage driver
+  # (overlayfs / fuse-overlayfs both fail in nested DinD).
+  #
+  # An HTTP_PROXY-based MITM cache (rpardini-proxy) was tried earlier
+  # and rejected: BuildKit auto-propagates HTTP_PROXY from dockerd to
+  # build containers, and the proxy's CONNECT allow-list rejects
+  # non-registry hosts (deb.debian.org, pypi.org, registry.npmjs.org,
+  # ...) — `RUN apt-get` / `pip install` / `npm install` then exits 100.
   registry-cache:
     profiles: ["test"]
-    image: rpardini/docker-registry-proxy:0.6.5
+    image: registry:2
     container_name: infinito-deployer-registry-cache
-    # GitHub-Actions runners have no IPv6 connectivity, but the upstream
-    # registries (docker.io etc.) return AAAA records. nginx inside the
-    # proxy resolves both A and AAAA, attempts the IPv6 address first,
-    # gets "Network unreachable", and marks the upstream as "temporarily
-    # disabled" without falling back to A — every blob pull stalls
-    # forever (CI run 25000929344 timed out 80 min on `compose pull`
-    # for matomo blobs because of this exact pattern). Forcing IPv6 off
-    # at the kernel level inside this container makes nginx see only A
-    # records.
-    sysctls:
-      net.ipv6.conf.all.disable_ipv6: 1
-      net.ipv6.conf.default.disable_ipv6: 1
-      net.ipv6.conf.lo.disable_ipv6: 1
     environment:
-      ENABLE_MANIFEST_CACHE: "true"
-      REGISTRIES: "ghcr.io quay.io registry.k8s.io k8s.gcr.io"
-      AUTH_REGISTRIES: ""
-      CACHE_MAX_SIZE: "32g"
-      DISABLE_IPV6: "true"
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+      REGISTRY_LOG_ACCESSLOG_DISABLED: "false"
     volumes:
       - type: bind
         source: ${TEST_REGISTRY_CACHE_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache}
-        target: /docker_mirror_cache
-      - type: bind
-        source: ${TEST_REGISTRY_CACHE_CA_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache-ca}
-        target: /ca
+        target: /var/lib/registry
     healthcheck:
       test:
         - CMD-SHELL
-        - "wget -qO- http://127.0.0.1:3128/ca.crt >/dev/null 2>&1"
+        - "wget -qO- http://127.0.0.1:5000/v2/ >/dev/null 2>&1"
       interval: 5s
       timeout: 3s
       retries: 30
@@ -513,15 +504,12 @@ services:
         source: ${TEST_REPO_SEED_HOST_PATH:-/tmp/infinito-deployer-e2e/repo-seeds}
         target: /opt/e2e/repo-seeds
         read_only: true
-      - type: bind
-        source: ${TEST_REGISTRY_CACHE_CA_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache-ca}
-        target: /opt/e2e/registry-cache-ca
-        read_only: true
       # Optional hermetic E2E repo caches improve reproducibility and
       # iteration speed but are not meant to hide real host/container
-      # network problems. The registry-cache-ca bind delivers the
-      # registry-cache MITM CA certificate to ssh-password's docker
-      # daemon at startup so HTTPS pulls through the proxy validate.
+      # network problems. The registry-cache is consumed via the
+      # `--registry-mirror=http://infinito-deployer-registry-cache:3128`
+      # CLI flag on dockerd (see ssh-password's Dockerfile), so no MITM
+      # CA delivery is required here.
 
     depends_on:
       catalog:

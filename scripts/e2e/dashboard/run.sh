@@ -142,11 +142,10 @@ prepare_local_repo_cache() {
   printf '%s\n%s\n' "${cache_output[0]}" "${cache_output[1]}"
 }
 
-prepare_registry_cache_dirs() {
+prepare_registry_cache_dir() {
   local cache_dir="${STATE_DIR}/e2e/registry-cache"
-  local ca_dir="${STATE_DIR}/e2e/registry-cache-ca"
-  mkdir -p "${cache_dir}" "${ca_dir}"
-  printf '%s\n%s\n' "${cache_dir}" "${ca_dir}"
+  mkdir -p "${cache_dir}"
+  printf '%s\n' "${cache_dir}"
 }
 
 render_env_file() {
@@ -159,7 +158,6 @@ render_env_file() {
   local test_repo_mirror_host_path
   local test_repo_seed_host_path
   local test_registry_cache_host_path
-  local test_registry_cache_ca_host_path
 
   if [[ "${MODE}" == "local" ]]; then
     local src_dir distro image_tag
@@ -186,12 +184,11 @@ render_env_file() {
   mapfile -t repo_cache_paths < <(prepare_local_repo_cache)
   test_repo_mirror_host_path="${repo_cache_paths[0]}"
   test_repo_seed_host_path="${repo_cache_paths[1]}"
-  mapfile -t registry_cache_paths < <(prepare_registry_cache_dirs)
-  test_registry_cache_host_path="${registry_cache_paths[0]}"
-  test_registry_cache_ca_host_path="${registry_cache_paths[1]}"
-  echo "→ Using hermetic E2E repo cache + dynamic registry-cache (rpardini proxy)"
-  echo "  Container registry traffic from ssh-password's DinD is transparently"
-  echo "  cached per-blob; no per-image hardcoded list needed."
+  test_registry_cache_host_path="$(prepare_registry_cache_dir)"
+  echo "→ Using hermetic E2E repo cache + Docker Hub registry-cache"
+  echo "  ssh-password's inner DinD routes docker.io pulls through the"
+  echo "  registry:2 pull-through cache via --registry-mirror; ghcr.io"
+  echo "  and other registries pull direct."
 
   local api_port="${E2E_API_PORT}"
   local web_port="${E2E_WEB_PORT}"
@@ -249,7 +246,6 @@ API_PROXY_TARGET=${api_proxy_target}
 TEST_REPO_MIRROR_HOST_PATH=${test_repo_mirror_host_path}
 TEST_REPO_SEED_HOST_PATH=${test_repo_seed_host_path}
 TEST_REGISTRY_CACHE_HOST_PATH=${test_registry_cache_host_path}
-TEST_REGISTRY_CACHE_CA_HOST_PATH=${test_registry_cache_ca_host_path}
 EOF
 }
 
