@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -207,7 +207,7 @@ test-env-down:
 # Start the minimal test stack (api db catalog runner-manager web) under the test profile.
 # Pass image overrides via env, e.g.:
 #   INFINITO_NEXUS_IMAGE=infinito-debian:latest JOB_RUNNER_IMAGE=infinito-debian:latest make test-up
-TEST_UP_SERVICES ?= api db catalog runner-manager web
+TEST_UP_SERVICES ?= api db catalog runner-manager web cache-registry cache-package
 test-up:
 	@$(MAKE) --no-print-directory warn-local-unpinned-images
 	@$(MAKE) --no-print-directory ensure-local-runner-image
@@ -253,7 +253,7 @@ test-perf: dirs
 	   ! printf '%s\n' "$$running_services" | grep -qx web || \
 	   ! printf '%s\n' "$$running_services" | grep -qx ssh-password; then \
 		echo "→ Starting test stack for perf harness"; \
-		$(MAKE) test-up TEST_UP_SERVICES="api db catalog runner-manager web ssh-password"; \
+		$(MAKE) test-up TEST_UP_SERVICES="api db catalog runner-manager web ssh-password cache-registry cache-package"; \
 		started_here=1; \
 	fi; \
 	mkdir -p state/perf/016; \
@@ -333,6 +333,16 @@ e2e-dashboard-ci-docker:
 # state are NOT touched.
 e2e-dashboard-wipe-state:
 	@bash scripts/e2e/dashboard/wipe-state.sh
+
+# Full reset of the local pull-through caches (cache-registry +
+# cache-package). Stops the cache services first so file handles are
+# released, then deletes their bind-mounted state via a privileged
+# alpine container (cache files are owned by container uids and
+# unreachable from the host shell otherwise). After this, the next
+# e2e run is fully cold and has to re-pull every blob/package from
+# upstream.
+e2e-dashboard-wipe-caches:
+	@bash scripts/e2e/dashboard/wipe-caches.sh
 
 # Build the Playwright + docker-cli image used by e2e-dashboard-local-docker.
 # Override base image or output tag via:

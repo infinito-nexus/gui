@@ -10,7 +10,9 @@ import httpx
 
 from .perf_support import REPO_ROOT, api_base_url, compose_ps_quiet, web_base_url
 
-STACK_SERVICES = "api db catalog runner-manager web ssh-password"
+STACK_SERVICES = (
+    "api db catalog runner-manager web ssh-password cache-registry cache-package"
+)
 RUNNER_PLAYBOOK = """\
 - hosts: all
   gather_facts: false

@@ -36,7 +36,7 @@ RUN pacman -Syu --noconfirm --needed \
   && echo "deploy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
   && echo "perfmask ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers \
   && install -d -m 0755 /etc/docker /usr/local/bin /run/systemd/system /etc/systemd/system/multi-user.target.wants /etc/systemd/system/sshd.service.d \
-  && printf '{\n  "storage-driver": "vfs",\n  "dns": ["1.1.1.1", "8.8.8.8"],\n  "insecure-registries": ["infinito-deployer-registry-cache:5000"]\n}\n' > /etc/docker/daemon.json \
+  && printf '{\n  "storage-driver": "vfs",\n  "dns": ["1.1.1.1", "8.8.8.8"],\n  "insecure-registries": ["infinito-deployer-cache-registry:5000"]\n}\n' > /etc/docker/daemon.json \
   && ln -sf /usr/bin/python3 /usr/local/bin/python3 \
   && ssh-keygen -A \
   && ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service \
@@ -51,7 +51,7 @@ RUN pacman -Syu --noconfirm --needed \
 # avoid IPv6 sysctl writes that fail against Docker's read-only /proc/sys
 # mount inside this DinD test target.
 RUN install -d -m 0755 /etc/systemd/system/docker.service.d \
- && printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-registry-cache:5000\n' \
+ && printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-cache-registry:5000\n' \
     > /etc/systemd/system/docker.service.d/no-iptables.conf
 
 # Why `--registry-mirror=` (CLI flag) instead of HTTP_PROXY env or

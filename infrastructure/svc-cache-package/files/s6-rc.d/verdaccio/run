@@ -1,0 +1,6 @@
+#!/command/with-contenv sh
+set -e
+# verdaccio doesn't support running as non-root if storage is owned by
+# another user; we chown'd the storage to verdaccio in entrypoint.sh.
+exec s6-setuidgid verdaccio \
+  /usr/local/bin/verdaccio --config /etc/verdaccio/config.yaml --listen 0.0.0.0:4873

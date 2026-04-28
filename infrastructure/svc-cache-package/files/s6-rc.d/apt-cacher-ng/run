@@ -1,0 +1,4 @@
+#!/command/with-contenv sh
+set -e
+exec s6-setuidgid apt-cacher-ng \
+  /usr/sbin/apt-cacher-ng -c /etc/apt-cacher-ng foreground=1

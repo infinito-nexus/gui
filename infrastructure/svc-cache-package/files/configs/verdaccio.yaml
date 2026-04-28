@@ -1,0 +1,48 @@
+# verdaccio config — pull-through cache mirroring registry.npmjs.org.
+# 2 GB max storage cap per requirement 018. Listens on 0.0.0.0:4873 so
+# containers on the compose network reach it by IP.
+
+storage: /state/cache-package/npm
+
+web:
+  enable: false
+
+# Anonymous read access; no publish.
+auth:
+  htpasswd:
+    file: /tmp/htpasswd-disabled
+    max_users: -1
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+    timeout: 30s
+    cache: true
+    max_fails: 3
+    fail_timeout: 5m
+
+packages:
+  '@*/*':
+    access: $anonymous
+    publish: $authenticated
+    proxy: npmjs
+  '**':
+    access: $anonymous
+    publish: $authenticated
+    proxy: npmjs
+
+server:
+  keepAliveTimeout: 60
+
+listen:
+  - 0.0.0.0:4873
+
+log:
+  type: stdout
+  format: pretty-timestamped
+  level: warn
+
+max_body_size: 200mb
+
+# 2 GB soft cap; verdaccio doesn't auto-prune so this is a documentation
+# guardrail. Operator-level GC scripts may live in a sidecar later.

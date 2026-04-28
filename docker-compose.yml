@@ -440,17 +440,24 @@ services:
   # build containers, and the proxy's CONNECT allow-list rejects
   # non-registry hosts (deb.debian.org, pypi.org, registry.npmjs.org,
   # ...) — `RUN apt-get` / `pip install` / `npm install` then exits 100.
-  registry-cache:
+  cache-registry:
     profiles: ["test"]
     image: registry:2
-    container_name: infinito-deployer-registry-cache
+    container_name: infinito-deployer-cache-registry
     environment:
       REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
       REGISTRY_LOG_ACCESSLOG_DISABLED: "false"
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
     volumes:
       - type: bind
-        source: ${TEST_REGISTRY_CACHE_HOST_PATH:-/tmp/infinito-deployer-e2e/registry-cache}
+        source: ${TEST_CACHE_REGISTRY_HOST_PATH:-/tmp/infinito-deployer-e2e/cache-registry}
         target: /var/lib/registry
+    networks:
+      default:
+        ipv4_address: ${TEST_CACHE_REGISTRY_IP:-172.28.0.30}
+    cpus: '1.0'
+    mem_reservation: 256m
+    mem_limit: 1g
     healthcheck:
       test:
         - CMD-SHELL
@@ -459,6 +466,43 @@ services:
       timeout: 3s
       retries: 30
       start_period: 30s
+    restart: ${RESTART_POLICY}
+
+  # cache-package: single container bundling apt-cacher-ng + devpi-server
+  # + verdaccio under s6-overlay v3 so the dashboard build's apt/pip/npm
+  # all hit a local pull-through cache instead of public upstream. Build
+  # context lives at infrastructure/svc-cache-package/files/ — see that
+  # directory's README and docs/requirements/018-... for design details.
+  cache-package:
+    profiles: ["test"]
+    build:
+      context: ./infrastructure/svc-cache-package/files
+      dockerfile: Dockerfile
+    container_name: infinito-deployer-cache-package
+    volumes:
+      - type: bind
+        source: ${TEST_CACHE_PACKAGE_HOST_PATH:-/tmp/infinito-deployer-e2e/cache-package}
+        target: /state/cache-package
+    networks:
+      default:
+        ipv4_address: ${TEST_CACHE_PACKAGE_IP:-172.28.0.31}
+    cpus: '1.5'
+    mem_reservation: 512m
+    mem_limit: 2g
+    healthcheck:
+      # Probe all three internal services so a failure in any one of them
+      # marks the container unhealthy and the e2e harness fails fast
+      # rather than racing into a build that silently uses public upstream.
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fsS --max-time 4 http://127.0.0.1:3142/acng-doc/ >/dev/null &&
+          curl -fsS --max-time 4 http://127.0.0.1:3141/+api >/dev/null &&
+          curl -fsS --max-time 4 http://127.0.0.1:4873/-/ping >/dev/null
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     restart: ${RESTART_POLICY}
 
   ssh-password:
@@ -506,15 +550,17 @@ services:
         read_only: true
       # Optional hermetic E2E repo caches improve reproducibility and
       # iteration speed but are not meant to hide real host/container
-      # network problems. The registry-cache is consumed via the
-      # `--registry-mirror=http://infinito-deployer-registry-cache:3128`
+      # network problems. The cache-registry is consumed via the
+      # `--registry-mirror=http://infinito-deployer-cache-registry:5000`
       # CLI flag on dockerd (see ssh-password's Dockerfile), so no MITM
       # CA delivery is required here.
 
     depends_on:
       catalog:
         condition: service_healthy
-      registry-cache:
+      cache-registry:
+        condition: service_healthy
+      cache-package:
         condition: service_healthy
 
     networks:

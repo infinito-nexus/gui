@@ -142,10 +142,11 @@ prepare_local_repo_cache() {
   printf '%s\n%s\n' "${cache_output[0]}" "${cache_output[1]}"
 }
 
-prepare_registry_cache_dir() {
-  local cache_dir="${STATE_DIR}/e2e/registry-cache"
-  mkdir -p "${cache_dir}"
-  printf '%s\n' "${cache_dir}"
+prepare_cache_dirs() {
+  local registry_dir="${STATE_DIR}/e2e/cache-registry"
+  local package_dir="${STATE_DIR}/e2e/cache-package"
+  mkdir -p "${registry_dir}" "${package_dir}"
+  printf '%s\n%s\n' "${registry_dir}" "${package_dir}"
 }
 
 render_env_file() {
@@ -157,7 +158,8 @@ render_env_file() {
   local docker_socket_gid
   local test_repo_mirror_host_path
   local test_repo_seed_host_path
-  local test_registry_cache_host_path
+  local test_cache_registry_host_path
+  local test_cache_package_host_path
 
   if [[ "${MODE}" == "local" ]]; then
     local src_dir distro image_tag
@@ -184,11 +186,14 @@ render_env_file() {
   mapfile -t repo_cache_paths < <(prepare_local_repo_cache)
   test_repo_mirror_host_path="${repo_cache_paths[0]}"
   test_repo_seed_host_path="${repo_cache_paths[1]}"
-  test_registry_cache_host_path="$(prepare_registry_cache_dir)"
-  echo "→ Using hermetic E2E repo cache + Docker Hub registry-cache"
-  echo "  ssh-password's inner DinD routes docker.io pulls through the"
-  echo "  registry:2 pull-through cache via --registry-mirror; ghcr.io"
-  echo "  and other registries pull direct."
+  mapfile -t cache_paths < <(prepare_cache_dirs)
+  test_cache_registry_host_path="${cache_paths[0]}"
+  test_cache_package_host_path="${cache_paths[1]}"
+  echo "→ Using hermetic E2E repo cache + cache-registry (docker.io) + cache-package (apt/pip/npm)"
+  echo "  ssh-password's inner DinD routes docker.io pulls through cache-registry"
+  echo "  via --registry-mirror; ghcr.io / quay.io / etc. pull direct."
+  echo "  Build containers consume cache-package via INFINITO_CACHE_* build-args"
+  echo "  (when the consuming Dockerfile supports them)."
 
   local api_port="${E2E_API_PORT}"
   local web_port="${E2E_WEB_PORT}"
@@ -245,7 +250,11 @@ WEB_PORT=${web_port}
 API_PROXY_TARGET=${api_proxy_target}
 TEST_REPO_MIRROR_HOST_PATH=${test_repo_mirror_host_path}
 TEST_REPO_SEED_HOST_PATH=${test_repo_seed_host_path}
-TEST_REGISTRY_CACHE_HOST_PATH=${test_registry_cache_host_path}
+TEST_CACHE_REGISTRY_HOST_PATH=${test_cache_registry_host_path}
+TEST_CACHE_PACKAGE_HOST_PATH=${test_cache_package_host_path}
+INFINITO_CACHE_APT_PROXY=http://172.28.0.31:3142
+INFINITO_CACHE_PIP_INDEX_URL=http://172.28.0.31:3141/root/pypi/+simple/
+INFINITO_CACHE_NPM_REGISTRY=http://172.28.0.31:4873/
 EOF
 }
 
