@@ -1,4 +1,6 @@
 # Infinito Deployer 🚀
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-blue?logo=github)](https://github.com/sponsors/kevinveenbirkenbach) [![Patreon](https://img.shields.io/badge/Support-Patreon-orange?logo=patreon)](https://www.patreon.com/c/kevinveenbirkenbach)
+
 
 **🖥️ Deploy terminal. 🛒 App store. ♾️ Infinito.Nexus — made accessible.**
 
