@@ -202,6 +202,36 @@ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKKBS2UWGKi9IRz2b+JjkAWGiAkFDrxnnQXiueLQTKDz
 docker compose -f docker-compose.ssh-test.yml up -d --build
 ```
 
+## OIDC E2E Test Stack
+
+The repository ships a self-contained OIDC login flow for end-to-end testing of the OAuth2-Proxy auth contract from [requirement 007](../../requirements/007-optional-auth-persistent-workspaces.md). It pairs `oauth2-proxy` (same image as in production) with `oidc-mock` (a seeded dummy IdP), both gated behind the `test` Compose profile. See [requirement 020](../../requirements/020-oidc-e2e-via-dummy-provider.md) for the architecture.
+
+`make test-env-up` brings up the full test profile, which includes the OIDC pair alongside the SSH test services. Login entry point on the host: <http://localhost:4180>. The proxy redirects to the mock IdP's `/Account/Login`; after submitting credentials, the callback returns to `:4180` with `X-Auth-Request-User` / `X-Auth-Request-Email` set on every upstream request.
+
+### Seeded users
+
+Hard-coded in [docker-compose.yml](../../../docker-compose.yml) under the `oidc-mock` service:
+
+| Role | Username | Password | Email |
+|---|---|---|---|
+| Workspace owner | `e2e-owner` | `e2e-owner-secret-TEST-ONLY` | `e2e-owner@example.com` |
+| Workspace member | `e2e-member` | `e2e-member-secret-TEST-ONLY` | `e2e-member@example.com` |
+
+OIDC client (proxy ↔ IdP, not for browser login):
+
+| Field | Value |
+|---|---|
+| Client ID | `infinito-deployer-e2e` |
+| Client secret | `e2e-client-secret-TEST-ONLY` |
+| Issuer (compose-internal) | `http://oidc-mock:8089` |
+
+### Notes
+
+- The `-TEST-ONLY` suffix is intentional so a copy-paste into a production config is obvious in review.
+- Both services are in the `test` Compose profile only; `make up` does not start them, and only port `4180` is exposed on the host.
+- The `oauth2-proxy` cookie secret is generated fresh per harness run (32 random bytes) and only lives in the temp env-file the e2e harness builds; it is never committed.
+- Used by the Playwright spec at [apps/web/tests/oidc_login.spec.ts](../../../apps/web/tests/oidc_login.spec.ts) and as the auth lane for `make e2e-dashboard-ci-docker-oidc`.
+
 ## Example Workspace Import
 
 The repository ships a ready-to-import workspace baseline at [examples/workspace/](../../../examples/workspace/) and a packaged archive at [examples/workspace-import.zip](../../../examples/workspace-import.zip). The baseline targets the `test-arch` container started by `make test-env-up`.
