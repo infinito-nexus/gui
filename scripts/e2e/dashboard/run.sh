@@ -213,33 +213,20 @@ render_env_file() {
 
   local stream_base_url="http://127.0.0.1:${api_port}"
   local cors_allow_origins="http://127.0.0.1:${web_port},http://localhost:${web_port}"
-  # Per-run cookie-secret for the OAuth2-Proxy test service (req 020).
-  # Always generated even in header-mock mode so the compose interpolation
-  # never fails — the proxy only consumes it when oidc-mock auth-mode runs.
-  local oauth2_proxy_cookie_secret
+  # OAuth2-Proxy + auth-mode env vars (req 020).
+  # - cookie-secret: per-run regardless of mode (prevents compose interp errors).
+  # - oidc-mock mode: Playwright in the compose network resolves via DNS, so the
+  #   IdP redirect target must be `oauth2-proxy:4180`; api trusts the proxy and
+  #   reads `X-Forwarded-User` / `X-Forwarded-Email` (oauth2-proxy's actual
+  #   --pass-user-headers output, NOT `X-Auth-Request-*` which only applies in
+  #   auth-only subrequest mode). header-mock mode keeps the legacy defaults so
+  #   the existing unit tests' header-mock contract stays intact.
+  local oauth2_proxy_cookie_secret oauth2_proxy_redirect_url
+  local auth_proxy_enabled auth_proxy_user_header auth_proxy_email_header
   oauth2_proxy_cookie_secret="$(head -c 32 /dev/urandom | base64 | tr -d '\n=' | head -c 32)"
-  # In oidc-mock mode the Playwright container resolves through compose
-  # DNS (`oauth2-proxy:4180`); flip the proxy's advertised callback URL
-  # to match so the IdP redirect target is reachable from the in-network
-  # browser. Default keeps the host-port URL for manual host-browser
-  # tests (Variante 2 in the OIDC walkthrough).
-  local oauth2_proxy_redirect_url
-  local auth_proxy_enabled
-  local auth_proxy_user_header
-  local auth_proxy_email_header
   if [[ "${INFINITO_E2E_AUTH_MODE:-header-mock}" == "oidc-mock" ]]; then
     oauth2_proxy_redirect_url="http://oauth2-proxy:4180/oauth2/callback"
-    # OIDC mode = api MUST trust the OAuth2-Proxy headers; otherwise the
-    # workspace API silently treats every request as anonymous and the
-    # OIDC login spec's `wsBody.authenticated` assertion fails after a
-    # successful IdP round-trip.
     auth_proxy_enabled="true"
-    # OAuth2-Proxy with --pass-user-headers=true forwards
-    # `X-Forwarded-User` / `X-Forwarded-Email` to the upstream (NOT
-    # `X-Auth-Request-*`, which only applies to auth-only / subrequest
-    # mode). Match the api's expected headers to the proxy's actual
-    # output; the legacy `X-Auth-Request-*` default is preserved for
-    # the existing header-mock unit tests.
     auth_proxy_user_header="X-Forwarded-User"
     auth_proxy_email_header="X-Forwarded-Email"
   else

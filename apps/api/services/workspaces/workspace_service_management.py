@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 from services.infinito_nexus_versions import normalize_infinito_nexus_version
 from services.job_runner.util import atomic_write_text, safe_mkdir
-from .paths import workspace_dir, workspaces_root
+from .paths import workspace_dir
 from .vault import _ensure_secrets_dirs
 from .workspace_context import (
     _HIDDEN_FILES,
@@ -23,7 +23,6 @@ from .workspace_context import (
     _sanitize_workspace_id,
     _sanitize_workspace_state,
     _to_entry,
-    _workspace_last_modified_iso,
     _write_meta,
     load_workspace_yaml_document,
 )

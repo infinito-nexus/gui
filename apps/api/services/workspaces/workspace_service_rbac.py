@@ -13,7 +13,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .paths import workspace_dir, workspaces_root
+from .paths import workspaces_root
 from .workspace_context import (
     _load_meta,
     _now_iso,

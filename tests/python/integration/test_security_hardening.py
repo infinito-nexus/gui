@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import time
 import unittest
 from typing import Any
 
 import httpx
 
-from .perf_support import api_base_url, compose_ps_quiet, web_base_url
+from .perf_support import REPO_ROOT, api_base_url, compose_ps_quiet, web_base_url
 from ._security_helpers import (
     RUNNER_PLAYBOOK,
     SECRET_VALUE,

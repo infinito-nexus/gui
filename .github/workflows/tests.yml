@@ -281,6 +281,18 @@ jobs:
           cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
+      - name: Install frontend dependencies
+        # The OIDC harness invokes `npx playwright test` inside the
+        # Playwright docker image with /work bind-mounted from
+        # apps/web. The playwright image bundles its own playwright
+        # CLI but not @playwright/test; that resolves out of the host
+        # node_modules, so npm ci must run on the runner first.
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd apps/web
+          npm ci
+
       - name: Run OIDC login e2e
         shell: bash
         run: |
