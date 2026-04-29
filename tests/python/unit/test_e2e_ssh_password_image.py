@@ -64,11 +64,14 @@ class TestE2ESshPasswordImage(unittest.TestCase):
             drop_in,
         )
         # HTTP_PROXY env routes inner-DinD build apt traffic through the
-        # cache-package's apt-cacher-ng on 172.28.0.31:3142 so port-ui's
-        # Dockerfile `apt-get install nodejs npm` no longer relies on
-        # raw deb.debian.org reachability from nested DinD (req 018).
+        # cache-package's apt-cacher-ng (req 018). The proxy target is
+        # the inner docker0 bridge gateway (172.17.0.1) NOT the outer
+        # compose network — a socat unit on ssh-password forwards from
+        # docker0:3142 to the cache-package outer IP, so build
+        # containers don't need kernel-level IP forwarding (which is
+        # blocked because /proc/sys is read-only in this DinD target).
         self.assertIn(
-            'Environment="HTTP_PROXY=http://172.28.0.31:3142"',
+            'Environment="HTTP_PROXY=http://172.17.0.1:3142"',
             drop_in,
         )
 

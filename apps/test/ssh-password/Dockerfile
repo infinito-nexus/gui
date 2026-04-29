@@ -27,6 +27,7 @@ RUN pacman -Syu --noconfirm --needed \
     python-requests \
     python-yaml \
     rsync \
+    socat \
     sudo \
     systemd \
   && useradd -m -s /bin/bash deploy \
@@ -50,35 +51,47 @@ RUN pacman -Syu --noconfirm --needed \
 # dockerd from mutating the outer container's shared nf_tables state, and
 # avoid IPv6 sysctl writes that fail against Docker's read-only /proc/sys
 # mount inside this DinD test target.
+# inner-DinD apt forwarder. The inner dockerd uses
+# --iptables=false --ip-forward=false (see drop-in below) and this DinD
+# target mounts /proc/sys read-only, so the kernel sysctl
+# net.ipv4.ip_forward cannot be flipped at runtime. Without forwarding,
+# packets from build containers on the inner docker0 bridge cannot
+# reach the outer compose network where cache-package lives at
+# 172.28.0.31:3142. Workaround: a socat process inside ssh-password
+# itself listens on every interface (incl. docker0) on port 3142 and
+# forwards to cache-package on the outer bridge. This is a same-namespace
+# proxy hop — no kernel forwarding involved — so it works in any docker
+# environment regardless of /proc/sys writability.
+RUN install -d -m 0755 /etc/systemd/system /etc/systemd/system/multi-user.target.wants \
+ && printf '[Unit]\nDescription=Forward inner-DinD apt traffic to cache-package on outer compose network\nAfter=network.target\nBefore=docker.service\n[Service]\nExecStart=/usr/bin/socat -d TCP-LISTEN:3142,bind=0.0.0.0,fork,reuseaddr TCP:172.28.0.31:3142\nRestart=always\nRestartSec=2\n[Install]\nWantedBy=multi-user.target\n' \
+    > /etc/systemd/system/infinito-cache-proxy.service \
+ && ln -sf /etc/systemd/system/infinito-cache-proxy.service /etc/systemd/system/multi-user.target.wants/infinito-cache-proxy.service
+
 RUN install -d -m 0755 /etc/systemd/system/docker.service.d \
- && printf '[Service]\nEnvironment="HTTP_PROXY=http://172.28.0.31:3142"\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-cache-registry:5000\n' \
+ && printf '[Service]\nEnvironment="HTTP_PROXY=http://172.17.0.1:3142"\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-cache-registry:5000\n' \
     > /etc/systemd/system/docker.service.d/no-iptables.conf
 
-# Why `--registry-mirror=` (CLI flag) instead of HTTP_PROXY env or
-# containerd hosts.toml:
-#   - HTTP_PROXY pointing at cache-REGISTRY broke before because the
-#     registry only allow-lists docker registry hostnames and rejects
-#     everything else, so `RUN apt-get` / `pip install` / `npm install`
-#     exited 100 (CI run 25006674718). HTTP_PROXY pointing at
-#     cache-PACKAGE (req 018; apt-cacher-ng on 172.28.0.31:3142) does
-#     not have that limitation — acng's `PassThroughPattern: .*`
-#     lets it cache deb.debian.org / ubuntu mirrors AND proxy
-#     arbitrary HTTPS via CONNECT, so apt traffic from build
-#     containers no longer needs raw internet from the inner DinD.
-#   - We deliberately set HTTP_PROXY only (not HTTPS_PROXY): apt
-#     mirrors are HTTP and we want them cached; pip / npm use HTTPS
-#     to pypi.org / registry.npmjs.org and going through acng's
-#     CONNECT tunnel adds latency without caching benefit.
-#   - --registry-mirror still uses the cache-REGISTRY because dockerd
-#     does not route registry pulls through HTTP_PROXY anyway.
+# Why `--registry-mirror=` (CLI flag) and HTTP_PROXY -> 172.17.0.1:
+#   - 172.17.0.1 is the default inner docker0 bridge IP that build
+#     containers see as their gateway. socat on ssh-password listens on
+#     every interface incl. docker0; build containers reach apt-cacher-ng
+#     via that local hop without needing kernel-level IP forwarding.
+#   - HTTP_PROXY pointing at cache-REGISTRY broke before because that
+#     registry only allow-lists docker registry hostnames (CI run
+#     25006674718). cache-PACKAGE's apt-cacher-ng has
+#     PassThroughPattern: .* and accepts deb.debian.org / Ubuntu mirrors
+#     plus arbitrary HTTPS CONNECT.
+#   - HTTP_PROXY only (not HTTPS_PROXY): apt mirrors are HTTP and benefit
+#     from caching; pip / npm use HTTPS to pypi.org / registry.npmjs.org
+#     and going through acng's CONNECT tunnel adds latency without
+#     caching benefit.
+#   - --registry-mirror still uses cache-REGISTRY — dockerd does not
+#     route registry pulls through HTTP_PROXY anyway.
 #   - containerd `hosts.toml` requires `containerd-snapshotter` mode,
-#     which is incompatible with this DinD target's `vfs` storage
-#     driver. fuse-overlayfs / overlayfs both fail in nested DinD
-#     here (overlay mount returns EINVAL).
-#   - daemon.json `registry-mirrors` is rewritten by the Ansible
-#     sys-svc-container role during deploy. CLI flags on the systemd
-#     unit survive that rewrite the same way the network flags above
-#     do.
+#     incompatible with this target's vfs storage driver.
+#   - daemon.json `registry-mirrors` is rewritten by Ansible's
+#     sys-svc-container role during deploy; CLI flags on the systemd
+#     unit survive that rewrite.
 #
 # Trade-off: this only caches docker.io. ghcr.io / quay.io / etc. go
 # direct from the inner DinD. That is acceptable because docker.io is
