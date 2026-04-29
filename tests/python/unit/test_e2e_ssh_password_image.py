@@ -63,6 +63,14 @@ class TestE2ESshPasswordImage(unittest.TestCase):
             "--default-network-opt bridge=com.docker.network.enable_ipv6=true",
             drop_in,
         )
+        # HTTP_PROXY env routes inner-DinD build apt traffic through the
+        # cache-package's apt-cacher-ng on 172.28.0.31:3142 so port-ui's
+        # Dockerfile `apt-get install nodejs npm` no longer relies on
+        # raw deb.debian.org reachability from nested DinD (req 018).
+        self.assertIn(
+            'Environment="HTTP_PROXY=http://172.28.0.31:3142"',
+            drop_in,
+        )
 
 
 if __name__ == "__main__":

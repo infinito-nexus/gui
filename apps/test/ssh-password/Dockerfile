@@ -51,17 +51,26 @@ RUN pacman -Syu --noconfirm --needed \
 # avoid IPv6 sysctl writes that fail against Docker's read-only /proc/sys
 # mount inside this DinD test target.
 RUN install -d -m 0755 /etc/systemd/system/docker.service.d \
- && printf '[Service]\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-cache-registry:5000\n' \
+ && printf '[Service]\nEnvironment="HTTP_PROXY=http://172.28.0.31:3142"\nExecStart=\nExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --iptables=false --ipv6=true --fixed-cidr-v6=fd42:2::/80 --ip-forward=false --ip6tables=false --default-network-opt bridge=com.docker.network.enable_ipv6=true --registry-mirror=http://infinito-deployer-cache-registry:5000\n' \
     > /etc/systemd/system/docker.service.d/no-iptables.conf
 
 # Why `--registry-mirror=` (CLI flag) instead of HTTP_PROXY env or
 # containerd hosts.toml:
-#   - `Environment="HTTP_PROXY=..."` on dockerd is auto-propagated by
-#     BuildKit to every build container as implicit build args. The
-#     dashboard build's `RUN apt-get update` / `pip install` /
-#     `npm install` then CONNECTs through the registry-cache, which
-#     only allow-lists docker registries and rejects everything else
-#     — apt-get exits 100 (CI run 25006674718).
+#   - HTTP_PROXY pointing at cache-REGISTRY broke before because the
+#     registry only allow-lists docker registry hostnames and rejects
+#     everything else, so `RUN apt-get` / `pip install` / `npm install`
+#     exited 100 (CI run 25006674718). HTTP_PROXY pointing at
+#     cache-PACKAGE (req 018; apt-cacher-ng on 172.28.0.31:3142) does
+#     not have that limitation — acng's `PassThroughPattern: .*`
+#     lets it cache deb.debian.org / ubuntu mirrors AND proxy
+#     arbitrary HTTPS via CONNECT, so apt traffic from build
+#     containers no longer needs raw internet from the inner DinD.
+#   - We deliberately set HTTP_PROXY only (not HTTPS_PROXY): apt
+#     mirrors are HTTP and we want them cached; pip / npm use HTTPS
+#     to pypi.org / registry.npmjs.org and going through acng's
+#     CONNECT tunnel adds latency without caching benefit.
+#   - --registry-mirror still uses the cache-REGISTRY because dockerd
+#     does not route registry pulls through HTTP_PROXY anyway.
 #   - containerd `hosts.toml` requires `containerd-snapshotter` mode,
 #     which is incompatible with this DinD target's `vfs` storage
 #     driver. fuse-overlayfs / overlayfs both fail in nested DinD
