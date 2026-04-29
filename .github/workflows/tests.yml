@@ -244,6 +244,54 @@ jobs:
         shell: bash
         run: bash scripts/ci/dump-container-logs.sh
 
+  web-dashboard-oidc-e2e:
+    runs-on: ubuntu-latest
+    # OIDC login spec only — fast (single test, no real deploy). 30 min
+    # is generous; the spec itself runs in <1 min once the test stack is
+    # up. The bulk of wallclock is starting api + db + catalog +
+    # runner-manager + web + ssh-password + cache-* + oidc-mock +
+    # oauth2-proxy.
+    timeout-minutes: 60
+    env:
+      INFINITO_E2E_CATALOG_IMAGE: ghcr.io/infinito-nexus/core/debian@sha256:b494b40a45823fbefea7936c20f512582496a2e977a5c5ad3511775e98e83023
+      INFINITO_E2E_JOB_RUNNER_IMAGE: ghcr.io/infinito-nexus/core/arch@sha256:9d6c7709caab53eeb1f227a1002f06df29990dfa0c4d41ca7cb84594c081f2cb
+      INFINITO_E2E_POSTGRES_IMAGE: postgres@sha256:4327b9fd295502f326f44153a1045a7170ddbfffed1c3829798328556cfd09e2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space on runner
+        shell: bash
+        run: |
+          # Same disk-pressure mitigation as web-dashboard-deploy-e2e —
+          # the OIDC variant brings up the same test stack PLUS oauth2-
+          # proxy + oidc-mock, so the budget is even tighter.
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL "${AGENT_TOOLSDIRECTORY:-}" || true
+          sudo apt-get clean -y || true
+          docker image prune -af || true
+          df -h /
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Run OIDC login e2e
+        shell: bash
+        run: |
+          set -euo pipefail
+          make e2e-dashboard-ci-docker-oidc
+
+      - name: Dump container logs on failure
+        if: failure()
+        shell: bash
+        run: bash scripts/ci/dump-container-logs.sh
+
   perf:
     runs-on: ubuntu-latest
     timeout-minutes: 45

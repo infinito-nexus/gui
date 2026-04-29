@@ -238,6 +238,13 @@ services:
       RUNNER_MANAGER_URL: ${RUNNER_MANAGER_URL:-http://runner-manager:8001}
       MANAGER_TOKEN_FILE: ${MANAGER_TOKEN_FILE:-/run/manager/token}
       INFINITO_ENFORCE_DIGEST_PINNING: ${INFINITO_ENFORCE_DIGEST_PINNING:-}
+      # Forward the OAuth2-Proxy header-based auth contract (req 007).
+      # The harness flips AUTH_PROXY_ENABLED to true in oidc-mock mode
+      # so the api treats X-Auth-Request-User / X-Auth-Request-Email as
+      # authoritative; in header-mock mode it stays disabled.
+      AUTH_PROXY_ENABLED: ${AUTH_PROXY_ENABLED:-false}
+      AUTH_PROXY_USER_HEADER: ${AUTH_PROXY_USER_HEADER:-X-Auth-Request-User}
+      AUTH_PROXY_EMAIL_HEADER: ${AUTH_PROXY_EMAIL_HEADER:-X-Auth-Request-Email}
 
     volumes:
       - type: ${INFINITO_REPO_MOUNT_TYPE:-volume}
@@ -661,11 +668,18 @@ services:
             "ClientId":     "infinito-deployer-e2e",
             "ClientSecrets": ["e2e-client-secret-TEST-ONLY"],
             "AllowedGrantTypes": ["authorization_code"],
-            "RedirectUris": ["http://localhost:4180/oauth2/callback"],
-            "PostLogoutRedirectUris": ["http://localhost:4180/"],
+            "RedirectUris": [
+              "http://localhost:4180/oauth2/callback",
+              "http://oauth2-proxy:4180/oauth2/callback"
+            ],
+            "PostLogoutRedirectUris": [
+              "http://localhost:4180/",
+              "http://oauth2-proxy:4180/"
+            ],
             "AllowedScopes": ["openid", "profile", "email"],
             "RequirePkce": false,
-            "RequireClientSecret": true
+            "RequireClientSecret": true,
+            "RequireConsent": false
           }
         ]
       USERS_CONFIGURATION_INLINE: |
@@ -675,9 +689,10 @@ services:
             "Username":  "e2e-owner",
             "Password":  "e2e-owner-secret-TEST-ONLY",
             "Claims": [
-              {"Type": "email",          "Value": "e2e-owner@example.com"},
-              {"Type": "email_verified", "Value": "true",  "ValueType": "boolean"},
-              {"Type": "name",           "Value": "E2E Owner"}
+              {"Type": "email",              "Value": "e2e-owner@example.com"},
+              {"Type": "email_verified",     "Value": "true",  "ValueType": "boolean"},
+              {"Type": "name",               "Value": "E2E Owner"},
+              {"Type": "preferred_username", "Value": "e2e-owner"}
             ]
           },
           {
@@ -685,9 +700,10 @@ services:
             "Username":  "e2e-member",
             "Password":  "e2e-member-secret-TEST-ONLY",
             "Claims": [
-              {"Type": "email",          "Value": "e2e-member@example.com"},
-              {"Type": "email_verified", "Value": "true",  "ValueType": "boolean"},
-              {"Type": "name",           "Value": "E2E Member"}
+              {"Type": "email",              "Value": "e2e-member@example.com"},
+              {"Type": "email_verified",     "Value": "true",  "ValueType": "boolean"},
+              {"Type": "name",               "Value": "E2E Member"},
+              {"Type": "preferred_username", "Value": "e2e-member"}
             ]
           }
         ]
@@ -726,7 +742,11 @@ services:
       - --client-secret=e2e-client-secret-TEST-ONLY
       - --http-address=0.0.0.0:4180
       - --upstream=http://web:3000
-      - --redirect-url=http://localhost:4180/oauth2/callback
+      # Default points at the host-published port for manual browser
+      # tests; the e2e harness flips this to http://oauth2-proxy:4180/...
+      # via env-file when INFINITO_E2E_AUTH_MODE=oidc-mock so the
+      # in-compose Playwright container can resolve the callback host.
+      - --redirect-url=${OAUTH2_PROXY_REDIRECT_URL:-http://localhost:4180/oauth2/callback}
       - --email-domain=*
       - --pass-user-headers=true
       - --set-xauthrequest=true

@@ -218,6 +218,36 @@ render_env_file() {
   # never fails — the proxy only consumes it when oidc-mock auth-mode runs.
   local oauth2_proxy_cookie_secret
   oauth2_proxy_cookie_secret="$(head -c 32 /dev/urandom | base64 | tr -d '\n=' | head -c 32)"
+  # In oidc-mock mode the Playwright container resolves through compose
+  # DNS (`oauth2-proxy:4180`); flip the proxy's advertised callback URL
+  # to match so the IdP redirect target is reachable from the in-network
+  # browser. Default keeps the host-port URL for manual host-browser
+  # tests (Variante 2 in the OIDC walkthrough).
+  local oauth2_proxy_redirect_url
+  local auth_proxy_enabled
+  local auth_proxy_user_header
+  local auth_proxy_email_header
+  if [[ "${INFINITO_E2E_AUTH_MODE:-header-mock}" == "oidc-mock" ]]; then
+    oauth2_proxy_redirect_url="http://oauth2-proxy:4180/oauth2/callback"
+    # OIDC mode = api MUST trust the OAuth2-Proxy headers; otherwise the
+    # workspace API silently treats every request as anonymous and the
+    # OIDC login spec's `wsBody.authenticated` assertion fails after a
+    # successful IdP round-trip.
+    auth_proxy_enabled="true"
+    # OAuth2-Proxy with --pass-user-headers=true forwards
+    # `X-Forwarded-User` / `X-Forwarded-Email` to the upstream (NOT
+    # `X-Auth-Request-*`, which only applies to auth-only / subrequest
+    # mode). Match the api's expected headers to the proxy's actual
+    # output; the legacy `X-Auth-Request-*` default is preserved for
+    # the existing header-mock unit tests.
+    auth_proxy_user_header="X-Forwarded-User"
+    auth_proxy_email_header="X-Forwarded-Email"
+  else
+    oauth2_proxy_redirect_url="http://localhost:4180/oauth2/callback"
+    auth_proxy_enabled="false"
+    auth_proxy_user_header="X-Auth-Request-User"
+    auth_proxy_email_header="X-Auth-Request-Email"
+  fi
   if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
     # Playwright runs inside the docker network, so 127.0.0.1 inside the browser
     # container is the browser itself, not the host. Use relative URLs so SSE
@@ -261,6 +291,10 @@ INFINITO_CACHE_APT_PROXY=http://172.28.0.31:3142
 INFINITO_CACHE_PIP_INDEX_URL=http://172.28.0.31:3141/root/pypi/+simple/
 INFINITO_CACHE_NPM_REGISTRY=http://172.28.0.31:4873/
 OAUTH2_PROXY_COOKIE_SECRET=${oauth2_proxy_cookie_secret}
+OAUTH2_PROXY_REDIRECT_URL=${oauth2_proxy_redirect_url}
+AUTH_PROXY_ENABLED=${auth_proxy_enabled}
+AUTH_PROXY_USER_HEADER=${auth_proxy_user_header}
+AUTH_PROXY_EMAIL_HEADER=${auth_proxy_email_header}
 EOF
 }
 
@@ -416,12 +450,29 @@ if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
     infinito-deployer-web 2>/dev/null | awk 'NF{print; exit}' || true)"
   network_name="${network_name:-infinito-deployer}"
 
-  echo "→ Running real dashboard deploy E2E inside docker (network=${network_name}, image=${playwright_image})"
-  # The dashboard reachability assertion in the spec calls
+  # Auth-mode switch (req 020). Default `header-mock` runs the existing
+  # dashboard E2E spec against the web upstream directly; `oidc-mock`
+  # runs the OIDC login spec against the oauth2-proxy front-door.
+  # Top-level (non-function) shell scope — no `local`.
+  if [[ "${INFINITO_E2E_AUTH_MODE:-header-mock}" == "oidc-mock" ]]; then
+    playwright_config="playwright.oidc.config.ts"
+    playwright_target="tests/oidc_login.spec.ts"
+    playwright_base_url="http://oauth2-proxy:4180"
+    echo "→ Running OIDC login E2E inside docker (network=${network_name}, image=${playwright_image}, mode=oidc-mock)"
+  else
+    playwright_config="playwright.dashboard.config.ts"
+    playwright_target="tests/dashboard_deploy_real.spec.ts"
+    playwright_base_url="http://web:${E2E_WEB_PORT}"
+    echo "→ Running real dashboard deploy E2E inside docker (network=${network_name}, image=${playwright_image})"
+  fi
+
+  # The dashboard reachability assertion in the dashboard spec calls
   # 'docker compose exec ssh-password curl ...' to probe the deployed app
   # inside its target container. The custom image bundles docker.io +
   # docker-compose-v2; mount the docker socket + generated compose env file
   # so 'docker compose exec' works from inside the playwright container.
+  # The OIDC spec doesn't need the docker socket but the same mount is
+  # harmless.
   docker run --rm \
     --user "$(id -u):$(id -g)" \
     --group-add "${DOCKER_SOCKET_GID}" \
@@ -431,13 +482,14 @@ if [[ "${INFINITO_E2E_PLAYWRIGHT_DOCKER:-0}" == "1" ]]; then
     -v "${DOCKER_SOCKET_PATH}:/var/run/docker.sock" \
     -v "${TMP_ENV_FILE}:${TMP_ENV_FILE}:ro" \
     -w /work \
-    -e PLAYWRIGHT_BASE_URL="http://web:${E2E_WEB_PORT}" \
+    -e PLAYWRIGHT_BASE_URL="${playwright_base_url}" \
     -e INFINITO_E2E_MODE="${MODE}" \
+    -e INFINITO_E2E_AUTH_MODE="${INFINITO_E2E_AUTH_MODE:-header-mock}" \
     -e INFINITO_E2E_COMPOSE_ENV_FILE="${TMP_ENV_FILE}" \
     -e INFINITO_E2E_COMPOSE_FILE="${REPO_ROOT}/docker-compose.yml" \
     -e HOME=/tmp \
     "${playwright_image}" \
-    npx playwright test -c playwright.dashboard.config.ts tests/dashboard_deploy_real.spec.ts
+    npx playwright test -c "${playwright_config}" "${playwright_target}"
 else
   export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-http://127.0.0.1:${E2E_WEB_PORT}}"
 
