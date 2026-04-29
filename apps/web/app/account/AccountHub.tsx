@@ -296,7 +296,7 @@ function CollaboratorsTab({
   if (rows.length === 0) {
     return (
       <div data-testid="account-collaborators-empty">
-        No collaborators yet. Invite someone via a workspace's Members panel.
+        No collaborators yet. Invite someone via a workspace&apos;s Members panel.
       </div>
     );
   }
