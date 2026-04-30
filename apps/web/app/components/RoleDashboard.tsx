@@ -352,8 +352,6 @@ export default function RoleDashboard({
         releaseTrackLocked={releaseTrackLocked}
         releaseTrackTooltip={releaseTrackTooltip}
         setReleaseTrack={setReleaseTrack}
-        activeMode={activeMode}
-        handleModeChange={handleModeChange}
         viewMenuOpen={viewMenuOpen}
         setViewMenuOpen={setViewMenuOpen}
         viewButtonRef={viewButtonRef}

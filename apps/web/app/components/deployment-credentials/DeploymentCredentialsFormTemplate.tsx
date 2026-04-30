@@ -3,7 +3,6 @@
 import type { ReactNode, RefObject } from "react";
 
 import styles from "../DeploymentCredentialsForm.module.css";
-import ModeToggle from "../ModeToggle";
 import RemoveServerModal from "./RemoveServerModal";
 import ServerCollectionView from "./ServerCollectionView";
 import {
@@ -186,11 +185,6 @@ export default function DeploymentCredentialsFormTemplate({
                 <span>Add</span>
               </button>
               <div className={styles.controlsRight}>
-                {deviceMode && onDeviceModeChange ? (
-                  <div className={styles.deviceModeControl}>
-                    <ModeToggle mode={deviceMode} onModeChange={onDeviceModeChange} />
-                  </div>
-                ) : null}
                 <div className={styles.viewModeControl}>
                   <button
                     ref={viewButtonRef}

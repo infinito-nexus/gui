@@ -30,8 +30,6 @@ type RoleDashboardBodyContainerProps = {
   releaseTrackLocked: boolean;
   releaseTrackTooltip: string;
   setReleaseTrack: Dispatch<SetStateAction<ReleaseTrack>>;
-  activeMode: "customer" | "expert";
-  handleModeChange: (mode: "customer" | "expert") => void;
   viewMenuOpen: boolean;
   setViewMenuOpen: Dispatch<SetStateAction<boolean>>;
   viewButtonRef: RefObject<HTMLButtonElement>;
@@ -82,8 +80,6 @@ export default function RoleDashboardBodyContainer({
   releaseTrackLocked,
   releaseTrackTooltip,
   setReleaseTrack,
-  activeMode,
-  handleModeChange,
   viewMenuOpen,
   setViewMenuOpen,
   viewButtonRef,
@@ -157,8 +153,6 @@ export default function RoleDashboardBodyContainer({
       onToggleReleaseTrack={() =>
         setReleaseTrack((prev) => (prev === "preview" ? "stable" : "preview"))
       }
-      activeMode={activeMode}
-      onModeChange={handleModeChange}
       viewMenuOpen={viewMenuOpen}
       onToggleViewMenu={() => setViewMenuOpen((prev) => !prev)}
       onSelectViewMode={(mode) => {

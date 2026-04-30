@@ -46,8 +46,6 @@ type RoleDashboardMainLayoutProps = {
   releaseTrackLocked: boolean;
   releaseTrackTooltip: string;
   onToggleReleaseTrack: () => void;
-  activeMode: "customer" | "expert";
-  onModeChange: (mode: "customer" | "expert") => void;
   viewMenuOpen: boolean;
   onToggleViewMenu: () => void;
   onSelectViewMode: (mode: ViewMode) => void;
@@ -131,8 +129,6 @@ export default function RoleDashboardMainLayout({
   releaseTrackLocked,
   releaseTrackTooltip,
   onToggleReleaseTrack,
-  activeMode,
-  onModeChange,
   viewMenuOpen,
   onToggleViewMenu,
   onSelectViewMode,
@@ -241,8 +237,6 @@ export default function RoleDashboardMainLayout({
               releaseTrackLocked={releaseTrackLocked}
               releaseTrackTooltip={releaseTrackTooltip}
               onToggleReleaseTrack={onToggleReleaseTrack}
-              activeMode={activeMode}
-              onModeChange={onModeChange}
               viewMenuOpen={viewMenuOpen}
               onToggleViewMenu={onToggleViewMenu}
               onSelectViewMode={onSelectViewMode}

@@ -464,6 +464,10 @@ export default function DeploymentWorkspace({
         onCancel: cancelExpertMode,
         onConfirm: confirmExpertMode,
       }}
+      modeSwitch={{
+        mode: deviceMode,
+        onModeChange: handleModeChange,
+      }}
       domainPopup={{
         open: domainPopupOpen,
         saving: primaryDomainModalSaving,

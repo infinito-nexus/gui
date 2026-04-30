@@ -1,5 +1,4 @@
 import type { ReactNode, RefObject } from "react";
-import ModeToggle from "../ModeToggle";
 import styles from "../RoleDashboard.module.css";
 import { VIEW_MODE_ICONS } from "./constants";
 import {
@@ -26,8 +25,6 @@ type RoleDashboardToolbarProps = {
   releaseTrackLocked: boolean;
   releaseTrackTooltip: string;
   onToggleReleaseTrack: () => void;
-  activeMode: "customer" | "expert";
-  onModeChange: (mode: "customer" | "expert") => void;
   viewMenuOpen: boolean;
   onToggleViewMenu: () => void;
   onSelectViewMode: (mode: ViewMode) => void;
@@ -50,8 +47,6 @@ export default function RoleDashboardToolbar({
   releaseTrackLocked,
   releaseTrackTooltip,
   onToggleReleaseTrack,
-  activeMode,
-  onModeChange,
   viewMenuOpen,
   onToggleViewMenu,
   onSelectViewMode,
@@ -132,9 +127,6 @@ export default function RoleDashboardToolbar({
         />
         <span>{releaseTrack === "preview" ? "Preview" : "Stable"}</span>
       </button>
-      <div className={styles.modeControl}>
-        <ModeToggle mode={activeMode} onModeChange={onModeChange} />
-      </div>
       <div className={styles.viewModeControl}>
         <button
           ref={viewButtonRef}

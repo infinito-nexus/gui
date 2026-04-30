@@ -48,6 +48,11 @@ type ExpertModeConfirmView = {
   onConfirm: () => void;
 };
 
+type ModeSwitchView = {
+  mode: "customer" | "expert";
+  onModeChange: (mode: "customer" | "expert") => void;
+};
+
 type DomainPopupView = {
   open: boolean;
   saving: boolean;
@@ -78,6 +83,7 @@ type DeploymentWorkspaceTemplateProps = {
   deployRolePicker: DeployRolePickerView;
   detailSearch: DetailSearchView;
   expertModeConfirm: ExpertModeConfirmView;
+  modeSwitch: ModeSwitchView;
   domainPopup: DomainPopupView;
 };
 
@@ -96,6 +102,7 @@ export default function DeploymentWorkspaceTemplate({
   deployRolePicker,
   detailSearch,
   expertModeConfirm,
+  modeSwitch,
   domainPopup,
 }: DeploymentWorkspaceTemplateProps) {
   // Mirror AccountPanel's localStorage session so the header switch
@@ -511,21 +518,43 @@ export default function DeploymentWorkspaceTemplate({
           <i className="fa-solid fa-arrow-left" aria-hidden="true" />
           <span>Back</span>
         </button>
-        <button
-          type="button"
-          onClick={onAuthClick}
-          data-testid="auth-toggle-button"
-          aria-label={authUserId ? "Logout" : "Login"}
-          className={`${styles.navButton} ${styles.authNavButton} ${
-            authUserId ? styles.authNavLoggedIn : styles.authNavLoggedOut
-          }`}
-        >
-          <i
-            className={`fa-solid ${authUserId ? "fa-right-from-bracket" : "fa-right-to-bracket"}`}
-            aria-hidden="true"
-          />
-          <span>{authUserId ? "Logout" : "Login"}</span>
-        </button>
+        <div className={styles.authModeGroup} role="group" aria-label="Session and mode">
+          <button
+            type="button"
+            onClick={onAuthClick}
+            data-testid="auth-toggle-button"
+            aria-label={authUserId ? "Logout" : "Login"}
+            className={`${styles.navButton} ${styles.authModeStart} ${
+              authUserId ? styles.authNavLoggedIn : styles.authNavLoggedOut
+            }`}
+          >
+            <i
+              className={`fa-solid ${authUserId ? "fa-right-from-bracket" : "fa-right-to-bracket"}`}
+              aria-hidden="true"
+            />
+            <span>{authUserId ? "Logout" : "Login"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              modeSwitch.onModeChange(modeSwitch.mode === "expert" ? "customer" : "expert")
+            }
+            data-testid="mode-toggle-button"
+            aria-label="Toggle basic/expert mode"
+            aria-pressed={modeSwitch.mode === "expert"}
+            className={`${styles.navButton} ${styles.authModeEnd} ${
+              modeSwitch.mode === "expert" ? styles.modeExpert : styles.modeBasic
+            }`}
+          >
+            <i
+              className={`fa-solid ${
+                modeSwitch.mode === "expert" ? "fa-toggle-on" : "fa-toggle-off"
+              }`}
+              aria-hidden="true"
+            />
+            <span>{modeSwitch.mode === "expert" ? "Expert" : "Basic"}</span>
+          </button>
+        </div>
         <button
           onClick={() => hasNext && onSelectPanel(enabledPanels[activeIndex + 1].key)}
           disabled={!hasNext}

@@ -446,12 +446,30 @@
 }
 
 /*
- * Auth toggle, placed in navRow between Back and Next. Same shape as
- * navButton (pill, 8/14 padding, 12px font); colored success-subtle
- * when logged out (Login) and danger-subtle when logged in (Logout).
+ * Auth + Mode segmented control, placed in navRow between Back and Next.
+ * Two adjacent navButtons sharing one pill outline:
+ *   - left half: Login (success-subtle) / Logout (danger-subtle)
+ *   - right half: Basic (primary-subtle) / Expert (warning-subtle)
+ * The right half replaces the per-panel ModeToggle so the mode is set
+ * globally for software/hardware/credentials views.
  */
-.authNavButton {
+.authModeGroup {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.authModeStart {
+  border-radius: 999px 0 0 999px;
   border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.authModeEnd {
+  border-radius: 0 999px 999px 0;
+  border: 1px solid transparent;
+  /* Collapse double border at the seam without losing the visible split. */
+  margin-left: -1px;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
@@ -474,6 +492,26 @@
 
 .authNavLoggedIn:hover {
   background: color-mix(in srgb, var(--bs-danger-bg-subtle) 70%, var(--bs-danger-text-emphasis) 30%);
+}
+
+.modeBasic {
+  border-color: var(--bs-primary-border-subtle);
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
+}
+
+.modeBasic:hover {
+  background: color-mix(in srgb, var(--bs-primary-bg-subtle) 70%, var(--bs-primary-text-emphasis) 30%);
+}
+
+.modeExpert {
+  border-color: var(--bs-warning-border-subtle);
+  background: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
+}
+
+.modeExpert:hover {
+  background: color-mix(in srgb, var(--bs-warning-bg-subtle) 70%, var(--bs-warning-text-emphasis) 30%);
 }
 
 .deployLayout {
