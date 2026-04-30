@@ -119,17 +119,44 @@ class RunnerManagerServiceSweepMixin:
         self,
         container_name: str,
         *,
-        timeout_seconds: float = 5.0,
+        timeout_seconds: float | None = None,
     ) -> None:
+        """Block until the runner container reports State.Running=true.
+
+        On exit-before-running (container died fast — typically a 127
+        from a missing binary or a build-time issue) the function pulls
+        the container's exit_code + last stdout/stderr lines via
+        `docker logs` and surfaces them in the HTTPException so CI logs
+        immediately show *why* the runner failed instead of the generic
+        "did not become running in time" message.
+
+        Default timeout is generous (30 s) because GitHub-Actions
+        runners are noticeably slower than local bare metal at
+        starting heavily-mounted, --read-only containers; can be
+        overridden per-deployment via env
+        ``INFINITO_RUNNER_WAIT_SECONDS``.
+        """
         root = _root()
+        if timeout_seconds is None:
+            try:
+                env_override = float(
+                    str(
+                        root.os.getenv("INFINITO_RUNNER_WAIT_SECONDS") or ""
+                    ).strip()
+                    or "30"
+                )
+            except (TypeError, ValueError):
+                env_override = 30.0
+            timeout_seconds = env_override
         deadline = root.time.monotonic() + max(float(timeout_seconds), 0.1)
+        last_exit_code: str | None = None
         while root.time.monotonic() < deadline:
             result = root.subprocess.run(
                 [
                     root.resolve_docker_bin(),
                     "inspect",
                     "-f",
-                    "{{.State.Running}}",
+                    "{{.State.Running}}|{{.State.Status}}|{{.State.ExitCode}}",
                     container_name,
                 ],
                 stdout=root.subprocess.PIPE,
@@ -137,13 +164,45 @@ class RunnerManagerServiceSweepMixin:
                 text=True,
                 check=False,
             )
-            if result.returncode == 0 and result.stdout.strip().lower() == "true":
-                return
+            if result.returncode == 0:
+                running, _sep, rest = result.stdout.strip().partition("|")
+                if running.lower() == "true":
+                    return
+                status, _sep2, exit_code = rest.partition("|")
+                # Container exited before reaching Running; no point
+                # waiting longer — surface the real reason now.
+                if status.strip().lower() in {"exited", "dead", "removing"}:
+                    last_exit_code = exit_code.strip() or last_exit_code
+                    break
+                last_exit_code = exit_code.strip() or last_exit_code
             root.time.sleep(0.1)
-        raise HTTPException(
-            status_code=500,
-            detail=f"runner container {container_name} did not become running in time",
+
+        # Best-effort log capture for diagnostics. Swallow any error so
+        # the original "did not become running" still surfaces.
+        log_tail = ""
+        try:
+            log_proc = root.subprocess.run(
+                [root.resolve_docker_bin(), "logs", "--tail", "40", container_name],
+                stdout=root.subprocess.PIPE,
+                stderr=root.subprocess.STDOUT,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+            log_tail = (log_proc.stdout or "").strip()
+        except Exception:  # pragma: no cover - diagnostic-only path
+            pass
+
+        msg = (
+            f"runner container {container_name} did not become running in time"
         )
+        if last_exit_code:
+            msg += f" (exit_code={last_exit_code})"
+        if log_tail:
+            # Cap the log tail so the API response stays manageable.
+            capped = log_tail if len(log_tail) <= 4000 else log_tail[-4000:]
+            msg += f"; logs:\n{capped}"
+        raise HTTPException(status_code=500, detail=msg)
 
     def _bootstrap_runner_secrets(
         self,

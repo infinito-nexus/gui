@@ -138,6 +138,34 @@ class RunnerManagerServiceRuntimeMixin:
             root.terminate_process_group(
                 proc.pid if isinstance(proc.pid, int) else None
             )
+            # Capture the container's actual exit code BEFORE stopping
+            # / removing it so failure diagnostics show why the runner
+            # died (was: hardcoded 127 placeholder which masked the
+            # real reason — e.g. slow CI startup that exceeded the
+            # _wait_for_container_running deadline vs. an actual
+            # command-not-found in the heredoc).
+            actual_exit_code = 127
+            try:
+                inspect = root.subprocess.run(
+                    [
+                        root.resolve_docker_bin(),
+                        "inspect",
+                        "-f",
+                        "{{.State.ExitCode}}",
+                        container_id,
+                    ],
+                    stdout=root.subprocess.PIPE,
+                    stderr=root.subprocess.DEVNULL,
+                    text=True,
+                    check=False,
+                    timeout=3,
+                )
+                if inspect.returncode == 0:
+                    parsed = (inspect.stdout or "").strip()
+                    if parsed.lstrip("-").isdigit():
+                        actual_exit_code = int(parsed)
+            except Exception:  # pragma: no cover - diagnostic-only path
+                pass
             root.stop_container(container_id)
             root.remove_container(container_id)
             self._disconnect_mode_a_targets(
@@ -149,7 +177,7 @@ class RunnerManagerServiceRuntimeMixin:
             root.remove_network(spec.network_name)
             meta["status"] = "failed"
             meta["finished_at"] = root.utc_iso()
-            meta["exit_code"] = 127
+            meta["exit_code"] = actual_exit_code
             meta["container_id"] = container_id
             meta["network_name"] = spec.network_name
             meta["mode_a_targets"] = mode_a_targets
