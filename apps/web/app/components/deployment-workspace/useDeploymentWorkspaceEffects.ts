@@ -12,7 +12,7 @@ type UseDeploymentWorkspaceEffectsProps = {
   setRoles: Dispatch<SetStateAction<Role[]>>;
   setRolesLoading: Dispatch<SetStateAction<boolean>>;
   setRolesError: Dispatch<SetStateAction<string | null>>;
-  setAccountTab: Dispatch<SetStateAction<"profile" | "billing">>;
+  setAccountTab: Dispatch<SetStateAction<"profile" | "billing" | "audit">>;
   setActivePanel: Dispatch<SetStateAction<PanelKey>>;
   setDeviceMode: Dispatch<SetStateAction<"customer" | "expert">>;
   pendingAliasFromQueryRef: MutableRefObject<string>;
@@ -139,6 +139,13 @@ export function useDeploymentWorkspaceEffects({
     const aliasParam = String(params.get("ui_device") || "").trim();
     if (panelParam === "billing") {
       setAccountTab("billing");
+    }
+    // Legacy `?ui_panel=audit` deep link: audit logs no longer have
+    // their own top-level tab, but we keep the URL so existing
+    // bookmarks (and the audit_logs Playwright spec) still land on
+    // the audit view — now a sub-tab of the Settings panel.
+    if (panelParam === "audit") {
+      setAccountTab("audit");
     }
     if (panelParam && PANEL_QUERY_TO_KEY[panelParam]) {
       setActivePanel(PANEL_QUERY_TO_KEY[panelParam]);

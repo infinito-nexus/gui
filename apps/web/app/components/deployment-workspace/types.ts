@@ -80,7 +80,6 @@ export type PanelKey =
   | "domain"
   | "server"
   | "inventory"
-  | "audit"
   | "deploy"
   | "account";
 
@@ -93,8 +92,16 @@ export type PanelQueryKey =
   | "audit"
   | "setup"
   | "account"
+  | "settings"
   | "billing";
 
+// Audit logs are no longer their own top-level tab — they live as a
+// sub-tab inside the Settings panel (formerly "Account"), gated behind
+// an authenticated session. The legacy `?ui_panel=audit` deep link is
+// preserved here so existing bookmarks (and the audit_logs Playwright
+// spec) keep working: the URL still routes to the Settings panel and
+// the effect hook in `useDeploymentWorkspaceEffects` opens the audit
+// sub-tab when it sees `audit`.
 export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   intro: "intro",
   software: "store",
@@ -102,9 +109,10 @@ export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   hardware: "server",
   device: "server",
   inventory: "inventory",
-  audit: "audit",
+  audit: "account",
   setup: "deploy",
   account: "account",
+  settings: "account",
   billing: "account",
 };
 
@@ -114,9 +122,8 @@ export const PANEL_KEY_TO_QUERY: Record<PanelKey, PanelQueryKey> = {
   domain: "domain",
   server: "hardware",
   inventory: "inventory",
-  audit: "audit",
   deploy: "setup",
-  account: "account",
+  account: "settings",
 };
 
 export const PANEL_ICON_BY_KEY: Record<PanelKey, string> = {
@@ -125,9 +132,8 @@ export const PANEL_ICON_BY_KEY: Record<PanelKey, string> = {
   domain: "fa-globe",
   server: "fa-server",
   inventory: "fa-box-archive",
-  audit: "fa-clipboard-list",
   deploy: "fa-screwdriver-wrench",
-  account: "fa-user",
+  account: "fa-gear",
 };
 
 export type WorkspaceTabPanel = {

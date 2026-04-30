@@ -285,6 +285,21 @@ test("audit logs panel supports filters, config updates, and export", async ({ p
   const expectedFrom = new Date("2026-04-21T10:00").toISOString();
   const expectedTo = new Date("2026-04-21T11:00").toISOString();
 
+  // Audit logs now live under the Settings panel as an auth-gated
+  // sub-tab. The legacy `?ui_panel=audit` deep link is preserved by
+  // useDeploymentWorkspaceEffects (auto-selecting the audit sub-tab),
+  // but AccountPanel only renders that sub-tab when the localStorage
+  // session is set. Seed the spec's session before navigation so the
+  // existing assertions still find the panel without an extra
+  // login-modal step.
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem("infinito.user_id", "audit-spec-user");
+    } catch {
+      /* ignore */
+    }
+  });
+
   await page.goto(`/?ui_panel=audit&workspace=${WORKSPACE_ID}`);
 
   const panel = page.getByTestId("audit-logs-panel");

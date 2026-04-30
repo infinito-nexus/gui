@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import AuditLogsPanel from "../../AuditLogsPanel";
 import styles from "../../DeploymentWorkspace.module.css";
 import { USER_STORAGE_KEY } from "../../workspace-panel/utils";
 import type { Role } from "../types";
 import BillingPanel from "./BillingPanel";
 
-export type AccountTabKey = "profile" | "billing";
+// Renamed UI surface (was "Account"). The internal panel key stays
+// `account` for state-stability, but every user-facing label says
+// "Settings". An additional `audit` sub-tab now lives under here so
+// the audit logs are gated by the same login state as billing.
+export type AccountTabKey = "profile" | "billing" | "audit";
 
 type AccountPanelProps = {
   baseUrl: string;
+  workspaceId: string;
   roles: Role[];
   selectedRolesByAlias: Record<string, string[]>;
   selectedPlansByAlias: Record<string, Record<string, string | null>>;
@@ -17,6 +23,12 @@ type AccountPanelProps = {
 };
 
 const ACCOUNT_SESSION_UPDATED_EVENT = "infinito:account-session-updated";
+// Fired by the global header switch button (DeploymentWorkspaceTemplate)
+// when the user clicks "Login" while the AccountPanel is mounted; we
+// react by opening the same login modal users see from inside the
+// panel so the entry point is identical regardless of where they
+// click.
+const ACCOUNT_OPEN_AUTH_EVENT = "infinito:account-open-auth";
 
 function normalizeUserId(value: unknown): string {
   return String(value ?? "")
@@ -33,6 +45,7 @@ function readUserId(): string | null {
 
 export default function AccountPanel({
   baseUrl,
+  workspaceId,
   roles,
   selectedRolesByAlias,
   selectedPlansByAlias,
@@ -64,11 +77,25 @@ export default function AccountPanel({
       syncUserId();
     };
     const onCustom = () => syncUserId();
+    const onOpenAuth = () => {
+      // Honor only when no session exists; logged-in users clicking
+      // "Logout" are handled by the header itself (which clears the
+      // session before this event would even reach us).
+      if (!readUserId()) {
+        setAuthMode("login");
+        setAuthError(null);
+        setAuthOpen(true);
+        setPendingTabAfterAuth(null);
+        setAuthForm((prev) => ({ ...prev, userId: prev.userId || "" }));
+      }
+    };
     window.addEventListener("storage", onStorage);
     window.addEventListener(ACCOUNT_SESSION_UPDATED_EVENT, onCustom);
+    window.addEventListener(ACCOUNT_OPEN_AUTH_EVENT, onOpenAuth);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(ACCOUNT_SESSION_UPDATED_EVENT, onCustom);
+      window.removeEventListener(ACCOUNT_OPEN_AUTH_EVENT, onOpenAuth);
     };
   }, [syncUserId]);
 
@@ -140,35 +167,43 @@ export default function AccountPanel({
   }, [onTabChange]);
 
   const handleTabSelect = (next: AccountTabKey) => {
-    if (next === "billing" && !userId) {
-      openAuth("login", { pendingTab: "billing" });
+    if ((next === "billing" || next === "audit") && !userId) {
+      openAuth("login", { pendingTab: next });
       return;
     }
     onTabChange(next);
   };
 
   useEffect(() => {
-    if (activeTab !== "billing") return;
+    if (activeTab !== "billing" && activeTab !== "audit") return;
     if (userId) return;
     if (authOpen) return;
     onTabChange("profile");
-    openAuth("login", { pendingTab: "billing" });
+    openAuth("login", { pendingTab: activeTab });
   }, [activeTab, authOpen, onTabChange, openAuth, userId]);
 
   const tabItems = useMemo(
-    () =>
-      [
-        { key: "profile" as const, label: "Profile" },
-        { key: "billing" as const, label: "Billing" },
-      ] satisfies Array<{ key: AccountTabKey; label: string }>,
-    []
+    () => {
+      const base: Array<{ key: AccountTabKey; label: string }> = [
+        { key: "profile", label: "Profile" },
+        { key: "billing", label: "Billing" },
+      ];
+      if (userId) {
+        base.push({ key: "audit", label: "Audit Logs" });
+      }
+      return base;
+    },
+    [userId]
   );
 
-  const effectiveTab = activeTab === "billing" && !userId ? "profile" : activeTab;
+  const effectiveTab =
+    (activeTab === "billing" || activeTab === "audit") && !userId
+      ? "profile"
+      : activeTab;
 
   return (
     <div className={styles.accountPanel}>
-      <div className={styles.accountSubTabList} role="tablist" aria-label="Account sections">
+      <div className={styles.accountSubTabList} role="tablist" aria-label="Settings sections">
         {tabItems.map((tab) => {
           const active = tab.key === effectiveTab;
           return (
@@ -188,7 +223,7 @@ export default function AccountPanel({
 
       {effectiveTab === "profile" ? (
         <div className={styles.accountCard}>
-          <h3 className={styles.accountCardTitle}>Account</h3>
+          <h3 className={styles.accountCardTitle}>Settings</h3>
           {userId ? (
             <>
               <p className={styles.accountCardHint}>
@@ -235,6 +270,8 @@ export default function AccountPanel({
             </>
           )}
         </div>
+      ) : effectiveTab === "audit" ? (
+        <AuditLogsPanel baseUrl={baseUrl} workspaceId={workspaceId} />
       ) : (
         <BillingPanel
           baseUrl={baseUrl}

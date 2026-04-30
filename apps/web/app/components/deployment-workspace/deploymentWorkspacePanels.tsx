@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import RoleDashboard from "../RoleDashboard";
 import DeploymentCredentialsForm from "../DeploymentCredentialsForm";
 import WorkspacePanel from "../WorkspacePanel";
-import AuditLogsPanel from "../AuditLogsPanel";
 import styles from "../DeploymentWorkspace.module.css";
 import IntroPanel from "./panels/IntroPanel";
 import DomainPanel from "./panels/DomainPanel";
@@ -376,11 +375,6 @@ export function buildDeploymentWorkspacePanels({
       ),
     },
     {
-      key: "audit",
-      title: "Audit Logs",
-      content: <AuditLogsPanel baseUrl={baseUrl} workspaceId={workspaceId} />,
-    },
-    {
       key: "deploy",
       title: "Setup",
       content: (
@@ -435,10 +429,11 @@ export function buildDeploymentWorkspacePanels({
     },
     {
       key: "account",
-      title: "Account",
+      title: "Settings",
       content: (
         <AccountPanel
           baseUrl={baseUrl}
+          workspaceId={workspaceId ?? ""}
           roles={roles}
           selectedRolesByAlias={selectedRolesByAlias}
           selectedPlansByAlias={selectedPlansByAlias}

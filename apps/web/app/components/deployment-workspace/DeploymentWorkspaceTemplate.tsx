@@ -1,5 +1,7 @@
+import { useCallback, useEffect, useState } from "react";
 import ProviderOrderPanel from "../ProviderOrderPanel";
 import styles from "../DeploymentWorkspace.module.css";
+import { USER_STORAGE_KEY } from "../workspace-panel/utils";
 import {
   PANEL_ICON_BY_KEY,
   type DomainCheckResult,
@@ -8,6 +10,13 @@ import {
   type PanelKey,
   type WorkspaceTabPanel,
 } from "./types";
+
+// Shared with AccountPanel: dispatched on storage mutations so other
+// components in the same tab pick up login/logout immediately (the
+// browser only fires the native `storage` event on OTHER tabs).
+const ACCOUNT_SESSION_UPDATED_EVENT = "infinito:account-session-updated";
+// Opens AccountPanel's auth modal from outside (header Login button).
+const ACCOUNT_OPEN_AUTH_EVENT = "infinito:account-open-auth";
 
 type DeployRolePickerView = {
   open: boolean;
@@ -72,6 +81,14 @@ type DeploymentWorkspaceTemplateProps = {
   domainPopup: DomainPopupView;
 };
 
+function readUserIdFromStorage(): string | null {
+  if (typeof window === "undefined") return null;
+  const value = String(window.localStorage.getItem(USER_STORAGE_KEY) || "")
+    .trim()
+    .toLowerCase();
+  return value || null;
+}
+
 export default function DeploymentWorkspaceTemplate({
   panels,
   activePanel,
@@ -86,9 +103,48 @@ export default function DeploymentWorkspaceTemplate({
   const hasPrev = activeIndex > 0;
   const hasNext = activeIndex >= 0 && activeIndex < enabledPanels.length - 1;
 
+  // Mirror AccountPanel's localStorage session so the header switch
+  // button stays in sync without lifting state up. We listen to both
+  // the native cross-tab `storage` event and the in-tab custom event
+  // AccountPanel dispatches whenever it mutates the session.
+  const [authUserId, setAuthUserId] = useState<string | null>(null);
+  useEffect(() => {
+    setAuthUserId(readUserIdFromStorage());
+    if (typeof window === "undefined") return;
+    const sync = () => setAuthUserId(readUserIdFromStorage());
+    const onStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== USER_STORAGE_KEY) return;
+      sync();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(ACCOUNT_SESSION_UPDATED_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(ACCOUNT_SESSION_UPDATED_EVENT, sync);
+    };
+  }, []);
+
+  const onAuthClick = useCallback(() => {
+    if (typeof window === "undefined") return;
+    if (authUserId) {
+      // Logout path: clear the session and announce the change so
+      // AccountPanel + this header both re-render anonymous.
+      window.localStorage.removeItem(USER_STORAGE_KEY);
+      window.dispatchEvent(new Event(ACCOUNT_SESSION_UPDATED_EVENT));
+      setAuthUserId(null);
+    } else {
+      // Login path: navigate to the Settings panel so the auth modal
+      // overlays the visible content, then ask AccountPanel to open
+      // its modal via a custom event.
+      onSelectPanel("account");
+      window.dispatchEvent(new Event(ACCOUNT_OPEN_AUTH_EVENT));
+    }
+  }, [authUserId, onSelectPanel]);
+
   return (
     <div className={styles.root}>
       <div className={styles.panels}>
+        <div className={styles.tabBarRow}>
         <div
           className={styles.tabList}
           role="tablist"
@@ -125,6 +181,22 @@ export default function DeploymentWorkspaceTemplate({
               </button>
             );
           })}
+        </div>
+        <button
+          type="button"
+          className={styles.authToggleButton}
+          onClick={onAuthClick}
+          data-testid="auth-toggle-button"
+          aria-label={authUserId ? "Logout" : "Login"}
+        >
+          <i
+            className={`fa-solid ${authUserId ? "fa-right-from-bracket" : "fa-right-to-bracket"} ${styles.tabIcon}`}
+            aria-hidden="true"
+          />
+          <span className={styles.tabTitle}>
+            {authUserId ? "Logout" : "Login"}
+          </span>
+        </button>
         </div>
         <div className={styles.tabFrame}>
           {panels.map((panel) => {
