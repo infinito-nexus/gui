@@ -128,7 +128,7 @@ export default function DeploymentWorkspace({
     string | null
   >(null);
   const [activePanel, setActivePanel] = useState<PanelKey>(initialPanel);
-  const [accountTab, setAccountTab] = useState<AccountTabKey>("profile");
+  const [accountTab, setAccountTab] = useState<AccountTabKey>("general");
   // Track authentication state from the AccountPanel's localStorage
   // session so the header's Login/Logout switch button mirrors it
   // without re-implementing the read.

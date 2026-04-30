@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import AuditLogsPanel from "../../AuditLogsPanel";
+import MembersPanel from "../../MembersPanel";
 import styles from "../../DeploymentWorkspace.module.css";
 import { USER_STORAGE_KEY } from "../../workspace-panel/utils";
+import { listMembers } from "../../../lib/members-api";
 import type { Role } from "../types";
 import BillingPanel from "./BillingPanel";
 
 // Renamed UI surface (was "Account"). The internal panel key stays
 // `account` for state-stability, but every user-facing label says
-// "Settings". An additional `audit` sub-tab now lives under here so
-// the audit logs are gated by the same login state as billing.
-export type AccountTabKey = "profile" | "billing" | "audit";
+// "Settings". The Settings panel is split into four sub-tabs:
+//   - general: signed-in info, login/register/logout controls
+//   - billing: existing BillingPanel (login-gated)
+//   - rbac:    workspace-member management via MembersPanel (login-gated)
+//   - audit:   AuditLogsPanel (login-gated)
+export type AccountTabKey = "general" | "billing" | "rbac" | "audit";
 
 type AccountPanelProps = {
   baseUrl: string;
@@ -163,11 +168,14 @@ export default function AccountPanel({
     window.localStorage.removeItem(USER_STORAGE_KEY);
     window.dispatchEvent(new Event(ACCOUNT_SESSION_UPDATED_EVENT));
     setPendingTabAfterAuth(null);
-    onTabChange("profile");
+    onTabChange("general");
   }, [onTabChange]);
 
   const handleTabSelect = (next: AccountTabKey) => {
-    if ((next === "billing" || next === "audit") && !userId) {
+    if (
+      (next === "billing" || next === "rbac" || next === "audit") &&
+      !userId
+    ) {
       openAuth("login", { pendingTab: next });
       return;
     }
@@ -175,20 +183,26 @@ export default function AccountPanel({
   };
 
   useEffect(() => {
-    if (activeTab !== "billing" && activeTab !== "audit") return;
+    if (
+      activeTab !== "billing" &&
+      activeTab !== "rbac" &&
+      activeTab !== "audit"
+    )
+      return;
     if (userId) return;
     if (authOpen) return;
-    onTabChange("profile");
+    onTabChange("general");
     openAuth("login", { pendingTab: activeTab });
   }, [activeTab, authOpen, onTabChange, openAuth, userId]);
 
   const tabItems = useMemo(
     () => {
       const base: Array<{ key: AccountTabKey; label: string }> = [
-        { key: "profile", label: "Profile" },
+        { key: "general", label: "General" },
         { key: "billing", label: "Billing" },
       ];
       if (userId) {
+        base.push({ key: "rbac", label: "RBAC" });
         base.push({ key: "audit", label: "Audit Logs" });
       }
       return base;
@@ -197,8 +211,9 @@ export default function AccountPanel({
   );
 
   const effectiveTab =
-    (activeTab === "billing" || activeTab === "audit") && !userId
-      ? "profile"
+    (activeTab === "billing" || activeTab === "rbac" || activeTab === "audit") &&
+    !userId
+      ? "general"
       : activeTab;
 
   return (
@@ -221,7 +236,7 @@ export default function AccountPanel({
         })}
       </div>
 
-      {effectiveTab === "profile" ? (
+      {effectiveTab === "general" ? (
         <div className={styles.accountCard}>
           <h3 className={styles.accountCardTitle}>Settings</h3>
           {userId ? (
@@ -239,6 +254,13 @@ export default function AccountPanel({
                 </button>
                 <button
                   type="button"
+                  className={`${styles.smallButton} ${styles.smallButtonEnabled}`}
+                  onClick={() => handleTabSelect("rbac")}
+                >
+                  Open RBAC
+                </button>
+                <button
+                  type="button"
                   className={`${styles.smallButton} ${styles.smallButtonEnabled} ${styles.smallButtonDanger}`}
                   onClick={logout}
                 >
@@ -249,7 +271,7 @@ export default function AccountPanel({
           ) : (
             <>
               <p className={styles.accountCardHint}>
-                Sign in to access billing and manage your account.
+                Sign in to access billing, RBAC and manage your account.
               </p>
               <div className={styles.accountCardActions}>
                 <button
@@ -270,6 +292,8 @@ export default function AccountPanel({
             </>
           )}
         </div>
+      ) : effectiveTab === "rbac" ? (
+        <RbacView workspaceId={workspaceId} currentUserId={userId ?? ""} />
       ) : effectiveTab === "audit" ? (
         <AuditLogsPanel baseUrl={baseUrl} workspaceId={workspaceId} />
       ) : (
@@ -433,6 +457,76 @@ export default function AccountPanel({
             document.body
           )
         : null}
+    </div>
+  );
+}
+
+// Loads the workspace's member list once to derive the current user's
+// owner-vs-member role, then renders the existing MembersPanel with
+// the correct ownership-gating. Server-side enforcement (req-019) is
+// the actual authority; the client-side flag controls visibility of
+// owner-only invite/remove/transfer controls in MembersPanel so a
+// member doesn't see actions that would 403 anyway.
+function RbacView({
+  workspaceId,
+  currentUserId,
+}: {
+  workspaceId: string;
+  currentUserId: string;
+}) {
+  const [isOwner, setIsOwner] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId || !currentUserId) {
+      setIsOwner(false);
+      return;
+    }
+    let alive = true;
+    setError(null);
+    setIsOwner(null);
+    listMembers(workspaceId)
+      .then((data) => {
+        if (!alive) return;
+        const ownerId = data.owner?.user_id ?? "";
+        setIsOwner(
+          normalizeUserId(ownerId) === normalizeUserId(currentUserId),
+        );
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setError(`Failed to load workspace members: ${(err as Error).message}`);
+        setIsOwner(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [workspaceId, currentUserId]);
+
+  if (!workspaceId) {
+    return (
+      <div className={styles.accountCard}>
+        <p className={styles.accountCardHint}>
+          Select a workspace to manage member access.
+        </p>
+      </div>
+    );
+  }
+
+  if (isOwner === null && !error) {
+    return (
+      <div className={styles.accountCard}>
+        <p className={styles.accountCardHint}>Loading members…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.accountCard}>
+      {error ? (
+        <p className={`text-danger ${styles.accountCardHint}`}>{error}</p>
+      ) : null}
+      <MembersPanel workspaceId={workspaceId} isOwner={isOwner ?? false} />
     </div>
   );
 }

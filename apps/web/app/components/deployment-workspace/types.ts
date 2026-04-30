@@ -89,19 +89,18 @@ export type PanelQueryKey =
   | "domain"
   | "hardware"
   | "inventory"
+  | "rbac"
   | "audit"
   | "setup"
   | "account"
   | "settings"
   | "billing";
 
-// Audit logs are no longer their own top-level tab — they live as a
-// sub-tab inside the Settings panel (formerly "Account"), gated behind
-// an authenticated session. The legacy `?ui_panel=audit` deep link is
-// preserved here so existing bookmarks (and the audit_logs Playwright
-// spec) keep working: the URL still routes to the Settings panel and
-// the effect hook in `useDeploymentWorkspaceEffects` opens the audit
-// sub-tab when it sees `audit`.
+// The Settings panel is split into sub-tabs
+// (general / billing / rbac / audit). Deep-linkable values that
+// should land on the Settings panel are mapped below; the matching
+// sub-tab is selected by the effect hook in
+// `useDeploymentWorkspaceEffects`.
 export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   intro: "intro",
   software: "store",
@@ -109,6 +108,7 @@ export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   hardware: "server",
   device: "server",
   inventory: "inventory",
+  rbac: "account",
   audit: "account",
   setup: "deploy",
   account: "account",
