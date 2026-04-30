@@ -15,20 +15,6 @@
   overflow: hidden;
 }
 
-/*
- * tabBarRow hosts the workspace tab list together with the right-aligned
- * Login/Logout switch button. The button is intentionally NOT inside
- * the tablist (it has no role="tab"), so a flex row separates them with
- * a comfortable gap and reserves margin to the panel box rendered below.
- */
-.tabBarRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-bottom: 0;
-}
-
 .tabList {
   display: flex;
   align-items: flex-end;
@@ -38,53 +24,6 @@
   padding: 0 1px 0 0;
   margin: 0;
   z-index: 2;
-  flex: 1 1 auto;
-}
-
-.authToggleButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid var(--bs-border-color-translucent);
-  border-radius: 14px;
-  /*
-   * Equal top/bottom padding centers the text inside the button.
-   * The parent row uses align-items: center so the button's vertical
-   * center matches the tabs' vertical center — text baseline aligns
-   * with the tab text. Button is 12px shorter than tabs (4+4 vs 10+10
-   * vertical padding), distributed as 6px gap above and below; the 6px
-   * bottom gap matches the 6px horizontal gap to the rightmost tab.
-   */
-  padding: 4px 16px;
-  font-size: 14px;
-  font-family: var(--font-display);
-  white-space: nowrap;
-  cursor: pointer;
-  flex: 0 0 auto;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-
-.authToggleLoggedOut {
-  border-color: var(--bs-success-border-subtle);
-  background: var(--bs-success-bg-subtle);
-  color: var(--bs-success-text-emphasis);
-}
-
-.authToggleLoggedOut:hover {
-  background: color-mix(in srgb, var(--bs-success-bg-subtle) 70%, var(--bs-success-text-emphasis) 30%);
-  color: var(--bs-success-text-emphasis);
-}
-
-.authToggleLoggedIn {
-  border-color: var(--bs-danger-border-subtle);
-  background: var(--bs-danger-bg-subtle);
-  color: var(--bs-danger-text-emphasis);
-}
-
-.authToggleLoggedIn:hover {
-  background: color-mix(in srgb, var(--bs-danger-bg-subtle) 70%, var(--bs-danger-text-emphasis) 30%);
-  color: var(--bs-danger-text-emphasis);
 }
 
 .tabButton {
@@ -161,12 +100,7 @@
   min-height: 0;
   margin-top: -1px;
   border: 1px solid var(--bs-border-color-translucent);
-  /*
-   * Top-left stays sharp so the leftmost tab merges visually with the
-   * panel box. Top-right is rounded because the right side of the row
-   * holds the floating Login/Logout button — no tab merges there.
-   */
-  border-radius: 0 16px 16px 16px;
+  border-radius: 0 0 16px 16px;
   background: var(--deployer-card-bg-soft);
   overflow: hidden;
 }
@@ -471,6 +405,9 @@
 }
 
 .navButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 14px;
   border-radius: 999px;
   font-size: 12px;
@@ -506,6 +443,37 @@
   background: var(--deployer-disabled-bg);
   color: var(--deployer-disabled-text);
   cursor: not-allowed;
+}
+
+/*
+ * Auth toggle, placed in navRow between Back and Next. Same shape as
+ * navButton (pill, 8/14 padding, 12px font); colored success-subtle
+ * when logged out (Login) and danger-subtle when logged in (Logout).
+ */
+.authNavButton {
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.authNavLoggedOut {
+  border-color: var(--bs-success-border-subtle);
+  background: var(--bs-success-bg-subtle);
+  color: var(--bs-success-text-emphasis);
+}
+
+.authNavLoggedOut:hover {
+  background: color-mix(in srgb, var(--bs-success-bg-subtle) 70%, var(--bs-success-text-emphasis) 30%);
+}
+
+.authNavLoggedIn {
+  border-color: var(--bs-danger-border-subtle);
+  background: var(--bs-danger-bg-subtle);
+  color: var(--bs-danger-text-emphasis);
+}
+
+.authNavLoggedIn:hover {
+  background: color-mix(in srgb, var(--bs-danger-bg-subtle) 70%, var(--bs-danger-text-emphasis) 30%);
 }
 
 .deployLayout {

@@ -135,23 +135,25 @@ export default function DeploymentWorkspaceTemplate({
     if (typeof window === "undefined") return;
     if (authUserId) {
       // Logout path: clear the session and announce the change so
-      // AccountPanel + this header both re-render anonymous.
+      // AccountPanel + this footer both re-render anonymous. Stay on
+      // the current panel — the user did not ask to leave it.
       window.localStorage.removeItem(USER_STORAGE_KEY);
       window.dispatchEvent(new Event(ACCOUNT_SESSION_UPDATED_EVENT));
       setAuthUserId(null);
     } else {
-      // Login path: navigate to the Settings panel so the auth modal
-      // overlays the visible content, then ask AccountPanel to open
-      // its modal via a custom event.
-      onSelectPanel("account");
+      // Login path: dispatch the open-auth event so AccountPanel's
+      // portal-mounted modal overlays the current view. We do NOT
+      // navigate to Settings — the user only asked for the modal.
+      // AccountPanel must stay mounted (see keepMounted below) so its
+      // event listener is alive even when Settings isn't the active
+      // panel.
       window.dispatchEvent(new Event(ACCOUNT_OPEN_AUTH_EVENT));
     }
-  }, [authUserId, onSelectPanel]);
+  }, [authUserId]);
 
   return (
     <div className={styles.root}>
       <div className={styles.panels}>
-        <div className={styles.tabBarRow}>
         <div
           className={styles.tabList}
           role="tablist"
@@ -189,29 +191,15 @@ export default function DeploymentWorkspaceTemplate({
             );
           })}
         </div>
-        <button
-          type="button"
-          className={`${styles.authToggleButton} ${
-            authUserId ? styles.authToggleLoggedIn : styles.authToggleLoggedOut
-          }`}
-          onClick={onAuthClick}
-          data-testid="auth-toggle-button"
-          aria-label={authUserId ? "Logout" : "Login"}
-        >
-          <i
-            className={`fa-solid ${authUserId ? "fa-right-from-bracket" : "fa-right-to-bracket"} ${styles.tabIcon}`}
-            aria-hidden="true"
-          />
-          <span className={styles.tabTitle}>
-            {authUserId ? "Logout" : "Login"}
-          </span>
-        </button>
-        </div>
         <div className={styles.tabFrame}>
           {panels.map((panel) => {
             const isDisabled = Boolean(panel.disabled);
             const isActive = !isDisabled && activePanel === panel.key;
-            const keepMounted = panel.key === "inventory";
+            // AccountPanel must stay mounted so its global event
+            // listener (ACCOUNT_OPEN_AUTH_EVENT) is alive even when
+            // Settings is not the active tab. The modal it renders
+            // is portaled to document.body so it overlays correctly.
+            const keepMounted = panel.key === "inventory" || panel.key === "account";
             if (!isActive && !keepMounted) return null;
             return (
               <section
@@ -520,7 +508,23 @@ export default function DeploymentWorkspaceTemplate({
             hasPrev ? styles.backEnabled : styles.backDisabled
           }`}
         >
-          Back
+          <i className="fa-solid fa-arrow-left" aria-hidden="true" />
+          <span>Back</span>
+        </button>
+        <button
+          type="button"
+          onClick={onAuthClick}
+          data-testid="auth-toggle-button"
+          aria-label={authUserId ? "Logout" : "Login"}
+          className={`${styles.navButton} ${styles.authNavButton} ${
+            authUserId ? styles.authNavLoggedIn : styles.authNavLoggedOut
+          }`}
+        >
+          <i
+            className={`fa-solid ${authUserId ? "fa-right-from-bracket" : "fa-right-to-bracket"}`}
+            aria-hidden="true"
+          />
+          <span>{authUserId ? "Logout" : "Login"}</span>
         </button>
         <button
           onClick={() => hasNext && onSelectPanel(enabledPanels[activeIndex + 1].key)}
@@ -529,7 +533,8 @@ export default function DeploymentWorkspaceTemplate({
             hasNext ? styles.nextEnabled : styles.nextDisabled
           }`}
         >
-          Next
+          <span>Next</span>
+          <i className="fa-solid fa-arrow-right" aria-hidden="true" />
         </button>
       </div>
     </div>
