@@ -3,3 +3,26 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-json
+
+  - repo: local
+    hooks:
+      # Lint runs first so quick style/static failures abort the commit
+      # before the slower test suite executes.
+      - id: make-lint
+        name: make lint
+        entry: make lint
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      # Only static unit tests (no containers / no integration). The full
+      # `make test` (with integration) runs in CI and may be invoked
+      # manually before push; pre-commit MUST stay container-free so it
+      # can run on any developer shell without a live stack.
+      - id: make-test-unit
+        name: make test-unit
+        entry: make test-unit
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

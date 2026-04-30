@@ -2,6 +2,7 @@
 under the 500-line repo-wide cap (enforced by `scripts/check-max-lines.sh`).
 Behaviour is identical to the previously-inline definitions.
 """
+
 from __future__ import annotations
 
 import subprocess

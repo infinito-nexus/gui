@@ -6,6 +6,7 @@ Provides owner / member / pending-invite logic on top of the
 filesystem-based workspace.json store. Identity stays opaque-string from
 the OAuth2-Proxy headers per req 007 — there is no user table.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -220,9 +221,7 @@ class WorkspaceServiceRBACMixin:
                 )
             for entry in meta.get("members") or []:
                 if entry.get("email") == normalized:
-                    raise HTTPException(
-                        status_code=409, detail="email already invited"
-                    )
+                    raise HTTPException(status_code=409, detail="email already invited")
             new_entry = {
                 "user_id": None,
                 "email": normalized,
@@ -292,13 +291,9 @@ class WorkspaceServiceRBACMixin:
             current_owner = str(meta.get("owner_id") or "").strip() or None
             current_email = self._normalize_email(meta.get("owner_email"))
             if not current_owner:
-                raise HTTPException(
-                    status_code=400, detail="workspace has no owner"
-                )
+                raise HTTPException(status_code=400, detail="workspace has no owner")
             if current_owner == target:
-                raise HTTPException(
-                    status_code=409, detail="user is already the owner"
-                )
+                raise HTTPException(status_code=409, detail="user is already the owner")
 
             members = list(meta.get("members") or [])
             promoted_entry = None

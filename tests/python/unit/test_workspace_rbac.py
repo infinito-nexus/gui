@@ -7,6 +7,7 @@ Covers:
 - Cross-user access without invite returns 404.
 - list_for_user includes claimed memberships, NOT pending invites.
 """
+
 from __future__ import annotations
 
 import importlib

@@ -37,9 +37,7 @@ class TestE2ESshPasswordImage(unittest.TestCase):
             {
                 "storage-driver": "vfs",
                 "dns": ["1.1.1.1", "8.8.8.8"],
-                "insecure-registries": [
-                    "infinito-deployer-cache-registry:5000"
-                ],
+                "insecure-registries": ["infinito-deployer-cache-registry:5000"],
             },
         )
 

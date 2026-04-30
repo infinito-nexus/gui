@@ -140,9 +140,7 @@ class RunnerManagerServiceSweepMixin:
         if timeout_seconds is None:
             try:
                 env_override = float(
-                    str(
-                        root.os.getenv("INFINITO_RUNNER_WAIT_SECONDS") or ""
-                    ).strip()
+                    str(root.os.getenv("INFINITO_RUNNER_WAIT_SECONDS") or "").strip()
                     or "30"
                 )
             except (TypeError, ValueError):
@@ -193,9 +191,7 @@ class RunnerManagerServiceSweepMixin:
         except Exception:  # pragma: no cover - diagnostic-only path
             pass
 
-        msg = (
-            f"runner container {container_name} did not become running in time"
-        )
+        msg = f"runner container {container_name} did not become running in time"
         if last_exit_code:
             msg += f" (exit_code={last_exit_code})"
         if log_tail:

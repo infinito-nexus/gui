@@ -1,8 +1,7 @@
 # Committing 💾
 
 - You MUST run `make autoformat` before every commit and stage every file it modified.
-- You MUST run `make test` (see [Testing and Validation](../../contributing/testing/common.md)) before every commit when the staged change includes at least one non-`.md`/`.rst` file. If it fails, you MUST run `make clean` and rerun it.
-- For markdown/reST-only changes you MAY skip `make test` unless the user explicitly requires it.
+- `make lint` and `make test-unit` are enforced automatically by the repo's pre-commit hooks (see [.pre-commit-config.yaml](../../../.pre-commit-config.yaml) and [Testing and Validation](../../contributing/testing/common.md)). Run `make pre-commit-install` once per checkout to enable them. The hooks MUST stay container-free so they can run on any developer shell — `make test-unit` covers Python and Node unit tests; the broader `make test` (with integration) is the responsibility of CI and any manual pre-push verification. Agents MUST NOT bypass these hooks (no `--no-verify`); on hook failure, you MUST fix the underlying cause and create a new commit (see [Iteration-Loop Commit Gate](#iteration-loop-commit-gate-)).
 - You MUST NOT commit without explicit user confirmation. You MUST always ask.
 - If validation warns about a staged file or component, you MUST ask the user whether to fix the warning first. You MUST keep the follow-up scoped to the staged files.
 
@@ -29,7 +28,7 @@ Loop exits (commit gate opens) when ALL are true:
 
 After exit:
 
-- ONE batched commit covering the whole iteration. Same pre-commit rules as above (autoformat, test on non-doc changes, ask).
+- ONE batched commit covering the whole iteration. Same pre-commit rules as above (autoformat, hook-enforced lint + test-unit, ask).
 - Multiple commits MAY be created only if the staged tree splits cleanly along independent concerns AND each split commit is itself green against the closing verification.
 
 Hard overrides (commit gate opens immediately, named scope only):

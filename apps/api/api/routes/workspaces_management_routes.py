@@ -98,6 +98,7 @@ def generate_inventory(
 
 # ---- req 019 — workspace RBAC members API -------------------------------
 
+
 @router.get("/{workspace_id}/members", response_model=WorkspaceMembersOut)
 def list_members(workspace_id: str, request: Request) -> WorkspaceMembersOut:
     _require_workspace(request, workspace_id)
@@ -114,9 +115,7 @@ def invite_member(
     workspace_id: str, body: WorkspaceMemberInviteIn, request: Request
 ) -> WorkspaceMemberOut:
     invited_by = _require_workspace_owner(request, workspace_id)
-    entry = _svc().invite_member(
-        workspace_id, invited_by=invited_by, email=body.email
-    )
+    entry = _svc().invite_member(workspace_id, invited_by=invited_by, email=body.email)
     return WorkspaceMemberOut(**entry)
 
 
@@ -140,7 +139,5 @@ def transfer_ownership(
     workspace_id: str, body: WorkspaceTransferOwnershipIn, request: Request
 ) -> WorkspaceTransferOwnershipOut:
     _require_workspace_owner(request, workspace_id)
-    result = _svc().transfer_ownership(
-        workspace_id, new_owner_id=body.new_owner_id
-    )
+    result = _svc().transfer_ownership(workspace_id, new_owner_id=body.new_owner_id)
     return WorkspaceTransferOwnershipOut(**result)
