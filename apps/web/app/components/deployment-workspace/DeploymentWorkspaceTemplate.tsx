@@ -98,11 +98,6 @@ export default function DeploymentWorkspaceTemplate({
   expertModeConfirm,
   domainPopup,
 }: DeploymentWorkspaceTemplateProps) {
-  const enabledPanels = panels.filter((panel) => !panel.disabled);
-  const activeIndex = enabledPanels.findIndex((panel) => panel.key === activePanel);
-  const hasPrev = activeIndex > 0;
-  const hasNext = activeIndex >= 0 && activeIndex < enabledPanels.length - 1;
-
   // Mirror AccountPanel's localStorage session so the header switch
   // button stays in sync without lifting state up. We listen to both
   // the native cross-tab `storage` event and the in-tab custom event
@@ -123,6 +118,18 @@ export default function DeploymentWorkspaceTemplate({
       window.removeEventListener(ACCOUNT_SESSION_UPDATED_EVENT, sync);
     };
   }, []);
+
+  // Settings tab is auth-gated: hidden from the tablist + skipped by
+  // next/prev nav when logged out. The panel content itself stays in
+  // the tabFrame so the header Login button can still surface the
+  // AccountPanel modal for anonymous visitors.
+  const visiblePanels = panels.filter(
+    (panel) => !(panel.key === "account" && !authUserId),
+  );
+  const enabledPanels = visiblePanels.filter((panel) => !panel.disabled);
+  const activeIndex = enabledPanels.findIndex((panel) => panel.key === activePanel);
+  const hasPrev = activeIndex > 0;
+  const hasNext = activeIndex >= 0 && activeIndex < enabledPanels.length - 1;
 
   const onAuthClick = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -150,7 +157,7 @@ export default function DeploymentWorkspaceTemplate({
           role="tablist"
           aria-label="Workspace sections"
         >
-          {panels.map((panel) => {
+          {visiblePanels.map((panel) => {
             const isDisabled = Boolean(panel.disabled);
             const isActive = !isDisabled && activePanel === panel.key;
             return (
@@ -184,7 +191,9 @@ export default function DeploymentWorkspaceTemplate({
         </div>
         <button
           type="button"
-          className={styles.authToggleButton}
+          className={`${styles.authToggleButton} ${
+            authUserId ? styles.authToggleLoggedIn : styles.authToggleLoggedOut
+          }`}
           onClick={onAuthClick}
           data-testid="auth-toggle-button"
           aria-label={authUserId ? "Logout" : "Login"}
