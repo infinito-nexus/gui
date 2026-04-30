@@ -6,9 +6,7 @@ One iteration = one attempted change, from the first edit to the closing verific
 
 1. Unless the user explicitly says to reuse the existing setup, you MUST start once with `make setup` to establish a clean baseline (copies `.env` from `env.example`, creates `state/`, and starts the stack).
 2. Edit-fix cycles inside the iteration:
-   - You MUST use `make restart` as the default edit-fix-redeploy step.
-   - For frontend-only changes, you MUST use `make web-sync` instead of a full restart. This rebuilds and syncs the Next.js app into the running `web` container without cycling the whole stack.
-   - For catalog-only changes, you MUST use `make refresh-catalog` instead of a full restart.
+   - After every source edit, you MUST run the refresh target that matches the edit scope before continuing. The SPOT for the rule and full matrix is [refresh.md](refresh.md); `make restart` is the default, with `make web-sync` for frontend-only and `make refresh-catalog` for catalog-only deviations.
    - You MUST NOT rerun `make setup` merely because a step failed or code changed. That restarts the stack unnecessarily.
    - If the same failure still reproduces on the restart path and you want to rule out stale state, you MAY run `make clean` followed by `make setup` once, then you MUST return to `make restart`.
 3. Closing verification — MUST be the last step of every iteration:

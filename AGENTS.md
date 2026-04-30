@@ -34,6 +34,12 @@ When overriding Make variables, agents MUST append `VAR=value` pairs **after** t
 
 Trailing `VAR=value` arguments are Make-native overrides and apply to the make invocation only. Use them for all environment-dependent parameters.
 
+## Refresh Containers After Edits
+
+After every source edit that affects code running inside a container, the agent MUST run the matching refresh target (`make restart`, `make web-sync`, `make refresh-catalog`, …) **before** declaring the edit complete or running any verification against the live stack. Host-side edits are NOT auto-synced into running containers; skipping this step verifies stale code.
+
+The full matrix and rules are in [refresh.md](docs/agents/action/refresh.md).
+
 ## Network Failures — Fix Causes, Not Symptoms
 
 - When a failure appears network-related (for example DNS resolution errors, routing problems, TLS handshake timeouts, registry/index access failures, proxy issues, CA trust problems, IPv4/IPv6 reachability problems, or firewall/NAT interference), agents MUST identify the root cause and the affected layer instead of only treating the visible symptom.

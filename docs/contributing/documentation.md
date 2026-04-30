@@ -49,5 +49,6 @@ You MUST use [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) keywords in all 
 - You MUST use `.md` files for commands, workflows, setup, and contributor guidance.
 - When more than one document can describe the same workflow, command family, or policy, one file MUST be declared the SPOT and the other documents MUST summarize only the minimum context and link back to that SPOT.
 - Supporting documents MUST NOT redefine requirement levels that belong to another page's SPOT unless they repeat the same wording and link back to that SPOT.
+- A document MUST NOT self-declare as `SPOT` (or `Single Point of Truth`). The canonical-reference role MUST emerge implicitly from how other documents link to it, not from a label the document gives itself. Other documents MAY explicitly point out that the SPOT lies elsewhere (e.g. `X.md is the SPOT for …`); cross-pointing is the allowed form.
 - You MUST NOT use `.md` files to describe implementation logic that is already visible in the code.
 - You MUST keep cross-links between `.md` files up to date so readers can navigate between related pages.
