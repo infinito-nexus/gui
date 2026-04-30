@@ -16,6 +16,33 @@ export type Bundle = {
   role_ids?: string[] | null;
 };
 
+export type ServiceLink = {
+  key: string;
+  default_enabled: boolean;
+  shared: boolean;
+};
+
+export type FormFieldType =
+  | "boolean"
+  | "integer"
+  | "float"
+  | "string"
+  | "text"
+  | "list"
+  | "mapping"
+  | "password";
+
+export type FormField = {
+  path: string[];
+  type: FormFieldType;
+  label: string;
+  description?: string | null;
+  default?: unknown;
+  enum?: unknown[] | null;
+  validation?: string | null;
+  secret?: boolean;
+};
+
 export type Role = {
   id: string;
   display_name: string;
@@ -33,6 +60,8 @@ export type Role = {
   categories?: string[] | null;
   galaxy_tags?: string[] | null;
   bundle_member?: boolean | null;
+  services_links?: ServiceLink[] | null;
+  form_fields?: FormField[] | null;
   pricing_summary?: {
     default_offering_id?: string | null;
     default_plan_id?: string | null;

@@ -175,3 +175,108 @@ class WorkspaceServiceInventoryRoleAppsMixin:
                 "content": _dump_yaml_fragment(section),
                 "imported_paths": imported_paths,
             }
+
+    def patch_role_app_field(
+        self,
+        workspace_id: str,
+        role_id: str,
+        alias: str | None,
+        path: list[str],
+        value: Any,
+        delete: bool,
+    ) -> dict[str, Any]:
+        """Set or delete a single key under `applications.<role-id>` (req-023).
+
+        `path` is a non-empty list of segments. When `delete=True` the
+        key at that path is removed (along with any now-empty parent
+        mappings, up to but not including the role section itself).
+        Concurrency is serialised via the existing workspace write
+        lock; each successful PATCH lands as a workspace commit per
+        req-013.
+        """
+        if not path or not all(isinstance(seg, str) and seg for seg in path):
+            raise HTTPException(
+                status_code=400,
+                detail="path must be a non-empty list of non-empty strings",
+            )
+
+        with self.workspace_write_lock(workspace_id):
+            normalized_role_id = _sanitize_role_id(role_id)
+            (
+                root,
+                host_vars_path,
+                alias_value,
+                host_vars_data,
+                applications,
+                section,
+            ) = self._read_role_app_context(workspace_id, normalized_role_id, alias)
+
+            if delete:
+                _delete_path(section, path)
+            else:
+                _set_path(section, path, value)
+
+            applications[normalized_role_id] = section
+            try:
+                atomic_write_text(host_vars_path, _dump_yaml_mapping(host_vars_data))
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=500, detail=f"failed to write host vars file: {exc}"
+                ) from exc
+
+            verb = "reset" if delete else "set"
+            self._history_commit(
+                root,
+                f"forms: {verb} {normalized_role_id}.{'.'.join(path)}",
+                metadata={
+                    "server": alias_value,
+                    "role": normalized_role_id,
+                    "field_path": "/".join(path),
+                },
+            )
+
+            return {
+                "role_id": normalized_role_id,
+                "alias": alias_value,
+                "host_vars_path": host_vars_path.relative_to(root).as_posix(),
+                "content": _dump_yaml_fragment(section),
+                "path": path,
+                "deleted": delete,
+            }
+
+
+def _set_path(target: dict[str, Any], path: list[str], value: Any) -> None:
+    """Walk into nested dicts (creating missing levels) and set the leaf."""
+    cursor: dict[str, Any] = target
+    for segment in path[:-1]:
+        existing = cursor.get(segment)
+        if not isinstance(existing, dict):
+            existing = {}
+            cursor[segment] = existing
+        cursor = existing
+    cursor[path[-1]] = value
+
+
+def _delete_path(target: dict[str, Any], path: list[str]) -> None:
+    """Remove the leaf key, then prune any now-empty parent mappings.
+
+    Pruning stops at `target` (the role's section root) so the role
+    section itself stays present but empty when the user clears the
+    last override.
+    """
+    crumbs: list[tuple[dict[str, Any], str]] = []
+    cursor: dict[str, Any] = target
+    for segment in path[:-1]:
+        existing = cursor.get(segment)
+        if not isinstance(existing, dict):
+            return
+        crumbs.append((cursor, segment))
+        cursor = existing
+
+    cursor.pop(path[-1], None)
+
+    for parent, segment in reversed(crumbs):
+        if isinstance(parent.get(segment), dict) and not parent[segment]:
+            del parent[segment]
+        else:
+            break

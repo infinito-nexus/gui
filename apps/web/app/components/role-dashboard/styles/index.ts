@@ -6,6 +6,7 @@ import enableControls from "./enable-controls.module.css";
 import enableOverlays from "./enable-overlays.module.css";
 import list from "./list.module.css";
 import logo from "./logo.module.css";
+import modalTabs from "./modal-tabs.module.css";
 import modals from "./modals.module.css";
 
 const styles: Record<string, string> = {
@@ -18,6 +19,7 @@ const styles: Record<string, string> = {
   ...columnAppList,
   ...logo,
   ...modals,
+  ...modalTabs,
 };
 
 export default styles;

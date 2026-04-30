@@ -15,6 +15,7 @@ from services.role_catalog import RoleCatalogError, RoleCatalogService
 
 from .bundles import bundles_mtime, load_bundle_role_ids
 from .categories import load_categories
+from .form_fields_loader import load_form_fields
 from .models import RoleQuery, safe_lower, statuses_valid, targets_valid
 from .paths import (
     file_mtime,
@@ -23,6 +24,7 @@ from .paths import (
     repo_roles_root,
     categories_path,
 )
+from .service_links_loader import load_service_links
 
 
 def _matches_any(haystack: Iterable[str], needles: Set[str]) -> bool:
@@ -131,6 +133,9 @@ class RoleIndexService:
             for warning in pricing_warnings:
                 LOGGER.warning("role %s: %s", md.id, warning)
 
+            services_links = load_service_links(role_dir)
+            form_fields = load_form_fields(role_dir)
+
             ro_list = RoleOut(
                 id=md.id,
                 display_name=md.display_name,
@@ -158,6 +163,8 @@ class RoleIndexService:
                 categories=categories.get(md.id, []),
                 bundle_member=md.id in bundle_role_ids,
                 pricing_summary=pricing_summary,
+                services_links=services_links,
+                form_fields=form_fields,
             )
 
             ro_detail_payload = ro_list.model_dump()

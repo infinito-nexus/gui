@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -179,6 +179,27 @@ class WorkspaceRoleAppConfigOut(BaseModel):
 
 class WorkspaceRoleAppConfigImportOut(WorkspaceRoleAppConfigOut):
     imported_paths: int = 0
+
+
+class WorkspaceRoleAppFieldPatchIn(BaseModel):
+    """PATCH input for the per-field config endpoint (req-023).
+
+    `path` is a non-empty list of segments (e.g. ["company", "name"]).
+    `value` is the new value to write at that path. Set `delete=True`
+    to remove the key instead — when deleting, `value` is ignored.
+    `alias` is optional; when omitted the write goes to
+    `group_vars/all.yml` instead of a per-host `host_vars/<alias>.yml`.
+    """
+
+    path: List[str] = Field(..., min_length=1)
+    value: Any = None
+    delete: bool = False
+    alias: Optional[str] = None
+
+
+class WorkspaceRoleAppFieldPatchOut(WorkspaceRoleAppConfigOut):
+    path: List[str]
+    deleted: bool
 
 
 class WorkspaceFileRenameIn(BaseModel):

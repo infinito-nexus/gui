@@ -1,0 +1,186 @@
+/*
+ * Tab strip + tab-panel layout shared between the role-detail modal's
+ * General / Services / Forms / Billing tabs (req-022 + req-023).
+ */
+
+.roleDetailsTabList {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+  flex-wrap: wrap;
+}
+
+.roleDetailsTabButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--deployer-muted-ink);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.roleDetailsTabButton:hover {
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 70%, transparent);
+}
+
+.roleDetailsTabButtonActive {
+  background: var(--deployer-card-bg-soft);
+  color: var(--bs-body-color);
+  border-color: var(--bs-border-color-translucent);
+}
+
+.roleDetailsTabPanel {
+  min-height: 0;
+}
+
+.servicesTabBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.servicesTabList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.servicesTabRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 60%, transparent);
+}
+
+.servicesTabRowMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.servicesTabRowLabel {
+  font-weight: 500;
+  color: var(--bs-body-color);
+}
+
+.servicesTabRowBadge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bs-info-bg-subtle);
+  color: var(--bs-info-text-emphasis);
+}
+
+.servicesTabRowToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+}
+
+.formsTabBody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.formsTabRow {
+  display: grid;
+  grid-template-columns: 220px 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 60%, transparent);
+}
+
+.formsTabRowLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.formsTabRowName {
+  font-weight: 500;
+  color: var(--bs-body-color);
+}
+
+.formsTabRowDescription {
+  color: var(--deployer-muted-ink);
+  font-size: 12px;
+}
+
+.formsTabRowInput {
+  width: 100%;
+}
+
+.formsTabRowReset {
+  align-self: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--bs-border-color-translucent);
+  background: transparent;
+  color: var(--deployer-muted-ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.formsTabRowReset:hover:not(:disabled) {
+  background: var(--deployer-card-bg-soft);
+  color: var(--bs-body-color);
+}
+
+.formsTabRowReset:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.formsTabRowIndicator {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+
+.formsTabRowIndicatorDefault {
+  background: var(--bs-secondary-bg-subtle);
+  color: var(--bs-secondary-text-emphasis);
+}
+
+.formsTabRowIndicatorSet {
+  background: var(--bs-success-bg-subtle);
+  color: var(--bs-success-text-emphasis);
+}
+
+.formsTabHint {
+  font-size: 12px;
+}
+
+.formsEmpty {
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--deployer-muted-ink);
+  font-style: italic;
+}
+
+.formsTabFooter {
+  font-size: 11px;
+  color: var(--deployer-muted-ink);
+  text-align: right;
+}

@@ -25,6 +25,8 @@ from api.schemas.workspace import (
     WorkspaceRoleAppConfigImportOut,
     WorkspaceRoleAppConfigIn,
     WorkspaceRoleAppConfigOut,
+    WorkspaceRoleAppFieldPatchIn,
+    WorkspaceRoleAppFieldPatchOut,
     WorkspaceRuntimeSettingsIn,
     WorkspaceRuntimeSettingsOut,
     WorkspaceServerConnectionIn,
@@ -175,6 +177,35 @@ def write_role_app_config(
         content=payload.content,
     )
     return WorkspaceRoleAppConfigOut(**data)
+
+
+@router.patch(
+    "/{workspace_id}/roles/{role_id}/app-config/field",
+    response_model=WorkspaceRoleAppFieldPatchOut,
+)
+def patch_role_app_field(
+    workspace_id: str,
+    role_id: str,
+    payload: WorkspaceRoleAppFieldPatchIn,
+    request: Request,
+) -> WorkspaceRoleAppFieldPatchOut:
+    """Per-field PATCH for the Forms tab (req-023).
+
+    Sets or deletes a single key under
+    `host_vars/<alias>.yml.applications.<role-id>.<path>`. When
+    `payload.alias` is null, writes to `group_vars/all.yml` instead.
+    """
+    _require_workspace(request, workspace_id)
+    _require_known_role(role_id)
+    data = _svc().patch_role_app_field(
+        workspace_id=workspace_id,
+        role_id=role_id,
+        alias=payload.alias,
+        path=payload.path,
+        value=payload.value,
+        delete=payload.delete,
+    )
+    return WorkspaceRoleAppFieldPatchOut(**data)
 
 
 @router.post(
