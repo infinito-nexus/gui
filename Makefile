@@ -99,7 +99,7 @@ up:
 	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" up -d --build --remove-orphans
 
 down:
-	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" down
+	@COMPOSE_PROFILES=test $(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" down --remove-orphans
 
 logs:
 	@$(DOCKER_COMPOSE) --env-file "$(EFFECTIVE_ENV_FILE)" -f "$(COMPOSE_FILE)" logs -f --tail=200
