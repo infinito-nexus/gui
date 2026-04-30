@@ -38,7 +38,7 @@ Copy `env.example` to `.env` and adjust the following runtime-facing variables w
 | `POSTGRES_PORT` | Postgres port | `5432` |
 | `POSTGRES_DB` | Database name | `infinito_deployer` |
 | `POSTGRES_USER` | Database user | `infinito` |
-| `POSTGRES_PASSWORD` | Database password | `infinito` |
+| `POSTGRES_PASSWORD` | Database password (test-only default — see [credentials.md](credentials.md)) | `infinito` |
 | `STATE_HOST_PATH` | Host path for persistent state; `./state` works for local startup, but containerized deployment jobs require an absolute path | `./state` |
 | `JOB_RUNNER_IMAGE` | Optional override for deployment job containers; falls back to `INFINITO_NEXUS_IMAGE` when unset | `(unset)` |
 | `JOB_RUNNER_REPO_HOST_PATH` | Optional absolute host path to mount a repository into a custom runner container | `/absolute/path/to/infinito-nexus` |
@@ -129,72 +129,19 @@ docker compose --profile test up -d --build
 docker compose --profile test down
 ```
 
-### Password auth service
+### Connecting
 
-- Host (from API container): `ssh-password`
-- Port (from API container): `22`
-- User: `deploy`
-- Password: `deploy`
-
-Connect from host:
+Both services answer on the host as well as inside the compose network. The user and password / key reference are listed in [credentials.md](credentials.md); the connect commands are:
 
 ```bash
+# password auth (host port 2222)
 ssh -p 2222 deploy@localhost
-```
 
-Use in UI/API (container-to-container):
-
-```
-Host: ssh-password
-Port: 22
-User: deploy
-Password: deploy
-```
-
-### Key auth service
-
-- Host (from API container): `ssh-key`
-- Port (from API container): `22`
-- User: `deploy`
-- Private key: `apps/test/ssh-key/test_id_ed25519`
-- Public key: `apps/test/ssh-key/test_id_ed25519.pub`
-
-Connect from host:
-
-```bash
+# key auth (host port 2223)
 ssh -i apps/test/ssh-key/test_id_ed25519 -p 2223 deploy@localhost
 ```
 
-If SSH asks about host key verification, bypass it for the test:
-
-```bash
-ssh -o StrictHostKeyChecking=no -i apps/test/ssh-key/test_id_ed25519 -p 2223 deploy@localhost
-```
-
-### Embedded test key (copy/paste)
-
-Private key:
-
-```text
------BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACCigUtlFhiovSEc9m/iY5AFhogJBQ68Z50F4rni0Eyg8wAAAJAf/nTxH/50
-8QAAAAtzc2gtZWQyNTUxOQAAACCigUtlFhiovSEc9m/iY5AFhogJBQ68Z50F4rni0Eyg8w
-AAAEBR9gZgUzGGRDOPEelNGNYk4qCapNn0TKobNocdi1kQsKKBS2UWGKi9IRz2b+JjkAWG
-iAkFDrxnnQXiueLQTKDzAAAADWluZmluaXRvLXRlc3Q=
------END OPENSSH PRIVATE KEY-----
-```
-
-Public key:
-
-```text
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKKBS2UWGKi9IRz2b+JjkAWGiAkFDrxnnQXiueLQTKDz infinito-test
-```
-
-### Notes
-
-- These credentials are for local testing only.
-- The `ssh-key` service uses `apps/test/ssh-key/authorized_keys`, already populated with the public key above.
+If SSH asks about host-key verification, append `-o StrictHostKeyChecking=no`. From inside the compose network the hosts are `ssh-password` / `ssh-key` on container port `22`. The `ssh-key` service uses `apps/test/ssh-key/authorized_keys`, already populated with the embedded test public key.
 
 ### Legacy compose file (optional)
 
@@ -208,28 +155,13 @@ The repository ships a self-contained OIDC login flow for end-to-end testing of 
 
 `make test-env-up` brings up the full test profile, which includes the OIDC pair alongside the SSH test services. Login entry point on the host: <http://localhost:4180>. The proxy redirects to the mock IdP's `/Account/Login`; after submitting credentials, the callback returns to `:4180` with `X-Auth-Request-User` / `X-Auth-Request-Email` set on every upstream request.
 
-### Seeded users
+### Seeded users and OIDC client
 
-Hard-coded in [docker-compose.yml](../../../docker-compose.yml) under the `oidc-mock` service:
-
-| Role | Username | Password | Email |
-|---|---|---|---|
-| Workspace owner | `e2e-owner` | `e2e-owner-secret-TEST-ONLY` | `e2e-owner@example.com` |
-| Workspace member | `e2e-member` | `e2e-member-secret-TEST-ONLY` | `e2e-member@example.com` |
-
-OIDC client (proxy ↔ IdP, not for browser login):
-
-| Field | Value |
-|---|---|
-| Client ID | `infinito-deployer-e2e` |
-| Client secret | `e2e-client-secret-TEST-ONLY` |
-| Issuer (compose-internal) | `http://oidc-mock:8089` |
+The seeded usernames, passwords, the OIDC client id / client secret, and the cookie-secret rotation policy are listed in [credentials.md](credentials.md). All values are hard-coded in [docker-compose.yml](../../../docker-compose.yml) under the `oidc-mock` and `oauth2-proxy` services.
 
 ### Notes
 
-- The `-TEST-ONLY` suffix is intentional so a copy-paste into a production config is obvious in review.
 - Both services are in the `test` Compose profile only; `make up` does not start them, and only port `4180` is exposed on the host.
-- The `oauth2-proxy` cookie secret is generated fresh per harness run (32 random bytes) and only lives in the temp env-file the e2e harness builds; it is never committed.
 - Used by the Playwright spec at [apps/web/tests/oidc_login.spec.ts](../../../apps/web/tests/oidc_login.spec.ts) and as the auth lane for `make e2e-dashboard-ci-docker-oidc`.
 
 ## Example Workspace Import
@@ -256,12 +188,7 @@ The baseline contains:
 | `host_vars/test-arch.yml` | presets `ansible_host`, `ansible_user`, `ansible_port`, `DOMAIN_PRIMARY` for `test-arch` |
 | `group_vars/all.yml` | disables SSH host-key checks for local runs |
 
-Credentials are intentionally NOT stored in the workspace. Enter them in the UI when prompted:
-
-| Field | Value |
-|---|---|
-| auth method | `password` |
-| password | `deploy` |
+Credentials are intentionally NOT stored in the workspace. Enter them in the UI when prompted; the values are listed in [credentials.md](credentials.md) under "Workspace Import".
 
 ## URLs After Startup
 
