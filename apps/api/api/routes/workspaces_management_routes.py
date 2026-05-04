@@ -10,6 +10,9 @@ from api.auth import (
     resolve_auth_context,
 )
 from api.schemas.workspace import (
+    WorkspaceAliasIn,
+    WorkspaceAliasOut,
+    WorkspaceCreateIn,
     WorkspaceCreateOut,
     WorkspaceDeleteOut,
     WorkspaceGenerateIn,
@@ -64,11 +67,16 @@ def list_workspaces(request: Request) -> WorkspaceListOut:
 
 
 @router.post("", response_model=WorkspaceCreateOut)
-def create_workspace(request: Request) -> WorkspaceCreateOut:
+def create_workspace(
+    request: Request, payload: WorkspaceCreateIn | None = None
+) -> WorkspaceCreateOut:
     ctx = resolve_auth_context(request)
-    meta = _svc().create(owner_id=ctx.user_id, owner_email=ctx.email)
+    name = payload.name if payload is not None else None
+    meta = _svc().create(owner_id=ctx.user_id, owner_email=ctx.email, name=name)
+    workspace_id = str(meta.get("workspace_id") or "")
     return WorkspaceCreateOut(
-        workspace_id=meta.get("workspace_id"),
+        workspace_id=workspace_id,
+        name=str(meta.get("name") or workspace_id),
         created_at=meta.get("created_at"),
     )
 
@@ -78,6 +86,22 @@ def delete_workspace(workspace_id: str, request: Request) -> WorkspaceDeleteOut:
     _require_workspace(request, workspace_id)
     _svc().delete(workspace_id)
     return WorkspaceDeleteOut(ok=True)
+
+
+@router.patch("/{workspace_id}/alias", response_model=WorkspaceAliasOut)
+def rename_workspace_alias(
+    workspace_id: str, payload: WorkspaceAliasIn, request: Request
+) -> WorkspaceAliasOut:
+    """Update a workspace's user-visible alias (per-user unique)."""
+    _require_workspace(request, workspace_id)
+    ctx = resolve_auth_context(request)
+    meta = _svc().rename_workspace_alias(
+        workspace_id, payload.name, owner_id=ctx.user_id
+    )
+    return WorkspaceAliasOut(
+        workspace_id=workspace_id,
+        name=str(meta.get("name") or workspace_id),
+    )
 
 
 @router.post("/{workspace_id}/generate-inventory", response_model=WorkspaceGenerateOut)

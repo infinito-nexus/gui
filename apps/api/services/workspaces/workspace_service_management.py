@@ -32,10 +32,80 @@ class WorkspaceServiceManagementMixin:
     def __init__(self) -> None:
         _ensure_workspace_root()
 
+    def _user_workspace_aliases(self, owner_id: str | None) -> set[str]:
+        """Return all aliases (the workspace `name` field) currently in
+        use by the given owner. Empty set when the owner is anonymous —
+        anonymous users cannot collide on aliases since each session
+        owns at most one ephemeral workspace from the UI side.
+        """
+        cleaned = (owner_id or "").strip()
+        if not cleaned:
+            return set()
+        # `list_for_user` is provided by the RBAC mixin; it returns
+        # entries already filtered to owner+claimed-member workspaces.
+        used: set[str] = set()
+        for entry in self.list_for_user(cleaned):
+            label = str(entry.get("name") or "").strip()
+            if label:
+                used.add(label)
+        return used
+
+    def _next_default_alias(self, owner_id: str | None) -> str:
+        """Pick the alias new workspaces get when the user did not
+        supply one. First slot for a user is always `main`; subsequent
+        ones are `workspace-2`, `workspace-3`, … skipping any value
+        already taken so re-creating after a delete reuses the freed
+        slot instead of monotonically growing.
+        """
+        used = self._user_workspace_aliases(owner_id)
+        if "main" not in used:
+            return "main"
+        n = 2
+        while f"workspace-{n}" in used:
+            n += 1
+        return f"workspace-{n}"
+
+    def _ensure_alias_unique(
+        self,
+        owner_id: str | None,
+        alias: str,
+        *,
+        exclude_workspace_id: str | None = None,
+    ) -> None:
+        """Reject an alias when another workspace owned by the same
+        user already carries it. `exclude_workspace_id` lets a future
+        rename endpoint compare against everything BUT the workspace
+        being renamed.
+        """
+        cleaned_owner = (owner_id or "").strip()
+        if not cleaned_owner:
+            return
+        for entry in self.list_for_user(cleaned_owner):
+            if entry.get("workspace_id") == exclude_workspace_id:
+                continue
+            if str(entry.get("name") or "").strip() == alias:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"alias '{alias}' is already used by another workspace; "
+                        "pick a different one"
+                    ),
+                )
+
     def create(
-        self, *, owner_id: str | None = None, owner_email: str | None = None
+        self,
+        *,
+        owner_id: str | None = None,
+        owner_email: str | None = None,
+        name: str | None = None,
     ) -> dict[str, Any]:
         _ensure_workspace_root()
+        cleaned_name = (name or "").strip()
+        if cleaned_name:
+            self._ensure_alias_unique(owner_id, cleaned_name)
+        else:
+            cleaned_name = self._next_default_alias(owner_id)
+
         workspace_id = _new_workspace_id()
         root = workspace_dir(workspace_id)
         safe_mkdir(root)
@@ -45,6 +115,7 @@ class WorkspaceServiceManagementMixin:
 
         meta = {
             "workspace_id": workspace_id,
+            "name": cleaned_name,
             "created_at": _now_iso(),
             "inventory_generated_at": None,
             "infinito_nexus_version": "latest",
@@ -91,6 +162,33 @@ class WorkspaceServiceManagementMixin:
         meta["state"] = _sanitize_workspace_state(state)
         meta["updated_at"] = _now_iso()
         _write_meta(root, meta)
+
+    def rename_workspace_alias(
+        self,
+        workspace_id: str,
+        new_alias: str,
+        *,
+        owner_id: str | None,
+    ) -> dict[str, Any]:
+        """Set the human-readable alias for an existing workspace.
+
+        Empty alias falls back to the workspace_id (effectively
+        reverting to the unnamed display). Non-empty aliases must be
+        unique across the calling user's workspaces.
+        """
+        cleaned = (new_alias or "").strip()
+        root = self.ensure(workspace_id)
+        meta = _load_meta(root)
+        if cleaned:
+            self._ensure_alias_unique(
+                owner_id, cleaned, exclude_workspace_id=workspace_id
+            )
+            meta["name"] = cleaned
+        else:
+            meta["name"] = workspace_id
+        meta["updated_at"] = _now_iso()
+        _write_meta(root, meta)
+        return meta
 
     def get_runtime_settings(self, workspace_id: str) -> dict[str, str]:
         root = self.ensure(workspace_id)

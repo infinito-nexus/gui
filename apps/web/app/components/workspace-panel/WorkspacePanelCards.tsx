@@ -217,6 +217,60 @@ export default function WorkspacePanelCards(props: any) {
     onDeleteWorkspace(workspaceId);
   };
 
+  // The workspace operations menu (History / Export / Import / Cleanup
+  // / Delete) is now hosted by the pink WorkspaceNavSegment in the
+  // bottom navRow. This bridge listens for the segment's custom event
+  // and routes each action to the existing workspace-panel handlers
+  // so the bottom-rail chip can be retired without re-implementing
+  // any business logic.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ action?: string }>).detail || {};
+      switch (detail.action) {
+        case "history":
+          openHistoryModal();
+          break;
+        case "export":
+          if (workspaceId && !zipBusy) {
+            downloadZip?.();
+          }
+          break;
+        case "import":
+          if (workspaceId && !uploadBusy) {
+            openUploadPicker?.();
+          }
+          break;
+        case "cleanup":
+          if (workspaceId && !inventoryCleanupBusy) {
+            openInventoryCleanup?.();
+          }
+          break;
+        case "delete":
+          deleteWorkspaceFromMenu();
+          break;
+        default:
+          break;
+      }
+    };
+    window.addEventListener("infinito:workspace-action", handler);
+    return () => {
+      window.removeEventListener("infinito:workspace-action", handler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    workspaceId,
+    zipBusy,
+    uploadBusy,
+    inventoryCleanupBusy,
+    deletingWorkspace,
+    onDeleteWorkspace,
+    onOpenHistory,
+    downloadZip,
+    openUploadPicker,
+    openInventoryCleanup,
+  ]);
+
   return (
     <div className={styles.cardsRoot}>
       <div className={`bg-body border ${styles.card}`}>
@@ -293,112 +347,13 @@ export default function WorkspacePanelCards(props: any) {
             ) : null}
           </div>
 
-          <div className={styles.menuWrap}>
-            <button
-              onClick={() => {
-                setWorkspaceMenuOpen((prev) => !prev);
-                setSecretsMenuOpen(false);
-                setUsersMenuOpen(false);
-                setUsersImportMenuOpen(false);
-                setUsersExportMenuOpen(false);
-              }}
-              className={styles.menuTrigger}
-            >
-              <i className="fa-solid fa-folder-tree" aria-hidden="true" />
-              <span>Workspace</span>
-              <i
-                className={`fa-solid ${
-                  workspaceMenuOpen ? "fa-chevron-up" : "fa-chevron-down"
-                }`}
-                aria-hidden="true"
-              />
-            </button>
-            {workspaceMenuOpen ? (
-              <div className={styles.menuPanel}>
-                <ul className={styles.menuList}>
-                  <li>
-                    <button
-                      onClick={openHistoryModal}
-                      disabled={!workspaceId}
-                      className={styles.menuItem}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <i className="fa-solid fa-clock" aria-hidden="true" />
-                        History
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => {
-                        setWorkspaceMenuOpen(false);
-                        downloadZip();
-                      }}
-                      disabled={!workspaceId || zipBusy}
-                      className={styles.menuItem}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <i className="fa-solid fa-file-arrow-down" aria-hidden="true" />
-                        {zipBusy ? "Exporting..." : "Export"}
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => {
-                        setWorkspaceMenuOpen(false);
-                        openUploadPicker();
-                      }}
-                      disabled={!workspaceId || uploadBusy}
-                      className={styles.menuItem}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <i className="fa-solid fa-file-arrow-up" aria-hidden="true" />
-                        {uploadBusy ? "Importing..." : "Import"}
-                      </span>
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => {
-                        setWorkspaceMenuOpen(false);
-                        openInventoryCleanup?.();
-                      }}
-                      disabled={!workspaceId || inventoryCleanupBusy}
-                      className={styles.menuItem}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <i className="fa-solid fa-broom" aria-hidden="true" />
-                        {inventoryCleanupBusy ? "Cleanup running..." : "Cleanup"}
-                      </span>
-                    </button>
-                  </li>
-                  <li className={styles.menuDivider} aria-hidden="true" />
-                  <li>
-                    <button
-                      onClick={deleteWorkspaceFromMenu}
-                      disabled={!workspaceId || deletingWorkspace || !onDeleteWorkspace}
-                      className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                    >
-                      <span className={styles.menuItemLabel}>
-                        <i className="fa-solid fa-trash" aria-hidden="true" />
-                        {deletingWorkspace ? "Deleting..." : "Delete workspace"}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-                {uploadError ? (
-                  <p className={`text-danger ${styles.menuStatus}`}>{uploadError}</p>
-                ) : null}
-                {zipError ? (
-                  <p className={`text-danger ${styles.menuStatus}`}>{zipError}</p>
-                ) : null}
-                {uploadStatus ? (
-                  <p className={`text-success ${styles.menuStatus}`}>{uploadStatus}</p>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
+          {/*
+            * Workspace operations menu (History / Export / Import /
+            * Cleanup / Delete) lives in the pink WorkspaceNavSegment
+            * in the bottom navRow now. The handlers above are still
+            * wired via the useEffect that listens for
+            * `infinito:workspace-action` events.
+            */}
 
           <WorkspacePanelUsersMenu
             workspaceId={workspaceId}

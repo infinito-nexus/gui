@@ -26,9 +26,32 @@ def _normalize_role_ids(values: list[str] | None) -> list[str]:
     return cleaned
 
 
+class WorkspaceCreateIn(BaseModel):
+    """Optional payload for POST /api/workspaces.
+
+    `name` is the human-readable workspace label rendered in the UI's
+    workspace switcher. When omitted (legacy callers), the backend
+    falls back to the workspace_id as the display name.
+    """
+
+    name: Optional[str] = None
+
+
 class WorkspaceCreateOut(BaseModel):
     workspace_id: str
+    name: str
     created_at: Optional[str] = None
+
+
+class WorkspaceAliasIn(BaseModel):
+    """PATCH input for renaming a workspace's per-user alias."""
+
+    name: str = Field(..., min_length=1, max_length=64)
+
+
+class WorkspaceAliasOut(BaseModel):
+    workspace_id: str
+    name: str
 
 
 class WorkspaceListEntryOut(BaseModel):
