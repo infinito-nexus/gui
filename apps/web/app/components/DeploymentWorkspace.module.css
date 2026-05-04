@@ -641,6 +641,332 @@
   margin: 4px 0;
 }
 
+/*
+ * Users tab — inline-editable user table.
+ */
+.usersTabRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  height: 100%;
+  min-height: 0;
+}
+
+.usersTabHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.usersTabTitle {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-family: var(--font-display);
+}
+
+.usersTabHint {
+  margin: 0;
+  font-size: 12px;
+  max-width: 640px;
+}
+
+.usersTabActions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.usersTabMessage {
+  margin: 0;
+  font-size: 13px;
+}
+
+.usersTabTableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 50%, transparent);
+}
+
+.usersTabTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.usersTabTable th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--deployer-muted-ink);
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 70%, transparent);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.usersTabTable td {
+  padding: 6px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+}
+
+.usersTabTable tr:last-child td {
+  border-bottom: none;
+}
+
+.usersTabTable input[type="text"],
+.usersTabTable input[type="email"] {
+  width: 100%;
+  font-size: 13px;
+}
+
+.usersTabRowActions {
+  text-align: right;
+  width: 56px;
+}
+
+.usersTabEmpty {
+  padding: 32px;
+  text-align: center;
+  color: var(--deployer-muted-ink);
+  font-style: italic;
+}
+
+.usersTabEmptyRow {
+  text-align: center;
+  padding: 24px;
+  color: var(--deployer-muted-ink);
+  font-style: italic;
+}
+
+.usersTabSyncBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--bs-border-color-translucent);
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 70%, transparent);
+  color: var(--deployer-muted-ink);
+}
+
+.usersTabSyncBadge[data-state="saving"] {
+  background: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
+  border-color: var(--bs-warning-border-subtle);
+}
+
+.usersTabSyncBadge[data-state="saved"] {
+  background: var(--bs-success-bg-subtle);
+  color: var(--bs-success-text-emphasis);
+  border-color: var(--bs-success-border-subtle);
+}
+
+.usersTabSyncBadge[data-state="error"] {
+  background: var(--bs-danger-bg-subtle);
+  color: var(--bs-danger-text-emphasis);
+  border-color: var(--bs-danger-border-subtle);
+}
+
+.usersTabExternalBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bs-warning-border-subtle);
+  background: var(--bs-warning-bg-subtle);
+  color: var(--bs-warning-text-emphasis);
+  font-size: 13px;
+}
+
+.usersTabHiddenInput {
+  display: none;
+}
+
+/*
+ * Import / Export split-buttons in the Users tab — single trigger
+ * with a chevron, dropdown lists the available formats (CSV / YAML).
+ */
+.usersTabSplitWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.usersTabSplitMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 10px;
+  background: var(--deployer-card-bg-soft);
+  box-shadow: var(--deployer-shadow);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.usersTabSplitItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--bs-body-color);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.usersTabSplitItem:hover {
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 60%, transparent);
+}
+
+.usersTabFilterRow th {
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 50%, transparent);
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+  position: sticky;
+  top: 33px;
+  z-index: 1;
+}
+
+.usersTabFilterRow input {
+  font-size: 13px;
+}
+
+.usersTabFilterButtonActive {
+  background: var(--bs-primary-bg-subtle);
+  color: var(--bs-primary-text-emphasis);
+  border-color: var(--bs-primary-border-subtle);
+}
+
+.usersTabFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 4px 0;
+  flex-wrap: wrap;
+}
+
+.usersTabPager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--deployer-muted-ink);
+}
+
+.usersTabPagerInfo {
+  white-space: nowrap;
+}
+
+.usersTabRowsSelector {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--deployer-muted-ink);
+}
+
+.usersTabRowsSelector select {
+  padding: 4px 8px;
+  font-size: 12px;
+  width: auto;
+}
+
+.usersTabModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.usersTabModalCard {
+  background: var(--deployer-card-bg-soft);
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 16px;
+  box-shadow: var(--deployer-shadow);
+  width: min(640px, 92vw);
+  max-height: 86vh;
+  overflow: auto;
+  padding: 20px;
+}
+
+.usersTabModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.usersTabModalTitle {
+  margin: 0;
+  font-size: 16px;
+  font-family: var(--font-display);
+}
+
+.usersTabModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.usersTabModalRow {
+  display: flex;
+  gap: 12px;
+}
+
+.usersTabModalRow > * {
+  flex: 1 1 0;
+}
+
+.usersTabModalField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.usersTabModalField > span {
+  color: var(--deployer-muted-ink);
+}
+
+.usersTabModalCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.usersTabModalTokens {
+  margin: 0;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--bs-body-bg) 70%, transparent);
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .workspaceSegmentItemLabel {
   flex: 1 1 auto;
   text-align: left;

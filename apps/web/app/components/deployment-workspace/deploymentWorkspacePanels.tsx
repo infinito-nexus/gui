@@ -9,6 +9,7 @@ import IntroPanel from "./panels/IntroPanel";
 import DomainPanel from "./panels/DomainPanel";
 import DeployPanel from "./panels/DeployPanel";
 import AccountPanel, { type AccountTabKey } from "./panels/AccountPanel";
+import UsersTabPanel from "./panels/UsersTabPanel";
 import type {
   ConnectionResult,
   ServerState,
@@ -347,6 +348,16 @@ export function buildDeploymentWorkspacePanels({
             compact
           />
         </div>
+      ),
+    },
+    {
+      key: "users",
+      title: "Users",
+      content: (
+        <UsersTabPanel
+          baseUrl={baseUrl}
+          workspaceId={workspaceId ?? ""}
+        />
       ),
     },
     {

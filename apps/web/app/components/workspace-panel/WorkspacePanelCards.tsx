@@ -355,18 +355,10 @@ export default function WorkspacePanelCards(props: any) {
             * `infinito:workspace-action` events.
             */}
 
-          <WorkspacePanelUsersMenu
-            workspaceId={workspaceId}
-            usersMenuOpen={usersMenuOpen}
-            setUsersMenuOpen={setUsersMenuOpen}
-            setSecretsMenuOpen={setSecretsMenuOpen}
-            setWorkspaceMenuOpen={setWorkspaceMenuOpen}
-            usersImportMenuOpen={usersImportMenuOpen}
-            setUsersImportMenuOpen={setUsersImportMenuOpen}
-            usersExportMenuOpen={usersExportMenuOpen}
-            setUsersExportMenuOpen={setUsersExportMenuOpen}
-            onUsersAction={onUsersAction}
-          />
+          {/*
+            * Users-overview chip retired — the user table now lives in
+            * its own top-level "Users" tab in the deployment workspace.
+            */}
 
           <input
             ref={uploadInputRef}

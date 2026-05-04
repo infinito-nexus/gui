@@ -131,9 +131,19 @@ export default function DeploymentWorkspaceTemplate({
   // next/prev nav when logged out. The panel content itself stays in
   // the tabFrame so the header Login button can still surface the
   // AccountPanel modal for anonymous visitors.
-  const visiblePanels = panels.filter(
-    (panel) => !(panel.key === "account" && !authUserId),
-  );
+  // Tab visibility (vs. mount state):
+  //   - `account` is hidden from the tablist for anonymous users; the
+  //     panel itself stays in the tabFrame so the header Login button
+  //     can surface AccountPanel's modal anytime.
+  //   - `inventory` is hidden from the tablist in basic (customer)
+  //     mode; the panel stays mounted (keepMounted below) so workspace
+  //     bootstrap state — workspace_id wiring, alias rename plumbing,
+  //     credential cache — keeps populating for the other tabs.
+  const visiblePanels = panels.filter((panel) => {
+    if (panel.key === "account" && !authUserId) return false;
+    if (panel.key === "inventory" && modeSwitch.mode !== "expert") return false;
+    return true;
+  });
   const enabledPanels = visiblePanels.filter((panel) => !panel.disabled);
   const activeIndex = enabledPanels.findIndex((panel) => panel.key === activePanel);
   const hasPrev = activeIndex > 0;

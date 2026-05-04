@@ -80,6 +80,7 @@ export type PanelKey =
   | "domain"
   | "server"
   | "inventory"
+  | "users"
   | "deploy"
   | "account";
 
@@ -89,6 +90,7 @@ export type PanelQueryKey =
   | "domain"
   | "hardware"
   | "inventory"
+  | "users"
   | "rbac"
   | "audit"
   | "setup"
@@ -108,6 +110,7 @@ export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   hardware: "server",
   device: "server",
   inventory: "inventory",
+  users: "users",
   rbac: "account",
   audit: "account",
   setup: "deploy",
@@ -122,6 +125,7 @@ export const PANEL_KEY_TO_QUERY: Record<PanelKey, PanelQueryKey> = {
   domain: "domain",
   server: "hardware",
   inventory: "inventory",
+  users: "users",
   deploy: "setup",
   account: "settings",
 };
@@ -132,6 +136,7 @@ export const PANEL_ICON_BY_KEY: Record<PanelKey, string> = {
   domain: "fa-globe",
   server: "fa-server",
   inventory: "fa-box-archive",
+  users: "fa-users",
   deploy: "fa-screwdriver-wrench",
   account: "fa-gear",
 };
