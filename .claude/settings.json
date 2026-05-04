@@ -56,7 +56,9 @@
       "Bash(docker build*)",
       "Bash(docker push*)",
       "Bash(git commit*)",
-      "Bash(git push*)"
+      "Bash(git push*)",
+      "Bash(git -C *)",
+      "Bash(git -c *)"
     ],
     "additionalDirectories": [
       "/tmp"
