@@ -8,7 +8,9 @@ class TestCiSupplyChainAudits(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         repo_root = Path(__file__).resolve().parents[3]
-        workflow_path = repo_root / ".github" / "workflows" / "tests.yml"
+        # The supply-chain job moved from the old monolithic tests.yml
+        # to its own checks.yml tier as part of the CI restructure.
+        workflow_path = repo_root / ".github" / "workflows" / "checks.yml"
         cls.workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
 
     def test_supply_chain_job_runs_python_and_node_audits(self) -> None:

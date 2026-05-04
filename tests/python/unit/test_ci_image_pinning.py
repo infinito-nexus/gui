@@ -8,8 +8,12 @@ class TestCiImagePinning(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         repo_root = Path(__file__).resolve().parents[3]
-        cls.workflow = yaml.safe_load(
-            (repo_root / ".github" / "workflows" / "tests.yml").read_text(
+        # CI tier-restructure splits the old monolithic tests.yml into
+        # several reusable workflows. Real-stack jobs (perf, dashboard)
+        # live under e2e.yml; the integration tier owns the
+        # docker-compose-bound Python tests.
+        cls.e2e_workflow = yaml.safe_load(
+            (repo_root / ".github" / "workflows" / "e2e.yml").read_text(
                 encoding="utf-8"
             )
         )
@@ -22,14 +26,14 @@ class TestCiImagePinning(unittest.TestCase):
         cls.makefile = (repo_root / "Makefile").read_text(encoding="utf-8")
 
     def test_perf_job_pins_images_by_digest(self) -> None:
-        env = self.workflow["jobs"]["perf"]["env"]
+        env = self.e2e_workflow["jobs"]["perf"]["env"]
         self.assertRegex(env["INFINITO_NEXUS_IMAGE"], r"@sha256:[0-9a-f]{64}$")
         self.assertRegex(env["JOB_RUNNER_IMAGE"], r"@sha256:[0-9a-f]{64}$")
         self.assertRegex(env["POSTGRES_IMAGE"], r"@sha256:[0-9a-f]{64}$")
         self.assertEqual(env["INFINITO_ENFORCE_DIGEST_PINNING"], "true")
 
     def test_dashboard_e2e_job_pins_images_by_digest(self) -> None:
-        env = self.workflow["jobs"]["web-dashboard-deploy-e2e"]["env"]
+        env = self.e2e_workflow["jobs"]["dashboard-deploy"]["env"]
         self.assertRegex(env["INFINITO_E2E_CATALOG_IMAGE"], r"@sha256:[0-9a-f]{64}$")
         self.assertRegex(env["INFINITO_E2E_JOB_RUNNER_IMAGE"], r"@sha256:[0-9a-f]{64}$")
         self.assertRegex(env["INFINITO_E2E_POSTGRES_IMAGE"], r"@sha256:[0-9a-f]{64}$")

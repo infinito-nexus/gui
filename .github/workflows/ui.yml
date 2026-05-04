@@ -1,0 +1,48 @@
+name: UI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+
+      - name: Install Playwright browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+
+      - name: Run UI tier (Playwright with mocked API)
+        # Uses playwright.ui.config.ts which whitelists every mocked-API
+        # spec under apps/web/tests/. Real-stack specs (dashboard_deploy_real,
+        # dashboard-perf, oidc_login) are excluded — those run in e2e.yml.
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright test -c playwright.ui.config.ts

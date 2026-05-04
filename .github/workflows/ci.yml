@@ -13,9 +13,37 @@ concurrency:
   group: ci-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Tier-based fail-fast pipeline:
+#
+#   lint         (ruff · max-lines · web-quality)            ─┐
+#   checks       (supply-chain)                              ─┤
+#   unit         (python · node)                              ─┤── ─►
+#   integration  (python — needs docker stack)                 ─┤    └► e2e
+#   ui           (Playwright with mocked API)                  ─┤    └► (dashboard-deploy · dashboard-oidc · perf)
+#                                                              ─┘
+#
+# Each tier is a reusable workflow file under .github/workflows/.
+# Failing the lint gate skips everything downstream so CI minutes are
+# spent on red runs that can actually be fixed by reading the diff.
 jobs:
-  lint-ruff:
-    uses: ./.github/workflows/ruff.yml
+  lint:
+    uses: ./.github/workflows/lint.yml
 
-  tests:
-    uses: ./.github/workflows/tests.yml
+  checks:
+    uses: ./.github/workflows/checks.yml
+
+  unit:
+    needs: lint
+    uses: ./.github/workflows/unit.yml
+
+  integration:
+    needs: unit
+    uses: ./.github/workflows/integration.yml
+
+  ui:
+    needs: unit
+    uses: ./.github/workflows/ui.yml
+
+  e2e:
+    needs: [integration, ui]
+    uses: ./.github/workflows/e2e.yml

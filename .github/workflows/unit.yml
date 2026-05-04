@@ -1,4 +1,4 @@
-name: Lint (ruff)
+name: Unit
 
 on:
   workflow_call:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-  ruff:
+  python:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -19,23 +19,29 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - name: Install ruff
+      - name: Run Python unit tests
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
-          pip install ruff
+          make test-python-unit
 
-      - name: Ruff check
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Node unit tests
         shell: bash
         run: |
           set -euo pipefail
-          ruff check .
-
-      # Optional: enforce formatting too (enable if you use ruff format)
-      # - name: Ruff format (check)
-      #   shell: bash
-      #   run: |
-      #     set -euo pipefail
-      #     ruff format --check .
+          make test-node-unit

@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-unit test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker e2e-dashboard-ci-docker-oidc lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-unit test-integration test-python-unit test-node-unit test-python-integration test-node-integration test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker e2e-dashboard-ci-docker-oidc lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -220,13 +220,15 @@ venv:
 install: venv
 	@$(PIP) install '.[dev]'
 
-test-unit: dirs install
+test-python-unit: dirs install
 	@echo "→ Running Python unit tests"
 	@STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest discover -s tests/python/unit -p "test_*.py" -t . -v
+
+test-node-unit: dirs
 	@echo "→ Running Node unit tests"
 	@STATE_DIR="$(TEST_STATE_DIR)" node --test tests/node/unit/*.mjs
 
-test: test-unit
+test-python-integration: dirs install
 	@echo "→ Running Python integration tests"
 	@modules=$$(find tests/python/integration -maxdepth 1 -name 'test_*.py' ! -name 'test_perf_*.py' -printf '%f\n' 2>/dev/null | sed 's/\.py$$//' | sed 's/^/tests.python.integration./'); \
 	if [ -n "$$modules" ]; then \
@@ -234,8 +236,16 @@ test: test-unit
 	else \
 		echo "→ (no python integration tests)"; \
 	fi
+
+test-node-integration: dirs
 	@echo "→ Running Node integration tests"
 	@if ls tests/node/integration/*.mjs >/dev/null 2>&1; then STATE_DIR="$(TEST_STATE_DIR)" node --test tests/node/integration/*.mjs; else echo "→ (no node integration tests)"; fi
+
+test-unit: test-python-unit test-node-unit
+
+test-integration: test-python-integration test-node-integration
+
+test: test-unit test-integration
 
 test-perf: dirs
 	@set -e; \
