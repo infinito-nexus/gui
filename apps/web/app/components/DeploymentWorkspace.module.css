@@ -890,6 +890,209 @@
   width: auto;
 }
 
+/*
+ * Order tab — customer-facing checkout surface (Basic mode).
+ * Two-column layout on wide viewports; stacked below ~720px so the
+ * form stays usable on narrow screens.
+ */
+.orderTabRoot {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 20px;
+  padding: 16px;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+}
+
+@media (max-width: 720px) {
+  .orderTabRoot {
+    grid-template-columns: 1fr;
+  }
+}
+
+.orderTabSummary {
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 50%, transparent);
+  padding: 14px;
+  height: fit-content;
+  position: sticky;
+  top: 0;
+}
+
+.orderTabSummaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.orderTabTitle {
+  margin: 0;
+  font-size: 16px;
+  font-family: var(--font-display);
+}
+
+.orderTabHint {
+  font-size: 12px;
+}
+
+.orderTabItemsWrap {
+  overflow-x: auto;
+}
+
+.orderTabItems {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.orderTabItems th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--deployer-muted-ink);
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+}
+
+.orderTabItems td {
+  padding: 6px 8px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--bs-border-color-translucent);
+}
+
+.orderTabItems tr:last-child td {
+  border-bottom: none;
+}
+
+.orderTabPriceCol {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.orderTabEmpty {
+  margin: 0;
+  font-size: 13px;
+  font-style: italic;
+}
+
+.orderTabForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.orderTabFormSection {
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 50%, transparent);
+  padding: 14px;
+}
+
+.orderTabFormTitle {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-family: var(--font-display);
+}
+
+.orderTabFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.orderTabField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.orderTabField > span {
+  color: var(--deployer-muted-ink);
+}
+
+.orderTabField em {
+  font-style: normal;
+  color: var(--bs-danger-text-emphasis);
+}
+
+.orderTabFieldFull {
+  grid-column: 1 / -1;
+}
+
+.orderTabCheckbox {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.orderTabCheckbox input {
+  margin-top: 4px;
+}
+
+.orderTabActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/*
+ * Bottom row that pairs the ToS checkbox with the "Place order"
+ * button so the user can both opt in AND submit without scrolling.
+ * Wraps below ~640px so the button drops under the checkbox on
+ * narrow viewports.
+ */
+.orderTabSubmitRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--deployer-card-bg-soft) 50%, transparent);
+  flex-wrap: wrap;
+}
+
+.orderTabSubmitRow > label {
+  flex: 1 1 280px;
+}
+
+.orderTabPlaceOrder {
+  flex: 0 0 auto;
+}
+
+/*
+ * Overview step (wizard step 1) renders only the cart summary,
+ * widened to fill the panel since there's no form column yet. The
+ * "Continue" button anchors the bottom-right.
+ */
+.orderTabRoot[data-step="overview"] {
+  grid-template-columns: 1fr;
+}
+
+.orderTabOverviewFull {
+  position: static;
+  height: fit-content;
+}
+
+.orderTabOverviewActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.orderTabMessage {
+  margin: 0;
+  font-size: 13px;
+}
+
 .usersTabModalOverlay {
   position: fixed;
   inset: 0;

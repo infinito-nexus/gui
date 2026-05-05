@@ -81,6 +81,7 @@ export type PanelKey =
   | "server"
   | "inventory"
   | "users"
+  | "order"
   | "deploy"
   | "account";
 
@@ -93,7 +94,9 @@ export type PanelQueryKey =
   | "users"
   | "rbac"
   | "audit"
+  | "order"
   | "setup"
+  | "deploy"
   | "account"
   | "settings"
   | "billing";
@@ -113,7 +116,9 @@ export const PANEL_QUERY_TO_KEY: Record<string, PanelKey> = {
   users: "users",
   rbac: "account",
   audit: "account",
+  order: "order",
   setup: "deploy",
+  deploy: "deploy",
   account: "account",
   settings: "account",
   billing: "account",
@@ -126,7 +131,8 @@ export const PANEL_KEY_TO_QUERY: Record<PanelKey, PanelQueryKey> = {
   server: "hardware",
   inventory: "inventory",
   users: "users",
-  deploy: "setup",
+  order: "order",
+  deploy: "deploy",
   account: "settings",
 };
 
@@ -137,7 +143,8 @@ export const PANEL_ICON_BY_KEY: Record<PanelKey, string> = {
   server: "fa-server",
   inventory: "fa-box-archive",
   users: "fa-users",
-  deploy: "fa-screwdriver-wrench",
+  order: "fa-cart-shopping",
+  deploy: "fa-rocket",
   account: "fa-gear",
 };
 

@@ -8,6 +8,7 @@ from .workspace_service_artifacts import WorkspaceServiceArtifactsMixin
 from .workspace_service_history import WorkspaceServiceHistoryMixin
 from .workspace_service_inventory import WorkspaceServiceInventoryMixin
 from .workspace_service_management import WorkspaceServiceManagementMixin
+from .workspace_service_orders import WorkspaceServiceOrdersMixin
 from .workspace_service_rbac import WorkspaceServiceRBACMixin
 from .workspace_service_security import WorkspaceServiceSecurityMixin
 
@@ -15,6 +16,7 @@ from .workspace_service_security import WorkspaceServiceSecurityMixin
 class WorkspaceService(
     WorkspaceServiceHistoryMixin,
     WorkspaceServiceManagementMixin,
+    WorkspaceServiceOrdersMixin,
     WorkspaceServiceRBACMixin,
     WorkspaceServiceInventoryMixin,
     WorkspaceServiceArtifactsMixin,

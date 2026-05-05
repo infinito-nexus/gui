@@ -26,6 +26,7 @@ import { useWorkspaceServerSelectionActions } from "./useWorkspaceServerSelectio
 import { useWorkspaceDeploymentRuntime } from "./useWorkspaceDeploymentRuntime";
 import { useWorkspaceRoleAppConfig } from "./useWorkspaceRoleAppConfig";
 import { useWorkspaceSelectionDerived } from "./useWorkspaceSelectionDerived";
+import { readSelectedByAlias, readSelectedPlansByAlias, useWorkspaceSelectionStorage } from "./useWorkspaceSelectionStorage";
 import { buildDeploymentWorkspacePanels } from "./deploymentWorkspacePanels";
 import { useWorkspaceServerMetadata } from "./useWorkspaceServerMetadata";
 import { useDeploymentWorkspaceEffects } from "./useDeploymentWorkspaceEffects";
@@ -45,10 +46,10 @@ export default function DeploymentWorkspace({
   const [activeAlias, setActiveAlias] = useState("");
   const [selectedByAlias, setSelectedByAlias] = useState<
     Record<string, Set<string>>
-  >(() => ({}));
+  >(() => readSelectedByAlias(initialWorkspaceId ?? null));
   const [selectedPlansByAlias, setSelectedPlansByAlias] = useState<
     Record<string, Record<string, string | null>>
-  >(() => ({}));
+  >(() => readSelectedPlansByAlias(initialWorkspaceId ?? null));
   const [aliasRenames, setAliasRenames] = useState<AliasRename[]>([]);
   const [aliasDeletes, setAliasDeletes] = useState<string[]>([]);
   const [aliasCleanups, setAliasCleanups] = useState<string[]>([]);
@@ -226,6 +227,7 @@ export default function DeploymentWorkspace({
     setConnectionResults,
     setDeployRoleFilter,
   });
+  useWorkspaceSelectionStorage(workspaceId, selectedByAlias, selectedPlansByAlias);
   const {
     applySelectedRolesByAlias,
     updateServer,

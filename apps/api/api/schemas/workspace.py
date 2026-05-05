@@ -54,6 +54,47 @@ class WorkspaceAliasOut(BaseModel):
     name: str
 
 
+class WorkspaceOrderItem(BaseModel):
+    """One line in the customer's cart (server alias × app role).
+
+    The `extra` map lets the frontend pass any pricing-engine context
+    (currency, plan label, computed amount) through to the stored
+    record without the schema needing to track every variant.
+    """
+
+    alias: str
+    role_id: str
+    plan_id: Optional[str] = None
+    plan_label: Optional[str] = None
+    amount: Optional[str] = None
+    currency: Optional[str] = None
+    extra: Optional[dict] = None
+
+
+class WorkspaceOrderIn(BaseModel):
+    full_name: str = Field(..., min_length=1, max_length=200)
+    email: str = Field(..., min_length=3, max_length=320)
+    company: Optional[str] = None
+    phone: Optional[str] = None
+    street: Optional[str] = None
+    postal_code: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    vat_id: Optional[str] = None
+    payment_method: str = "invoice"
+    billing_cycle: str = "monthly"
+    notes: Optional[str] = None
+    terms_accepted: bool = False
+    items: List[WorkspaceOrderItem] = Field(default_factory=list)
+
+
+class WorkspaceOrderOut(BaseModel):
+    order_id: str
+    created_at: str
+    owner_user_id: Optional[str] = None
+    workspace_username: Optional[str] = None
+
+
 class WorkspaceListEntryOut(BaseModel):
     workspace_id: str
     name: str

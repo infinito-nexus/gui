@@ -22,6 +22,8 @@ from api.schemas.workspace import (
     WorkspaceMemberInviteIn,
     WorkspaceMemberOut,
     WorkspaceMembersOut,
+    WorkspaceOrderIn,
+    WorkspaceOrderOut,
     WorkspaceTransferOwnershipIn,
     WorkspaceTransferOwnershipOut,
 )
@@ -86,6 +88,28 @@ def delete_workspace(workspace_id: str, request: Request) -> WorkspaceDeleteOut:
     _require_workspace(request, workspace_id)
     _svc().delete(workspace_id)
     return WorkspaceDeleteOut(ok=True)
+
+
+@router.post("/{workspace_id}/orders", response_model=WorkspaceOrderOut)
+def place_workspace_order(
+    workspace_id: str, payload: WorkspaceOrderIn, request: Request
+) -> WorkspaceOrderOut:
+    """Save a customer order under the workspace.
+
+    Anonymous orders auto-create a workspace user from the contact
+    info; authenticated orders are tagged with the auth context's
+    user_id and skip the user creation since the user already has a
+    platform identity.
+    """
+    _require_workspace(request, workspace_id)
+    ctx = resolve_auth_context(request)
+    data = _svc().place_order(
+        workspace_id,
+        payload.model_dump(),
+        owner_id=ctx.user_id,
+        owner_email=ctx.email,
+    )
+    return WorkspaceOrderOut(**data)
 
 
 @router.patch("/{workspace_id}/alias", response_model=WorkspaceAliasOut)

@@ -9,6 +9,7 @@ import IntroPanel from "./panels/IntroPanel";
 import DomainPanel from "./panels/DomainPanel";
 import DeployPanel from "./panels/DeployPanel";
 import AccountPanel, { type AccountTabKey } from "./panels/AccountPanel";
+import OrderTabPanel from "./panels/OrderTabPanel";
 import UsersTabPanel from "./panels/UsersTabPanel";
 import type {
   ConnectionResult,
@@ -386,8 +387,22 @@ export function buildDeploymentWorkspacePanels({
       ),
     },
     {
+      key: "order",
+      title: "Order",
+      content: (
+        <OrderTabPanel
+          baseUrl={baseUrl}
+          workspaceId={workspaceId ?? ""}
+          roles={roles}
+          servers={servers}
+          selectedRolesByAlias={selectedRolesByAlias}
+          selectedPlansByAlias={selectedPlansByAlias}
+        />
+      ),
+    },
+    {
       key: "deploy",
-      title: "Setup",
+      title: "Deploy",
       content: (
         <DeployPanel
           baseUrl={baseUrl}

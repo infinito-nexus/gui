@@ -5,6 +5,10 @@ import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { DEFAULT_PRIMARY_DOMAIN } from "./domain-utils";
 import { PANEL_KEY_TO_QUERY, PANEL_QUERY_TO_KEY, type PanelKey, type Role, type WorkspaceTabPanel } from "./types";
 import type { ConnectionResult, ServerState } from "../deployment-credentials/types";
+import {
+  readSelectedByAlias,
+  readSelectedPlansByAlias,
+} from "./useWorkspaceSelectionStorage";
 
 type UseDeploymentWorkspaceEffectsProps = {
   baseUrl: string;
@@ -230,7 +234,13 @@ export function useDeploymentWorkspaceEffects({
     setConnectionResults({});
     setDeploySelection(new Set());
     setDeployRoleFilter(new Set());
-    setSelectedPlansByAlias({});
+    // Restore the user's per-(server, app) plan choice and per-server
+    // app assignment from localStorage. This bridges the gap between
+    // a hard reload (where in-memory React state is gone) and the
+    // backend hydration of inventory.yml (which only covers
+    // app-assignments, never the plan choice).
+    setSelectedByAlias(readSelectedByAlias(workspaceId));
+    setSelectedPlansByAlias(readSelectedPlansByAlias(workspaceId));
     setAliasRenames([]);
     setAliasDeletes([]);
     setAliasCleanups([]);

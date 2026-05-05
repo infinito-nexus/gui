@@ -135,13 +135,19 @@ export default function DeploymentWorkspaceTemplate({
   //   - `account` is hidden from the tablist for anonymous users; the
   //     panel itself stays in the tabFrame so the header Login button
   //     can surface AccountPanel's modal anytime.
-  //   - `inventory` is hidden from the tablist in basic (customer)
-  //     mode; the panel stays mounted (keepMounted below) so workspace
-  //     bootstrap state — workspace_id wiring, alias rename plumbing,
-  //     credential cache — keeps populating for the other tabs.
+  //   - `inventory` and `deploy` are technical surfaces shown only in
+  //     Expert mode; the inventory panel stays mounted (keepMounted
+  //     below) so workspace bootstrap state — workspace_id wiring,
+  //     alias rename plumbing, credential cache — keeps feeding the
+  //     other tabs.
+  //   - `order` is the Basic-mode counterpart of `deploy` — a
+  //     customer-facing checkout surface.
+  const isExpert = modeSwitch.mode === "expert";
   const visiblePanels = panels.filter((panel) => {
     if (panel.key === "account" && !authUserId) return false;
-    if (panel.key === "inventory" && modeSwitch.mode !== "expert") return false;
+    if ((panel.key === "inventory" || panel.key === "deploy") && !isExpert)
+      return false;
+    if (panel.key === "order" && isExpert) return false;
     return true;
   });
   const enabledPanels = visiblePanels.filter((panel) => !panel.disabled);
