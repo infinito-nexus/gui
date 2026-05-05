@@ -7,6 +7,7 @@ import WorkspacePanel from "../WorkspacePanel";
 import styles from "../DeploymentWorkspace.module.css";
 import IntroPanel from "./panels/IntroPanel";
 import DomainPanel from "./panels/DomainPanel";
+import CustomerDomainPanel from "./panels/CustomerDomainPanel";
 import DeployPanel from "./panels/DeployPanel";
 import AccountPanel, { type AccountTabKey } from "./panels/AccountPanel";
 import OrderTabPanel from "./panels/OrderTabPanel";
@@ -64,11 +65,15 @@ type BuildDeploymentWorkspacePanelsProps = {
   primaryDomainError: string | null;
   filteredDomainEntries: DomainEntry[];
   allDomainEntries: DomainEntry[];
-  domainUsageByName: Map<string, number>;
+  devicesByDomain: Map<string, string[]>;
+  onDetachServerDomain: (alias: string) => void;
+  isAdministrator: boolean;
   primaryDomainDraft: string;
   onSelectPrimaryDomain: (domain: string) => void;
   onOpenAddSubdomain: (parentFqdn: string) => void;
   onRemoveDomain: (domain: string) => void;
+  onDomainStatusChanged: (domain: string, status: import("./types").DomainStatus, statusChangedAt: string | null) => void;
+  onAddReservedDomain: (fqdn: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   workspaceId: string | null;
   connectionResults: Record<string, ConnectionResult>;
   onActiveAliasChange: (alias: string) => void;
@@ -193,11 +198,15 @@ export function buildDeploymentWorkspacePanels({
   primaryDomainError,
   filteredDomainEntries,
   allDomainEntries,
-  domainUsageByName,
+  devicesByDomain,
   primaryDomainDraft,
   onSelectPrimaryDomain,
   onOpenAddSubdomain,
   onRemoveDomain,
+  onDomainStatusChanged,
+  onAddReservedDomain,
+  onDetachServerDomain,
+  isAdministrator,
   workspaceId,
   connectionResults,
   onActiveAliasChange,
@@ -304,23 +313,42 @@ export function buildDeploymentWorkspacePanels({
     {
       key: "domain",
       title: "Domain",
-      content: (
-        <DomainPanel
-          filterQuery={domainFilterQuery}
-          onFilterQueryChange={onDomainFilterQueryChange}
-          filterKind={domainFilterKind}
-          onFilterKindChange={onDomainFilterKindChange}
-          onOpenAddDomain={onOpenAddDomain}
-          primaryDomainError={primaryDomainError}
-          filteredEntries={filteredDomainEntries}
-          allEntries={allDomainEntries}
-          domainUsageByName={domainUsageByName}
-          primaryDomainDraft={primaryDomainDraft}
-          onSelectPrimaryDomain={onSelectPrimaryDomain}
-          onOpenAddSubdomain={onOpenAddSubdomain}
-          onRemoveDomain={onRemoveDomain}
-        />
-      ),
+      content:
+        deviceMode === "expert" ? (
+          <DomainPanel
+            filterQuery={domainFilterQuery}
+            onFilterQueryChange={onDomainFilterQueryChange}
+            filterKind={domainFilterKind}
+            onFilterKindChange={onDomainFilterKindChange}
+            onOpenAddDomain={onOpenAddDomain}
+            primaryDomainError={primaryDomainError}
+            filteredEntries={filteredDomainEntries}
+            allEntries={allDomainEntries}
+            devicesByDomain={devicesByDomain}
+            primaryDomainDraft={primaryDomainDraft}
+            onSelectPrimaryDomain={onSelectPrimaryDomain}
+            onOpenAddSubdomain={onOpenAddSubdomain}
+            onRemoveDomain={onRemoveDomain}
+            onDomainStatusChanged={onDomainStatusChanged}
+            onDetachServerDomain={onDetachServerDomain}
+            isAdministrator={isAdministrator}
+            baseUrl={baseUrl}
+            workspaceId={workspaceId ?? ""}
+          />
+        ) : (
+          <CustomerDomainPanel
+            baseUrl={baseUrl}
+            workspaceId={workspaceId ?? ""}
+            entries={allDomainEntries}
+            devicesByDomain={devicesByDomain}
+            primaryDomainDraft={primaryDomainDraft}
+            onSelectPrimaryDomain={onSelectPrimaryDomain}
+            onRemoveDomain={onRemoveDomain}
+            onStatusChanged={onDomainStatusChanged}
+            onAddReservedDomain={onAddReservedDomain}
+            isAdministrator={isAdministrator}
+          />
+        ),
     },
     {
       key: "server",

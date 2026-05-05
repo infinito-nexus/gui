@@ -313,6 +313,7 @@ export function useWorkspaceDomainPopup({
         {
           type: domainPopupType,
           domain: nextDomain,
+          status: "reserved",
           ...(nextParentFqdn ? { parent_fqdn: nextParentFqdn } : {}),
         },
       ],

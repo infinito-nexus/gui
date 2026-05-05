@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import styles from "../../DeploymentWorkspace.module.css";
 import {
   DEFAULT_PRIMARY_DOMAIN,
@@ -7,7 +8,10 @@ import type {
   DomainEntry,
   DomainFilterKind,
   DomainKind,
+  DomainStatus,
 } from "../types";
+import { DomainStatusBadge } from "./domain/DomainStatusBadge";
+import { transitionDomainStatus } from "./domain/domainStatusClient";
 
 type DomainPanelProps = {
   filterQuery: string;
@@ -18,11 +22,43 @@ type DomainPanelProps = {
   primaryDomainError: string | null;
   filteredEntries: DomainEntry[];
   allEntries: DomainEntry[];
-  domainUsageByName: Map<string, number>;
+  devicesByDomain: Map<string, string[]>;
   primaryDomainDraft: string;
   onSelectPrimaryDomain: (domain: string) => void;
   onOpenAddSubdomain: (parentFqdn: string) => void;
   onRemoveDomain: (domain: string) => void;
+  onDomainStatusChanged: (
+    domain: string,
+    status: DomainStatus,
+    statusChangedAt: string | null
+  ) => void;
+  onDetachServerDomain: (alias: string) => void;
+  isAdministrator: boolean;
+  baseUrl: string;
+  workspaceId: string;
+};
+
+type TransitionAction = {
+  next: DomainStatus;
+  label: string;
+  icon: string;
+  adminOnly?: boolean;
+};
+
+const EXPERT_TRANSITIONS: Record<DomainStatus, TransitionAction[]> = {
+  reserved: [{ next: "ordered", label: "Order now", icon: "fa-cart-shopping" }],
+  ordered: [
+    { next: "active", label: "Mark active", icon: "fa-circle-check", adminOnly: true },
+    { next: "failed", label: "Mark failed", icon: "fa-triangle-exclamation", adminOnly: true },
+    { next: "cancelled", label: "Cancel order", icon: "fa-ban" },
+  ],
+  active: [{ next: "disabled", label: "Disable", icon: "fa-power-off" }],
+  disabled: [{ next: "active", label: "Enable", icon: "fa-play" }],
+  failed: [
+    { next: "ordered", label: "Retry", icon: "fa-rotate-right", adminOnly: true },
+    { next: "cancelled", label: "Cancel order", icon: "fa-ban" },
+  ],
+  cancelled: [],
 };
 
 export default function DomainPanel({
@@ -34,12 +70,44 @@ export default function DomainPanel({
   primaryDomainError,
   filteredEntries,
   allEntries,
-  domainUsageByName,
+  devicesByDomain,
   primaryDomainDraft,
   onSelectPrimaryDomain,
   onOpenAddSubdomain,
   onRemoveDomain,
+  onDomainStatusChanged,
+  onDetachServerDomain,
+  isAdministrator,
+  baseUrl,
+  workspaceId,
 }: DomainPanelProps) {
+  const [busyDomain, setBusyDomain] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const handleTransition = useCallback(
+    async (domain: string, next: DomainStatus) => {
+      if (!workspaceId) return;
+      setBusyDomain(domain);
+      setStatusError(null);
+      try {
+        const result = await transitionDomainStatus({
+          baseUrl,
+          workspaceId,
+          domain,
+          next,
+        });
+        onDomainStatusChanged(
+          result.domain,
+          result.status,
+          result.status_changed_at ?? null
+        );
+      } catch (err) {
+        setStatusError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBusyDomain(null);
+      }
+    },
+    [baseUrl, workspaceId, onDomainStatusChanged]
+  );
   return (
     <div className={styles.domainPanel}>
       <div className={styles.domainTableFilters}>
@@ -72,6 +140,9 @@ export default function DomainPanel({
       {primaryDomainError ? (
         <p className={styles.primaryDomainError}>{primaryDomainError}</p>
       ) : null}
+      {statusError ? (
+        <p className={styles.primaryDomainError}>{statusError}</p>
+      ) : null}
 
       <div className={styles.domainTableWrap}>
         <table className={styles.domainTable}>
@@ -80,6 +151,7 @@ export default function DomainPanel({
               <th>Default</th>
               <th>Domain</th>
               <th>Type</th>
+              <th>Status</th>
               <th>Parent FQDN</th>
               <th>Devices</th>
               <th>Action</th>
@@ -88,29 +160,35 @@ export default function DomainPanel({
           <tbody>
             {filteredEntries.length === 0 ? (
               <tr>
-                <td colSpan={6} className={styles.domainTableEmpty}>
+                <td colSpan={7} className={styles.domainTableEmpty}>
                   No domains match the current filter.
                 </td>
               </tr>
             ) : (
               filteredEntries.map((entry) => {
                 const domainKey = normalizeDomainName(entry.domain);
-                const inUse = (domainUsageByName.get(domainKey) || 0) > 0;
+                const devices = devicesByDomain.get(domainKey) || [];
+                const inUse = devices.length > 0;
                 const hasChildren = allEntries.some(
                   (item) =>
                     item.kind === "subdomain" &&
                     normalizeDomainName(item.parentFqdn || "") === domainKey
                 );
-                const removeBlocked =
-                  domainKey === DEFAULT_PRIMARY_DOMAIN || hasChildren || inUse;
-                const removeTitle =
-                  domainKey === DEFAULT_PRIMARY_DOMAIN
-                    ? "localhost is required."
-                    : hasChildren
-                    ? "Remove subdomains first."
-                    : inUse
-                    ? "Reassign devices before removing this domain."
-                    : "Remove domain";
+                const isLocalhost = domainKey === DEFAULT_PRIMARY_DOMAIN;
+                const canRemove =
+                  !isLocalhost &&
+                  !hasChildren &&
+                  !inUse &&
+                  entry.status === "disabled";
+                const removeReason = isLocalhost
+                  ? "localhost is required."
+                  : hasChildren
+                  ? "Remove linked subdomains first."
+                  : inUse
+                  ? "Detach all devices first."
+                  : entry.status !== "disabled"
+                  ? "Disable the domain before removing."
+                  : "";
                 const addSubdomainParent =
                   entry.kind === "fqdn"
                     ? normalizeDomainName(entry.domain)
@@ -137,10 +215,47 @@ export default function DomainPanel({
                       <code>{entry.domain}</code>
                     </td>
                     <td>{entry.kind}</td>
+                    <td>
+                      <DomainStatusBadge status={entry.status} />
+                    </td>
                     <td>{entry.parentFqdn ? <code>{entry.parentFqdn}</code> : "-"}</td>
-                    <td>{domainUsageByName.get(domainKey) || 0}</td>
+                    <td>
+                      {devices.length === 0 ? (
+                        <span className={styles.domainTableEmpty}>—</span>
+                      ) : (
+                        <div className={styles.domainActionRow}>
+                          {devices.map((alias) => (
+                            <button
+                              key={alias}
+                              type="button"
+                              onClick={() => onDetachServerDomain(alias)}
+                              title={`Detach ${entry.domain} from ${alias}`}
+                              className={styles.domainActionButton}
+                            >
+                              <span>{alias}</span>
+                              <i className="fa-solid fa-xmark" aria-hidden="true" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       <div className={styles.domainActionRow}>
+                        {(EXPERT_TRANSITIONS[entry.status] || [])
+                          .filter((action) => !action.adminOnly || isAdministrator)
+                          .map((action) => (
+                            <button
+                              key={action.next}
+                              type="button"
+                              disabled={busyDomain === entry.domain}
+                              onClick={() => handleTransition(entry.domain, action.next)}
+                              className={styles.domainActionButton}
+                              title={action.label}
+                            >
+                              <i className={`fa-solid ${action.icon}`} aria-hidden="true" />
+                              <span>{action.label}</span>
+                            </button>
+                          ))}
                         <button
                           type="button"
                           onClick={() => onOpenAddSubdomain(addSubdomainParent)}
@@ -154,8 +269,8 @@ export default function DomainPanel({
                         <button
                           type="button"
                           onClick={() => onRemoveDomain(entry.domain)}
-                          disabled={removeBlocked}
-                          title={removeTitle}
+                          disabled={!canRemove}
+                          title={canRemove ? "Remove domain" : removeReason}
                           className={styles.domainRemoveButton}
                         >
                           <i className="fa-solid fa-trash" aria-hidden="true" />

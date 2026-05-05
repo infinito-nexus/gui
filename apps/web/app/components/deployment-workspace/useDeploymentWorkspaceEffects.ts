@@ -252,7 +252,7 @@ export function useDeploymentWorkspaceEffects({
     setExpertConfirmOpen(false);
     setDetailSearchOpen(false);
     setDetailSearchTargetAlias(null);
-    setPrimaryDomainDraft(DEFAULT_PRIMARY_DOMAIN);
+    setPrimaryDomainDraft("");
     setPrimaryDomainModalError(null);
     setPrimaryDomainModalSaving(false);
     setDomainFilterQuery("");

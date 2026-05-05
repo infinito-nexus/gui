@@ -95,6 +95,54 @@ class WorkspaceOrderOut(BaseModel):
     workspace_username: Optional[str] = None
 
 
+_DOMAIN_STATUSES = {
+    "reserved",
+    "ordered",
+    "active",
+    "disabled",
+    "failed",
+    "cancelled",
+}
+
+
+class WorkspaceDomainStatusIn(BaseModel):
+    """PATCH-style input for transitioning a domain's status."""
+
+    status: str = Field(..., min_length=1)
+    order_id: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, value: str) -> str:
+        normalized = (value or "").strip().lower()
+        if normalized not in _DOMAIN_STATUSES:
+            raise ValueError(
+                "status must be one of "
+                "reserved|ordered|active|disabled|failed|cancelled"
+            )
+        return normalized
+
+
+class WorkspaceDomainStatusOut(BaseModel):
+    domain: str
+    status: str
+    status_changed_at: Optional[str] = None
+    order_id: Optional[str] = None
+
+
+class WorkspaceDomainOut(BaseModel):
+    domain: str
+    type: str
+    parent_fqdn: Optional[str] = None
+    status: str = "active"
+    status_changed_at: Optional[str] = None
+    order_id: Optional[str] = None
+
+
+class WorkspaceDomainsListOut(BaseModel):
+    domains: List[WorkspaceDomainOut] = Field(default_factory=list)
+
+
 class WorkspaceListEntryOut(BaseModel):
     workspace_id: str
     name: str

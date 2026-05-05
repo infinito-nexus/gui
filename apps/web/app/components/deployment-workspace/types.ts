@@ -56,11 +56,22 @@ export type RoleAppConfigResponse = {
 
 export type DomainKind = "local" | "fqdn" | "subdomain";
 
+export type DomainStatus =
+  | "reserved"
+  | "ordered"
+  | "active"
+  | "disabled"
+  | "failed"
+  | "cancelled";
+
 export type DomainEntry = {
   id: string;
   kind: DomainKind;
   domain: string;
   parentFqdn: string | null;
+  status: DomainStatus;
+  statusChangedAt: string | null;
+  orderId: string | null;
 };
 
 export type DomainFilterKind = "all" | DomainKind;

@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from .auth import router as auth_router
 from .bundles import router as bundles_router
 from .deployments import router as deployments_router
 from .infinito_nexus import router as infinito_nexus_router
@@ -26,3 +27,4 @@ router.include_router(server_requirements_router)
 router.include_router(pricing_router)
 router.include_router(providers_router)
 router.include_router(users_router)
+router.include_router(auth_router)

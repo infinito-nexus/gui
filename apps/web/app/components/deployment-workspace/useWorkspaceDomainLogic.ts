@@ -11,6 +11,8 @@ import {
   GROUP_VARS_DOMAIN_CATALOG_KEY,
   buildDomainCatalogPayload,
   createDefaultDomainEntries,
+  fetchDomainAvailability,
+  isLikelyFqdn,
   normalizeDomainName,
   normalizePrimaryDomainSelection,
   parseDomainCatalogFromGroupVars,
@@ -158,14 +160,24 @@ export function useWorkspaceDomainLogic({
     [domainEntries]
   );
 
-  const domainUsageByName = useMemo(() => {
-    const usage = new Map<string, number>();
+  const devicesByDomain = useMemo(() => {
+    // Maps domain → list of server aliases that have it as primary.
+    // The Domain panel renders these as detachable chips and uses the
+    // length to decide whether removal is allowed.
+    const map = new Map<string, string[]>();
     servers.forEach((server) => {
       const value = normalizeDomainName(server.primaryDomain);
       if (!value) return;
-      usage.set(value, (usage.get(value) || 0) + 1);
+      const alias = String(server.alias || "").trim();
+      if (!alias) return;
+      const existing = map.get(value);
+      if (existing) {
+        existing.push(alias);
+      } else {
+        map.set(value, [alias]);
+      }
     });
-    return usage;
+    return map;
   }, [servers]);
 
   const filteredDomainEntries = useMemo(() => {
@@ -198,7 +210,7 @@ export function useWorkspaceDomainLogic({
           : primaryDomainDraft;
       const nextEntries = parseDomainCatalogFromGroupVars({
         [GROUP_VARS_DOMAIN_CATALOG_KEY]: buildDomainCatalogPayload(sourceEntries),
-        DOMAIN_PRIMARY: sourcePrimaryDomain || DEFAULT_PRIMARY_DOMAIN,
+        DOMAIN_PRIMARY: sourcePrimaryDomain,
       });
       const nextDomain = normalizePrimaryDomainSelection(
         sourcePrimaryDomain,
@@ -410,10 +422,70 @@ export function useWorkspaceDomainLogic({
       persistWorkspaceDomainSettings,
     });
 
+  const addReservedDomain = useCallback(
+    async (rawFqdn: string): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const fqdn = normalizeDomainName(rawFqdn);
+      if (!isLikelyFqdn(fqdn)) {
+        return { ok: false, error: "Enter a valid FQDN (e.g. shop.example.org)." };
+      }
+      const duplicate = domainEntries.some(
+        (entry) => normalizeDomainName(entry.domain) === fqdn
+      );
+      if (duplicate) {
+        // Already in the workspace — nothing to add. The user can
+        // pick it as default via the radio if they want.
+        return { ok: true };
+      }
+      // Same availability gate the Add Domain popup uses, so the
+      // inline Reserve flow can't bypass it.
+      const check = await fetchDomainAvailability(baseUrl, fqdn);
+      if ("error" in check) return { ok: false, error: check.error };
+      if (!check.available) {
+        return {
+          ok: false,
+          error: check.note || "Domain is likely already registered.",
+        };
+      }
+      const nextEntries = parseDomainCatalogFromGroupVars({
+        [GROUP_VARS_DOMAIN_CATALOG_KEY]: [
+          ...buildDomainCatalogPayload(domainEntries),
+          { type: "fqdn", domain: fqdn, status: "reserved" },
+        ],
+      });
+      // Don't auto-select the new domain as primary — the user picks
+      // it explicitly via the radio button (which itself persists).
+      await persistWorkspaceDomainSettings({
+        entries: nextEntries,
+        primaryDomain: primaryDomainDraft,
+      });
+      return { ok: true };
+    },
+    [baseUrl, domainEntries, primaryDomainDraft, persistWorkspaceDomainSettings]
+  );
+
+  const applyDomainStatus = useCallback(
+    (
+      domain: string,
+      status: DomainEntry["status"],
+      statusChangedAt: string | null
+    ) => {
+      const targetDomain = normalizeDomainName(domain);
+      if (!targetDomain) return;
+      setDomainEntries((prev) =>
+        prev.map((entry) =>
+          normalizeDomainName(entry.domain) === targetDomain
+            ? { ...entry, status, statusChangedAt }
+            : entry
+        )
+      );
+    },
+    [setDomainEntries]
+  );
+
   return {
     primaryDomainOptions,
     fqdnDomainOptions,
-    domainUsageByName,
+    devicesByDomain,
     filteredDomainEntries,
     persistWorkspaceDomainSettings,
     openDomainPopup,
@@ -421,5 +493,7 @@ export function useWorkspaceDomainLogic({
     checkDomainPopupFqdn,
     addDomainFromPopup,
     removeDomainEntry,
+    applyDomainStatus,
+    addReservedDomain,
   };
 }

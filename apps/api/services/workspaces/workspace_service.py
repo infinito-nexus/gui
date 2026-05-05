@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import threading
 
 from .workspace_service_artifacts import WorkspaceServiceArtifactsMixin
+from .workspace_service_domains import WorkspaceServiceDomainsMixin
 from .workspace_service_history import WorkspaceServiceHistoryMixin
 from .workspace_service_inventory import WorkspaceServiceInventoryMixin
 from .workspace_service_management import WorkspaceServiceManagementMixin
@@ -17,6 +18,7 @@ class WorkspaceService(
     WorkspaceServiceHistoryMixin,
     WorkspaceServiceManagementMixin,
     WorkspaceServiceOrdersMixin,
+    WorkspaceServiceDomainsMixin,
     WorkspaceServiceRBACMixin,
     WorkspaceServiceInventoryMixin,
     WorkspaceServiceArtifactsMixin,

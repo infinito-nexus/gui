@@ -1,8 +1,24 @@
-import type { DomainEntry, DomainKind } from "./types";
+import type { DomainEntry, DomainKind, DomainStatus } from "./types";
 
 export const DEFAULT_PRIMARY_DOMAIN = "localhost";
 export const GROUP_VARS_DOMAIN_CATALOG_KEY = "INFINITO_DOMAINS";
 export const GROUP_VARS_ALL_PATH = "group_vars/all.yml";
+
+const DOMAIN_STATUSES: ReadonlySet<DomainStatus> = new Set([
+  "reserved",
+  "ordered",
+  "active",
+  "disabled",
+  "failed",
+  "cancelled",
+]);
+
+export function normalizeDomainStatus(value: unknown): DomainStatus {
+  const raw = String(value || "").trim().toLowerCase();
+  return (DOMAIN_STATUSES.has(raw as DomainStatus)
+    ? (raw as DomainStatus)
+    : "active");
+}
 
 export function normalizeDomainName(value: unknown): string {
   return String(value || "").trim().toLowerCase();
@@ -59,6 +75,9 @@ export function createDefaultDomainEntries(): DomainEntry[] {
       kind: "local",
       domain: DEFAULT_PRIMARY_DOMAIN,
       parentFqdn: null,
+      status: "active",
+      statusChangedAt: null,
+      orderId: null,
     },
   ];
 }
@@ -70,10 +89,13 @@ export function buildDomainCatalogPayload(
     const row: Record<string, string> = {
       type: entry.kind,
       domain: entry.domain,
+      status: entry.status,
     };
     if (entry.kind === "subdomain" && entry.parentFqdn) {
       row.parent_fqdn = entry.parentFqdn;
     }
+    if (entry.statusChangedAt) row.status_changed_at = entry.statusChangedAt;
+    if (entry.orderId) row.order_id = entry.orderId;
     return row;
   });
 }
@@ -90,7 +112,14 @@ export function parseDomainCatalogFromGroupVars(
 ): DomainEntry[] {
   const rawCatalog = data[GROUP_VARS_DOMAIN_CATALOG_KEY];
   const rawItems = Array.isArray(rawCatalog) ? rawCatalog : [];
-  const staged: Array<{ kind: DomainKind; domain: string; parentFqdn: string | null }> = [];
+  const staged: Array<{
+    kind: DomainKind;
+    domain: string;
+    parentFqdn: string | null;
+    status: DomainStatus;
+    statusChangedAt: string | null;
+    orderId: string | null;
+  }> = [];
 
   rawItems.forEach((item) => {
     if (typeof item === "string") {
@@ -100,6 +129,9 @@ export function parseDomainCatalogFromGroupVars(
         kind: inferDomainKind(domain),
         domain,
         parentFqdn: null,
+        status: "active",
+        statusChangedAt: null,
+        orderId: null,
       });
       return;
     }
@@ -115,10 +147,20 @@ export function parseDomainCatalogFromGroupVars(
     const parentFqdn = normalizeDomainName(
       node.parent_fqdn ?? node.parentFqdn ?? node.parent
     );
+    const status = normalizeDomainStatus(node.status);
+    const statusChangedAtRaw = node.status_changed_at ?? node.statusChangedAt;
+    const orderIdRaw = node.order_id ?? node.orderId;
     staged.push({
       kind,
       domain,
       parentFqdn: parentFqdn || null,
+      status,
+      statusChangedAt:
+        typeof statusChangedAtRaw === "string" && statusChangedAtRaw
+          ? statusChangedAtRaw
+          : null,
+      orderId:
+        typeof orderIdRaw === "string" && orderIdRaw ? orderIdRaw : null,
     });
   });
 
@@ -128,6 +170,9 @@ export function parseDomainCatalogFromGroupVars(
       kind: inferDomainKind(fallbackPrimary),
       domain: fallbackPrimary,
       parentFqdn: null,
+      status: "active",
+      statusChangedAt: null,
+      orderId: null,
     });
   }
 
@@ -135,15 +180,24 @@ export function parseDomainCatalogFromGroupVars(
   const seenDomains = new Set<string>();
   const fqdnDomains = new Set<string>();
 
+  type PushMeta = {
+    status?: DomainStatus;
+    statusChangedAt?: string | null;
+    orderId?: string | null;
+  };
   const pushEntry = (
     kind: DomainKind,
     domain: string,
-    parentFqdn: string | null = null
+    parentFqdn: string | null = null,
+    meta: PushMeta = {}
   ) => {
     const normalizedDomain = normalizeDomainName(domain);
     if (!normalizedDomain || seenDomains.has(normalizedDomain)) return;
     if (kind === "local" && !isValidDomainToken(normalizedDomain)) return;
     if (kind === "fqdn" && !isLikelyFqdn(normalizedDomain)) return;
+    const status = meta.status ?? "active";
+    const statusChangedAt = meta.statusChangedAt ?? null;
+    const orderId = meta.orderId ?? null;
     if (kind === "subdomain") {
       if (!normalizedDomain.includes(".")) return;
       const normalizedParent = normalizeDomainName(
@@ -158,6 +212,9 @@ export function parseDomainCatalogFromGroupVars(
         kind: "subdomain",
         domain: normalizedDomain,
         parentFqdn: normalizedParent,
+        status,
+        statusChangedAt,
+        orderId,
       });
       seenDomains.add(normalizedDomain);
       return;
@@ -167,6 +224,9 @@ export function parseDomainCatalogFromGroupVars(
       kind,
       domain: normalizedDomain,
       parentFqdn: null,
+      status,
+      statusChangedAt,
+      orderId,
     });
     seenDomains.add(normalizedDomain);
     if (kind === "fqdn") {
@@ -175,6 +235,11 @@ export function parseDomainCatalogFromGroupVars(
   };
 
   staged.forEach((entry) => {
+    const meta: PushMeta = {
+      status: entry.status,
+      statusChangedAt: entry.statusChangedAt,
+      orderId: entry.orderId,
+    };
     if (entry.kind === "subdomain") {
       const parentFqdn =
         normalizeDomainName(entry.parentFqdn || "") ||
@@ -182,10 +247,10 @@ export function parseDomainCatalogFromGroupVars(
       if (parentFqdn && !fqdnDomains.has(parentFqdn)) {
         pushEntry("fqdn", parentFqdn, null);
       }
-      pushEntry("subdomain", entry.domain, parentFqdn || null);
+      pushEntry("subdomain", entry.domain, parentFqdn || null, meta);
       return;
     }
-    pushEntry(entry.kind, entry.domain, null);
+    pushEntry(entry.kind, entry.domain, null, meta);
   });
 
   if (!seenDomains.has(DEFAULT_PRIMARY_DOMAIN)) {
@@ -194,6 +259,9 @@ export function parseDomainCatalogFromGroupVars(
       kind: "local",
       domain: DEFAULT_PRIMARY_DOMAIN,
       parentFqdn: null,
+      status: "active",
+      statusChangedAt: null,
+      orderId: null,
     });
     seenDomains.add(DEFAULT_PRIMARY_DOMAIN);
   }
@@ -208,12 +276,67 @@ export function parseDomainCatalogFromGroupVars(
     );
 }
 
+export function persistServerPrimaryDomain(
+  baseUrl: string,
+  workspaceId: string,
+  alias: string,
+  primaryDomain: string | null
+): Promise<void> {
+  return fetch(`${baseUrl}/api/providers/primary-domain`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      alias,
+      primary_domain: primaryDomain,
+    }),
+  }).then(() => undefined).catch(() => undefined);
+}
+
+export async function fetchDomainAvailability(
+  baseUrl: string,
+  fqdn: string
+): Promise<{ available: boolean; note: string } | { error: string }> {
+  try {
+    const res = await fetch(
+      `${baseUrl}/api/providers/domain-availability?domain=${encodeURIComponent(fqdn)}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try {
+        const data = await res.json();
+        if (typeof data?.detail === "string" && data.detail.trim()) {
+          detail = data.detail.trim();
+        }
+      } catch {
+        const text = await res.text();
+        if (text.trim()) detail = text.trim();
+      }
+      return { error: detail };
+    }
+    const data = (await res.json()) as { available?: boolean; note?: string };
+    return {
+      available: Boolean(data?.available),
+      note: String(data?.note || "").trim(),
+    };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Domain availability check failed.",
+    };
+  }
+}
+
 export function normalizePrimaryDomainSelection(
   value: unknown,
   entries: DomainEntry[]
 ): string {
+  // Returns empty string when nothing is selected — the UI surfaces a
+  // search field in that case rather than auto-falling back to
+  // localhost. Existing workspaces with a saved DOMAIN_PRIMARY keep
+  // their choice as long as the entry still exists.
   const desired = normalizeDomainName(value);
-  if (!desired) return DEFAULT_PRIMARY_DOMAIN;
+  if (!desired) return "";
   const lookup = new Map<string, string>();
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
     const domain = normalizeDomainName(entry.domain);
@@ -222,5 +345,5 @@ export function normalizePrimaryDomainSelection(
       lookup.set(domain, entry.domain);
     }
   });
-  return lookup.get(desired) || DEFAULT_PRIMARY_DOMAIN;
+  return lookup.get(desired) || "";
 }

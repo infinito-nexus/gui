@@ -15,6 +15,9 @@ from api.schemas.workspace import (
     WorkspaceCreateIn,
     WorkspaceCreateOut,
     WorkspaceDeleteOut,
+    WorkspaceDomainsListOut,
+    WorkspaceDomainStatusIn,
+    WorkspaceDomainStatusOut,
     WorkspaceGenerateIn,
     WorkspaceGenerateOut,
     WorkspaceListOut,
@@ -110,6 +113,53 @@ def place_workspace_order(
         owner_email=ctx.email,
     )
     return WorkspaceOrderOut(**data)
+
+
+@router.get("/{workspace_id}/domains", response_model=WorkspaceDomainsListOut)
+def list_workspace_domains(
+    workspace_id: str, request: Request
+) -> WorkspaceDomainsListOut:
+    """List all domains in this workspace, with status."""
+    _require_workspace(request, workspace_id)
+    return WorkspaceDomainsListOut(domains=_svc().list_domains(workspace_id))
+
+
+@router.post(
+    "/{workspace_id}/domains/{domain}/status",
+    response_model=WorkspaceDomainStatusOut,
+)
+def transition_workspace_domain_status(
+    workspace_id: str,
+    domain: str,
+    payload: WorkspaceDomainStatusIn,
+    request: Request,
+) -> WorkspaceDomainStatusOut:
+    """Move a domain to a new lifecycle status.
+
+    Validates the transition against ALLOWED_TRANSITIONS in the
+    domains service. Stamps `status_changed_at` and optionally
+    attaches an `order_id` when entering `ordered`. `active` and
+    `failed` are admin-only outcomes; customers may only cancel
+    their own ordered/failed entries.
+    """
+    from services.workspaces.workspace_service_domains import (
+        ADMIN_ONLY_TRANSITIONS,
+    )
+
+    _require_workspace(request, workspace_id)
+    ctx = resolve_auth_context(request)
+    if payload.status in ADMIN_ONLY_TRANSITIONS and not ctx.is_administrator:
+        raise HTTPException(
+            status_code=403,
+            detail=f"transition to {payload.status!r} requires administrator group",
+        )
+    data = _svc().transition_domain_status(
+        workspace_id,
+        domain,
+        payload.status,
+        order_id=payload.order_id,
+    )
+    return WorkspaceDomainStatusOut(**data)
 
 
 @router.patch("/{workspace_id}/alias", response_model=WorkspaceAliasOut)

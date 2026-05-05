@@ -23,6 +23,7 @@ import { type AccountTabKey } from "./panels/AccountPanel";
 import { useWorkspaceDomainLogic } from "./useWorkspaceDomainLogic";
 
 import { useWorkspaceServerSelectionActions } from "./useWorkspaceServerSelectionActions";
+import { useDetachServerDomain } from "./useDetachServerDomain"; import { useAuthContext } from "./useAuthContext";
 import { useWorkspaceDeploymentRuntime } from "./useWorkspaceDeploymentRuntime";
 import { useWorkspaceRoleAppConfig } from "./useWorkspaceRoleAppConfig";
 import { useWorkspaceSelectionDerived } from "./useWorkspaceSelectionDerived";
@@ -77,9 +78,7 @@ export default function DeploymentWorkspace({
   const [workspaceId, setWorkspaceId] = useState<string | null>(
     initialWorkspaceId ?? null
   );
-  const [workspacePrimaryDomain, setWorkspacePrimaryDomain] = useState(
-    DEFAULT_PRIMARY_DOMAIN
-  );
+  const [workspacePrimaryDomain, setWorkspacePrimaryDomain] = useState("");
   const [inventoryReady, setInventoryReady] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
@@ -98,9 +97,7 @@ export default function DeploymentWorkspace({
   const [detailSearchTargetAlias, setDetailSearchTargetAlias] = useState<
     string | null
   >(null);
-  const [primaryDomainDraft, setPrimaryDomainDraft] = useState(
-    DEFAULT_PRIMARY_DOMAIN
-  );
+  const [primaryDomainDraft, setPrimaryDomainDraft] = useState("");
   const [primaryDomainModalError, setPrimaryDomainModalError] = useState<
     string | null
   >(null);
@@ -156,7 +153,7 @@ export default function DeploymentWorkspace({
   const {
     primaryDomainOptions,
     fqdnDomainOptions,
-    domainUsageByName,
+    devicesByDomain,
     filteredDomainEntries,
     persistWorkspaceDomainSettings,
     openDomainPopup,
@@ -164,6 +161,8 @@ export default function DeploymentWorkspace({
     checkDomainPopupFqdn,
     addDomainFromPopup,
     removeDomainEntry,
+    applyDomainStatus,
+    addReservedDomain,
   } = useWorkspaceDomainLogic({
     baseUrl,
     workspaceId,
@@ -228,6 +227,8 @@ export default function DeploymentWorkspace({
     setDeployRoleFilter,
   });
   useWorkspaceSelectionStorage(workspaceId, selectedByAlias, selectedPlansByAlias);
+  const detachServerDomain = useDetachServerDomain(baseUrl, workspaceId, setServers);
+  const isAdmin = useAuthContext(baseUrl).is_administrator;
   const {
     applySelectedRolesByAlias,
     updateServer,
@@ -361,13 +362,13 @@ export default function DeploymentWorkspace({
     activeAlias, servers, serverMetaByAlias, selectedRolesByAlias, onToggleSelectedForAlias: toggleSelectedForAlias, selectedPlansByAlias, onSelectRolePlanForAlias: selectRolePlanForAlias,
     serverSwitcher, onCreateServerForTarget: addServerWithDefaults, deviceMode, onModeChange: handleModeChange, domainFilterQuery, onDomainFilterQueryChange: setDomainFilterQuery,
     domainFilterKind, onDomainFilterKindChange: setDomainFilterKind, onOpenAddDomain: (kind = "fqdn") => openDomainPopup(kind), primaryDomainError: primaryDomainModalError,
-    filteredDomainEntries, allDomainEntries: domainEntries, domainUsageByName, primaryDomainDraft,
+    filteredDomainEntries, allDomainEntries: domainEntries, devicesByDomain, primaryDomainDraft,
     onSelectPrimaryDomain: (domain) => {
       setPrimaryDomainDraft(domain);
       setPrimaryDomainModalError(null);
       void persistWorkspaceDomainSettings({ entries: domainEntries, primaryDomain: domain });
     },
-    onOpenAddSubdomain: (parentFqdn) => openDomainPopup("subdomain", { kind: "subdomain", parentFqdn }), onRemoveDomain: removeDomainEntry,
+    onOpenAddSubdomain: (parentFqdn) => openDomainPopup("subdomain", { kind: "subdomain", parentFqdn }), onRemoveDomain: removeDomainEntry, onDomainStatusChanged: applyDomainStatus, onAddReservedDomain: addReservedDomain, onDetachServerDomain: detachServerDomain, isAdministrator: isAdmin,
     workspaceId, connectionResults, onActiveAliasChange: setActiveAlias, onUpdateServer: updateServer, onConnectionResult: handleConnectionResult,
     onRemoveServer: removeServer, onCleanupServer: cleanupServer, onAddServer: addServerWithDefaults, openCredentialsAlias, onOpenCredentialsAliasHandled: () => setOpenCredentialsAlias(null),
     primaryDomainOptions, onRequestAddPrimaryDomain: (request) => openDomainPopup("fqdn", request),
