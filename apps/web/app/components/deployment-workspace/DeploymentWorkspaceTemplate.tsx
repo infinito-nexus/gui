@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ProviderOrderPanel from "../ProviderOrderPanel";
 import WorkspaceNavSegment from "./WorkspaceNavSegment";
-import styles from "../DeploymentWorkspace.module.css";
+import styles from "../deployment/workspace/Main.module.css";
 import { USER_STORAGE_KEY } from "../workspace-panel/utils";
 import {
   PANEL_ICON_BY_KEY,

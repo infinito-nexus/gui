@@ -148,7 +148,7 @@ class TestWorkspaceHistoryService(unittest.TestCase):
         root = service.ensure(workspace_id)
 
         with patch(
-            "services.workspaces.workspace_service_history.subprocess.run"
+            "services.workspaces.mixins.history.main.subprocess.run"
         ) as mock_run:
             mock_run.return_value = subprocess.CompletedProcess(
                 args=[],

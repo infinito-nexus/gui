@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { CSSProperties, Dispatch, MutableRefObject, SetStateAction } from "react";
-import styles from "../DeploymentWorkspace.module.css";
+import styles from "../deployment/workspace/Main.module.css";
 import { buildDeploymentPayload } from "../../lib/deployment_payload";
 import {
   clearWorkspaceMasterPassword,

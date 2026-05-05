@@ -1,5 +1,5 @@
 import type { ChangeEvent, RefObject } from "react";
-import styles from "../WorkspacePanel.module.css";
+import styles from "../workspace/Panel.module.css";
 import type { WorkspaceUser } from "./users-utils";
 
 type Props = {

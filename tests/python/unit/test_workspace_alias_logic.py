@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from services.workspaces.workspace_service_management import (
+from services.workspaces.mixins.management import (
     WorkspaceServiceManagementMixin,
 )
 
@@ -112,10 +112,10 @@ class TestRenameWorkspaceAlias(unittest.TestCase):
         with (
             patch.object(svc, "ensure") as ensure_mock,
             patch(
-                "services.workspaces.workspace_service_management._load_meta",
+                "services.workspaces.mixins.management._load_meta",
                 return_value={"workspace_id": "b", "name": "workspace-2"},
             ),
-            patch("services.workspaces.workspace_service_management._write_meta"),
+            patch("services.workspaces.mixins.management._write_meta"),
         ):
             ensure_mock.return_value = object()
             with self.assertRaises(HTTPException) as ctx:
@@ -128,11 +128,11 @@ class TestRenameWorkspaceAlias(unittest.TestCase):
         with (
             patch.object(svc, "ensure") as ensure_mock,
             patch(
-                "services.workspaces.workspace_service_management._load_meta",
+                "services.workspaces.mixins.management._load_meta",
                 return_value={"workspace_id": "a", "name": "main"},
             ),
             patch(
-                "services.workspaces.workspace_service_management._write_meta",
+                "services.workspaces.mixins.management._write_meta",
                 side_effect=lambda root, meta: captured.setdefault("meta", meta),
             ),
         ):
@@ -147,11 +147,11 @@ class TestRenameWorkspaceAlias(unittest.TestCase):
         with (
             patch.object(svc, "ensure") as ensure_mock,
             patch(
-                "services.workspaces.workspace_service_management._load_meta",
+                "services.workspaces.mixins.management._load_meta",
                 return_value={"workspace_id": "abc", "name": "old"},
             ),
             patch(
-                "services.workspaces.workspace_service_management._write_meta",
+                "services.workspaces.mixins.management._write_meta",
                 side_effect=lambda root, meta: captured.setdefault("meta", meta),
             ),
         ):

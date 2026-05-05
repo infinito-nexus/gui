@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import styles from "../DeploymentWorkspace.module.css";
+import styles from "../deployment/workspace/Main.module.css";
 import { WORKSPACE_STORAGE_KEY } from "../workspace-panel/utils";
 
 type WorkspaceListEntry = {

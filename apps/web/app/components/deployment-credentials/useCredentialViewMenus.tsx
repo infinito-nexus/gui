@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 import type { MutableRefObject } from "react";
-import styles from "../DeploymentCredentialsForm.module.css";
+import styles from "../deployment/CredentialsForm.module.css";
 import type { ServerViewMode } from "./types";
 
 type UseCredentialViewMenusArgs = {

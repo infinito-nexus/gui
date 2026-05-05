@@ -58,7 +58,8 @@ class TestWebImageSupplyChain(unittest.TestCase):
             / "app"
             / "components"
             / "workspace-panel"
-            / "WorkspacePanelFileEditor.tsx"
+            / "panel"
+            / "FileEditor.tsx"
         )
 
         layout_source = layout_path.read_text(encoding="utf-8")

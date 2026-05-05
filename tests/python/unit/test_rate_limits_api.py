@@ -144,8 +144,8 @@ class TestRateLimitsApi(unittest.TestCase):
         client, rate_limits = self._client()
 
         with (
-            patch("api.routes.workspaces.ensure_workspace_access") as m_access,
-            patch("api.routes.workspaces._svc") as m_workspaces,
+            patch("api.routes.workspaces.main.ensure_workspace_access") as m_access,
+            patch("api.routes.workspaces.main._svc") as m_workspaces,
         ):
             m_access.return_value = None
             m_workspaces.return_value.test_connection.return_value = {
@@ -176,8 +176,8 @@ class TestRateLimitsApi(unittest.TestCase):
         rate_limits.fail_with(429)
 
         with (
-            patch("api.routes.workspaces.ensure_workspace_access") as m_access,
-            patch("api.routes.workspaces._svc") as m_workspaces,
+            patch("api.routes.workspaces.main.ensure_workspace_access") as m_access,
+            patch("api.routes.workspaces.main._svc") as m_workspaces,
         ):
             m_access.return_value = None
 

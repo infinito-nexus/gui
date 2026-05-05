@@ -12,11 +12,11 @@ import type {
   PrimaryDomainMenu,
   StatusIndicator,
   StatusPopover,
-} from "./ServerCollectionView.types";
+} from "./server-collection/View.types";
 import {
   getAliasErrorFor,
   normalizePortValue,
-} from "./ServerCollectionView.utils";
+} from "./server-collection/View.utils";
 import type { ServerState } from "./types";
 import { useServerCollectionValidation } from "./useServerCollectionValidation";
 type CredentialField =

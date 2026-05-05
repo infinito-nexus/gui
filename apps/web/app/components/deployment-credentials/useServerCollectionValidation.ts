@@ -2,11 +2,11 @@
 
 import { useCallback } from "react";
 import styles from "./styles.module.css";
-import type { StatusIndicator, ValidationState } from "./ServerCollectionView.types";
+import type { StatusIndicator, ValidationState } from "./server-collection/View.types";
 import {
   getValidationState as buildValidationState,
   hasFormIssues,
-} from "./ServerCollectionView.utils";
+} from "./server-collection/View.utils";
 import type { ServerState } from "./types";
 
 type UseServerCollectionValidationProps = {

@@ -1,4 +1,4 @@
-import styles from "../../../DeploymentWorkspace.module.css";
+import styles from "../../../deployment/workspace/Main.module.css";
 import type { DomainStatus } from "../../types";
 
 const STATUS_CLASS: Record<DomainStatus, string> = {

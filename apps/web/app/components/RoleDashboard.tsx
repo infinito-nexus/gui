@@ -4,13 +4,13 @@ import { useRef, useState } from "react";
 import {
   BUNDLE_OPTIONAL_LIST_COLUMNS,
   type BundleOptionalListColumnKey,
-} from "./role-dashboard/BundleGridView";
-import RoleDashboardBodyContainer from "./role-dashboard/RoleDashboardBodyContainer";
-import RoleDashboardOverlays from "./role-dashboard/RoleDashboardOverlays";
+} from "./role-dashboard/bundle/grid/View";
+import RoleDashboardBodyContainer from "./role-dashboard/dashboard/BodyContainer";
+import RoleDashboardOverlays from "./role-dashboard/dashboard/Overlays";
 import {
   OPTIONAL_LIST_COLUMNS,
   type OptionalListColumnKey,
-} from "./role-dashboard/RoleListView";
+} from "./role-dashboard/role/ListView";
 import {
   normalizeFacet,
   type DeployTargetFilter,

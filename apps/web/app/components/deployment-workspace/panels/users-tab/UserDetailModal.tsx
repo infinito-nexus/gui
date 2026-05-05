@@ -1,7 +1,7 @@
 "use client";
 
 import YAML from "yaml";
-import styles from "../../../DeploymentWorkspace.module.css";
+import styles from "../../../deployment/workspace/Main.module.css";
 import type { UserRow } from "./users-tab-utils";
 
 type Props = {

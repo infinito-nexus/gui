@@ -1,4 +1,4 @@
-import styles from "../../DeploymentWorkspace.module.css";
+import styles from "../../deployment/workspace/Main.module.css";
 
 export default function IntroPanel() {
   return (

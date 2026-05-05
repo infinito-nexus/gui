@@ -73,12 +73,7 @@ def find_clusters(
     threshold: int = CLUSTER_THRESHOLD,
     extensions: tuple[str, ...] = CHECKED_EXTENSIONS,
 ) -> list[Cluster]:
-    """Return every prefix-cluster in ``directory`` (non-recursive).
-
-    Only files matching ``extensions`` count. Subdirectories are
-    ignored — moving files into a subdirectory is the way to drop
-    out of a cluster, so we don't keep recursing into the cure.
-    """
+    """Return every prefix-cluster in ``directory`` (non-recursive)."""
     if not directory.is_dir():
         return []
     by_prefix: dict[str, list[str]] = {}
@@ -96,6 +91,47 @@ def find_clusters(
                 Cluster(directory=directory, prefix=prefix, files=tuple(files))
             )
     return clusters
+
+
+_RECURSE_SKIP_DIRS = {
+    "__pycache__",
+    "node_modules",
+    ".next",
+    ".venv",
+    "venv",
+    ".git",
+    "dist",
+    "build",
+}
+
+
+def find_clusters_recursive(
+    root: Path,
+    *,
+    threshold: int = CLUSTER_THRESHOLD,
+    extensions: tuple[str, ...] = CHECKED_EXTENSIONS,
+) -> list[Cluster]:
+    """Walk ``root`` and run the cluster check on every directory.
+
+    Subdirectories are NOT a free pass: if a freshly-created subfolder
+    still hosts files that share a first-word prefix (e.g. moving
+    ``WorkspacePanel.*`` under ``workspace/`` without renaming), the
+    same UX problem recurs. Recursion catches that.
+    """
+    if not root.is_dir():
+        return []
+    out: list[Cluster] = []
+    stack = [root]
+    while stack:
+        current = stack.pop()
+        out.extend(find_clusters(current, threshold=threshold, extensions=extensions))
+        for child in current.iterdir():
+            if not child.is_dir() or child.is_symlink():
+                continue
+            if child.name in _RECURSE_SKIP_DIRS:
+                continue
+            stack.append(child)
+    return out
 
 
 def _format_cluster(cluster: Cluster, repo_root: Path) -> str:
@@ -208,9 +244,12 @@ class TestRepoHasNoPrefixClusters(unittest.TestCase):
     flagged clusters are reorganised into subdirectories."""
 
     def test_no_prefix_clusters_in_checked_dirs(self) -> None:
+        # Recurse into subdirectories: simply moving files into a
+        # subfolder without renaming (e.g. workspace/WorkspacePanel*)
+        # still hosts the same UX problem and must be flagged.
         all_clusters: list[Cluster] = []
         for directory in CHECKED_DIRECTORIES:
-            all_clusters.extend(find_clusters(directory))
+            all_clusters.extend(find_clusters_recursive(directory))
         if not all_clusters:
             return
         report_lines = [

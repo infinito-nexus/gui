@@ -31,7 +31,7 @@ from services.job_runner.paths import job_paths, jobs_root  # noqa: F401 - re-ex
 from services.job_runner.persistence import load_json, write_meta  # noqa: F401 - re-exported for mixins via _root()
 from services.job_runner.runner import start_process, terminate_process_group  # noqa: F401 - re-exported for mixins via _root()
 from services.job_runner.util import safe_mkdir, utc_iso  # noqa: F401 - re-exported for mixins via _root()
-from services.workspaces.workspace_context import load_workspace_yaml_document  # noqa: F401 - re-exported for mixins via _root()
+from services.workspaces.mixins.context import load_workspace_yaml_document  # noqa: F401 - re-exported for mixins via _root()
 
 from .runner_manager_service_runtime import RunnerManagerServiceRuntimeMixin
 from .runner_manager_service_support import with_group_add

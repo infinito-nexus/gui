@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useMemo, useRef, useState } from "react";
-import DeploymentWorkspaceServerSwitcher from "../DeploymentWorkspaceServerSwitcher";
+import DeploymentWorkspaceServerSwitcher from "../deployment/workspace/ServerSwitcher";
 import type {
   ConnectionResult,
   ServerState,

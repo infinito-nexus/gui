@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import { createWorkspacePanelCoreActions } from "./actions-core";
-import { createWorkspacePanelVaultActions } from "./actions-vault";
-import { createWorkspacePanelFileActions } from "./actions-files";
+import { createWorkspacePanelCoreActions } from "./actions/core/main";
+import { createWorkspacePanelVaultActions } from "./actions/vault";
+import { createWorkspacePanelFileActions } from "./actions/files";
 import { useZipImportWorkflow } from "./useZipImportWorkflow";
 
 export function useWorkspacePanelActions(ctx: any) {

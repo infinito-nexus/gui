@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
-import WorkspaceSwitcher from "./WorkspaceSwitcher";
-import WorkspacePanelLayout from "./WorkspacePanelLayout";
+import WorkspaceSwitcher from "./switcher/Switcher";
+import WorkspacePanelLayout from "./panel/Layout";
 import UsersOverviewPanel from "./UsersOverviewPanel";
 import { USERS_GROUP_VARS_PATH } from "./users-utils";
 

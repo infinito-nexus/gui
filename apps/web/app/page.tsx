@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import DeploymentConsole from "./components/DeploymentConsole";
+import DeploymentConsole from "./components/deployment/Console";
 import LoginPrompt from "./components/LoginPrompt";
 import {
   PANEL_QUERY_TO_KEY,

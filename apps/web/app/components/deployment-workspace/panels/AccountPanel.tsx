@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import AuditLogsPanel from "../../AuditLogsPanel";
 import MembersPanel from "../../MembersPanel";
-import styles from "../../DeploymentWorkspace.module.css";
+import styles from "../../deployment/workspace/Main.module.css";
 import { USER_STORAGE_KEY } from "../../workspace-panel/utils";
 import { listMembers } from "../../../lib/members-api";
 import type { Role } from "../types";

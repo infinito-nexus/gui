@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import LiveDeploymentView from "../../LiveDeploymentView";
-import styles from "../../DeploymentWorkspace.module.css";
+import LiveDeploymentView from "../../live/View";
+import styles from "../../deployment/workspace/Main.module.css";
 import type { ServerState } from "../../deployment-credentials/types";
 import {
   createDeviceStyle,

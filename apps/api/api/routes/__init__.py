@@ -12,8 +12,6 @@ from .server_requirements import router as server_requirements_router
 from .users import router as users_router
 from .workspace_logs import router as workspace_logs_router
 from .workspaces import router as workspaces_router
-from . import workspaces_history_routes as _workspaces_history_routes  # noqa: F401
-from . import workspaces_management_routes as _workspaces_management_routes  # noqa: F401
 
 router = APIRouter()
 router.include_router(roles_router)

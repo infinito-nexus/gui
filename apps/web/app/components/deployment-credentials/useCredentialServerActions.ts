@@ -6,7 +6,7 @@ import type {
 import type {
   CredentialBlurPayload,
   PendingServerAction,
-} from "./DeploymentCredentialsForm.types";
+} from "./form/types";
 import {
   getWorkspaceMasterPassword,
   promptWorkspaceMasterPassword,

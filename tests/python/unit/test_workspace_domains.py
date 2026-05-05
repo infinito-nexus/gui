@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 import yaml
 from fastapi import HTTPException
 
-from services.workspaces.workspace_service_domains import (
+from services.workspaces.mixins.domains import (
     DOMAIN_CATALOG_KEY,
     WorkspaceServiceDomainsMixin,
 )

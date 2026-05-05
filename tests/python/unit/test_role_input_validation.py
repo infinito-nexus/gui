@@ -121,8 +121,8 @@ class TestRoleInputValidation(unittest.TestCase):
         workspace_id = self._create_workspace(client)
 
         with (
-            patch("api.routes.workspaces_management_routes._roles") as m_roles,
-            patch("api.routes.workspaces_management_routes._svc") as m_workspaces,
+            patch("api.routes.workspaces.management_routes._roles") as m_roles,
+            patch("api.routes.workspaces.management_routes._svc") as m_workspaces,
         ):
             m_roles.return_value.get.side_effect = HTTPException(
                 status_code=404,
@@ -153,9 +153,9 @@ class TestRoleInputValidation(unittest.TestCase):
         workspace_id = self._create_workspace(client)
 
         with (
-            patch("api.routes.workspaces.ensure_workspace_access") as m_access,
-            patch("api.routes.workspaces._roles") as m_roles,
-            patch("api.routes.workspaces._svc") as m_workspaces,
+            patch("api.routes.workspaces.main.ensure_workspace_access") as m_access,
+            patch("api.routes.workspaces.main._roles") as m_roles,
+            patch("api.routes.workspaces.main._svc") as m_workspaces,
         ):
             m_access.return_value = None
             m_roles.return_value.get.side_effect = HTTPException(
@@ -181,9 +181,9 @@ class TestRoleInputValidation(unittest.TestCase):
         workspace_id = self._create_workspace(client)
 
         with (
-            patch("api.routes.workspaces.ensure_workspace_access") as m_access,
-            patch("api.routes.workspaces._roles") as m_roles,
-            patch("api.routes.workspaces._svc") as m_workspaces,
+            patch("api.routes.workspaces.main.ensure_workspace_access") as m_access,
+            patch("api.routes.workspaces.main._roles") as m_roles,
+            patch("api.routes.workspaces.main._svc") as m_workspaces,
         ):
             m_access.return_value = None
             m_roles.return_value.get.side_effect = HTTPException(

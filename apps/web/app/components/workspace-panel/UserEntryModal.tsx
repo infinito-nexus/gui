@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import styles from "../WorkspacePanel.module.css";
+import styles from "../workspace/Panel.module.css";
 import { asTrimmed } from "./users-utils";
 import type { WorkspaceUserForm } from "./users-utils";
 

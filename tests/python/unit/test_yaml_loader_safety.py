@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from services.workspaces.workspace_context import load_workspace_yaml_document
+from services.workspaces.mixins.context import load_workspace_yaml_document
 
 
 class TestYamlLoaderSafety(unittest.TestCase):

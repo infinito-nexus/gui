@@ -1,4 +1,4 @@
-import styles from "../WorkspacePanel.module.css";
+import styles from "../workspace/Panel.module.css";
 
 type Props = {
   open: boolean;

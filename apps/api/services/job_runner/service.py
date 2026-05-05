@@ -25,7 +25,7 @@ from services.inventory_preview import build_inventory_preview  # noqa: F401 - r
 from services.runner_manager_client import RunnerManagerClient  # noqa: F401 - re-exported for mixins via _root()
 from services.workspaces import WorkspaceService  # noqa: F401 - re-exported for mixins via _root()
 from services.workspaces.vault import KDBX_FILENAME, _vault_password_from_kdbx  # noqa: F401 - re-exported for mixins via _root()
-from services.workspaces.workspace_context import (  # noqa: F401 - re-exported for mixins via _root()
+from services.workspaces.mixins.context import (  # noqa: F401 - re-exported for mixins via _root()
     _WorkspaceYamlDumper,
     load_workspace_yaml_document,
 )

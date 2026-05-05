@@ -38,12 +38,12 @@ class TestWorkspaceServiceRefactorPart2(WorkspaceServiceRefactorTestCase):
         with (
             patch.dict(os.environ, {"INFINITO_REPO_PATH": str(repo_root)}, clear=False),
             patch(
-                "services.workspaces.workspace_service_artifacts._vault_password_from_kdbx",
+                "services.workspaces.mixins.artifacts.main._vault_password_from_kdbx",
                 return_value="derived-vault-pass",
             ),
             patch.object(service, "_history_commit"),
             patch(
-                "services.workspaces.workspace_service_artifacts.subprocess.run",
+                "services.workspaces.mixins.artifacts.main.subprocess.run",
                 side_effect=_fake_run,
             ),
         ):
@@ -96,12 +96,12 @@ class TestWorkspaceServiceRefactorPart2(WorkspaceServiceRefactorTestCase):
         with (
             patch.dict(os.environ, {"INFINITO_REPO_PATH": str(repo_root)}, clear=False),
             patch(
-                "services.workspaces.workspace_service_artifacts._vault_password_from_kdbx",
+                "services.workspaces.mixins.artifacts.main._vault_password_from_kdbx",
                 return_value="derived-vault-pass",
             ),
             patch.object(service, "_history_commit"),
             patch(
-                "services.workspaces.workspace_service_artifacts.subprocess.run",
+                "services.workspaces.mixins.artifacts.main.subprocess.run",
                 side_effect=_fake_run,
             ),
         ):
@@ -210,12 +210,12 @@ class TestWorkspaceServiceRefactorPart2(WorkspaceServiceRefactorTestCase):
         with (
             patch.dict(os.environ, {"INFINITO_REPO_PATH": str(repo_root)}, clear=False),
             patch(
-                "services.workspaces.workspace_service_artifacts._vault_password_from_kdbx",
+                "services.workspaces.mixins.artifacts.main._vault_password_from_kdbx",
                 return_value="derived-vault-pass",
             ),
             patch.object(service, "_history_commit"),
             patch(
-                "services.workspaces.workspace_service_artifacts.subprocess.run",
+                "services.workspaces.mixins.artifacts.main.subprocess.run",
                 side_effect=_fake_run,
             ),
         ):

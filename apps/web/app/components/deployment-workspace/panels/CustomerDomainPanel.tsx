@@ -7,7 +7,7 @@
 // Expert view.
 
 import { useCallback, useState } from "react";
-import styles from "../../DeploymentWorkspace.module.css";
+import styles from "../../deployment/workspace/Main.module.css";
 import {
   DEFAULT_PRIMARY_DOMAIN,
   normalizeDomainName,

@@ -17,8 +17,8 @@ import {
   type ReleaseTrack,
   type DeployTargetFilter,
 } from "./dashboard-filters";
-import type { BundleOptionalListColumnKey } from "./BundleGridView";
-import type { OptionalListColumnKey } from "./RoleListView";
+import type { BundleOptionalListColumnKey } from "./bundle/grid/View";
+import type { OptionalListColumnKey } from "./role/ListView";
 import { VIEW_MODES, type Bundle, type Role, type ViewMode } from "./types";
 
 type UseRoleDashboardBootstrapParams = {

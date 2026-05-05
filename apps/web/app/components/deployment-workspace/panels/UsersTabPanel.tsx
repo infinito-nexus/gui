@@ -10,7 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import YAML from "yaml";
-import styles from "../../DeploymentWorkspace.module.css";
+import styles from "../../deployment/workspace/Main.module.css";
 import { encodePath } from "../../workspace-panel/utils";
 import {
   parseUsersFromCsv,
@@ -19,9 +19,9 @@ import {
   type WorkspaceUser,
 } from "../../workspace-panel/users-utils";
 import UserDetailModal from "./users-tab/UserDetailModal";
-import UsersTabFooter from "./users-tab/UsersTabFooter";
-import UsersTabTable from "./users-tab/UsersTabTable";
-import UsersTabToolbar from "./users-tab/UsersTabToolbar";
+import UsersTabFooter from "./users-tab/Footer";
+import UsersTabTable from "./users-tab/Table";
+import UsersTabToolbar from "./users-tab/Toolbar";
 import {
   AUTOSAVE_DEBOUNCE_MS,
   COLUMNS,

@@ -2,9 +2,9 @@
 
 import type { ReactNode } from "react";
 import RoleDashboard from "../RoleDashboard";
-import DeploymentCredentialsForm from "../DeploymentCredentialsForm";
-import WorkspacePanel from "../WorkspacePanel";
-import styles from "../DeploymentWorkspace.module.css";
+import DeploymentCredentialsForm from "../deployment/CredentialsForm";
+import WorkspacePanel from "../workspace/Panel";
+import styles from "../deployment/workspace/Main.module.css";
 import IntroPanel from "./panels/IntroPanel";
 import DomainPanel from "./panels/DomainPanel";
 import CustomerDomainPanel from "./panels/CustomerDomainPanel";

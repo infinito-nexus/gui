@@ -11,13 +11,16 @@ from io import BytesIO
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from services.workspaces import (
-    workspace_context,
-    workspace_service_artifacts,
-    workspace_service_history,
-    workspace_service_history_restore,
-    workspace_service_inventory,
-    workspace_service_management,
+from services.workspaces import WorkspaceService  # noqa: F401
+from services.workspaces.mixins import (
+    context as workspace_context,
+    inventory as workspace_service_inventory,
+    management as workspace_service_management,
+)
+from services.workspaces.mixins.artifacts import main as workspace_service_artifacts
+from services.workspaces.mixins.history import (
+    main as workspace_service_history,
+    restore as workspace_service_history_restore,
 )
 
 

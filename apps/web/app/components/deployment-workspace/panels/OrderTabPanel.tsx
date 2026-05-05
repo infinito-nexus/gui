@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import styles from "../../DeploymentWorkspace.module.css";
+import styles from "../../deployment/workspace/Main.module.css";
 import type { Role } from "../types";
 import OrderItemsTable from "./order/OrderItemsTable";
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import unittest
 
-from services.workspaces.workspace_service_inventory_role_apps import (
+from services.workspaces.mixins.inventory_role_apps import (
     _delete_path,
     _set_path,
 )

@@ -11,7 +11,7 @@ from unittest.mock import patch
 import yaml
 from fastapi import HTTPException
 
-from services.workspaces.workspace_service_orders import (
+from services.workspaces.mixins.orders import (
     WorkspaceServiceOrdersMixin,
     _slugify_username,
     _split_full_name,
@@ -83,10 +83,10 @@ class TestPlaceOrder(unittest.TestCase):
     def test_anonymous_order_creates_workspace_user(self) -> None:
         with (
             patch(
-                "services.workspaces.workspace_service_orders._load_meta",
+                "services.workspaces.mixins.orders._load_meta",
                 return_value={},
             ),
-            patch("services.workspaces.workspace_service_orders._write_meta"),
+            patch("services.workspaces.mixins.orders._write_meta"),
         ):
             result = self.svc.place_order(
                 "workspace-1",
@@ -120,10 +120,10 @@ class TestPlaceOrder(unittest.TestCase):
     def test_authenticated_order_skips_user_creation(self) -> None:
         with (
             patch(
-                "services.workspaces.workspace_service_orders._load_meta",
+                "services.workspaces.mixins.orders._load_meta",
                 return_value={},
             ),
-            patch("services.workspaces.workspace_service_orders._write_meta"),
+            patch("services.workspaces.mixins.orders._write_meta"),
         ):
             result = self.svc.place_order(
                 "workspace-1",
@@ -170,10 +170,10 @@ class TestPlaceOrder(unittest.TestCase):
 
         with (
             patch(
-                "services.workspaces.workspace_service_orders._load_meta",
+                "services.workspaces.mixins.orders._load_meta",
                 return_value={},
             ),
-            patch("services.workspaces.workspace_service_orders._write_meta"),
+            patch("services.workspaces.mixins.orders._write_meta"),
         ):
             self.svc.place_order(
                 "workspace-1",
@@ -202,10 +202,10 @@ class TestListOrders(unittest.TestCase):
     def test_lists_newest_first(self) -> None:
         with (
             patch(
-                "services.workspaces.workspace_service_orders._load_meta",
+                "services.workspaces.mixins.orders._load_meta",
                 return_value={},
             ),
-            patch("services.workspaces.workspace_service_orders._write_meta"),
+            patch("services.workspaces.mixins.orders._write_meta"),
         ):
             r1 = self.svc.place_order(
                 "workspace-1",
@@ -220,7 +220,7 @@ class TestListOrders(unittest.TestCase):
             # Force a different created_at by patching _now_iso for
             # the second call.
             with patch(
-                "services.workspaces.workspace_service_orders._now_iso",
+                "services.workspaces.mixins.orders._now_iso",
                 return_value="9999-01-01T00:00:00Z",
             ):
                 r2 = self.svc.place_order(
