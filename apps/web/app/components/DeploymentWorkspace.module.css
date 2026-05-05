@@ -891,7 +891,7 @@
 }
 
 /*
- * Order tab — customer-facing checkout surface (Basic mode).
+ * Order tab — customer-facing checkout surface (Customer mode).
  * Two-column layout on wide viewports; stacked below ~720px so the
  * form stays usable on narrow screens.
  */

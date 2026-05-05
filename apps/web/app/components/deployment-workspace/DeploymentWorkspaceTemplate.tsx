@@ -140,7 +140,7 @@ export default function DeploymentWorkspaceTemplate({
   //     below) so workspace bootstrap state — workspace_id wiring,
   //     alias rename plumbing, credential cache — keeps feeding the
   //     other tabs.
-  //   - `order` is the Basic-mode counterpart of `deploy` — a
+  //   - `order` is the Customer-mode counterpart of `deploy` — a
   //     customer-facing checkout surface.
   const isExpert = modeSwitch.mode === "expert";
   const visiblePanels = panels.filter((panel) => {
@@ -558,7 +558,7 @@ export default function DeploymentWorkspaceTemplate({
               modeSwitch.onModeChange(modeSwitch.mode === "expert" ? "customer" : "expert")
             }
             data-testid="mode-toggle-button"
-            aria-label="Toggle basic/expert mode"
+            aria-label="Toggle customer/expert mode"
             aria-pressed={modeSwitch.mode === "expert"}
             className={`${styles.navButton} ${styles.authModeEnd} ${
               modeSwitch.mode === "expert" ? styles.modeExpert : styles.modeBasic
@@ -570,7 +570,7 @@ export default function DeploymentWorkspaceTemplate({
               }`}
               aria-hidden="true"
             />
-            <span>{modeSwitch.mode === "expert" ? "Expert" : "Basic"}</span>
+            <span>{modeSwitch.mode === "expert" ? "Expert" : "Customer"}</span>
           </button>
         </div>
         <button
