@@ -1,4 +1,4 @@
-.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-unit test-integration test-python-unit test-node-unit test-python-integration test-node-integration test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker e2e-dashboard-ci-docker-oidc lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
+.PHONY: setup env dirs up down logs ps refresh-catalog db-up db-stop db-logs db-wait db-psql requirements-init ensure-local-runner-image test-arch test-env-up test-env-down test-up web-sync venv install test test-unit test-integration test-lint test-python-unit test-node-unit test-python-integration test-node-integration test-perf clean example-workspace-zip e2e-dashboard-local e2e-dashboard-local-docker e2e-dashboard-ci e2e-dashboard-ci-docker e2e-dashboard-ci-docker-oidc lint lint-python lint-shell autoformat autoformat-python autoformat-shell warn-local-unpinned-images pre-commit-install pre-commit-run playwright-build debug-workspace-perms repair-workspace-perms break-workspace-perms api-smoke-deployment api-smoke-deployment-full e2e-dashboard-wipe-state e2e-dashboard-wipe-caches
 
 # Use docker compose v2 by default; override via env if needed:
 #   make setup DOCKER_COMPOSE="docker-compose"
@@ -245,7 +245,15 @@ test-unit: test-python-unit test-node-unit
 
 test-integration: test-python-integration test-node-integration
 
-test: test-unit test-integration
+# Filesystem-layout lint (prefix clusters). NOT pulled in by
+# `make lint` or `make test-unit` so the pre-commit hook stays
+# unblocked — today the rule fails on existing clusters by design.
+# `make test` (the comprehensive run) does include it.
+test-lint: dirs install
+	@echo "→ Filesystem-layout lint (prefix clusters)"
+	@STATE_DIR="$(TEST_STATE_DIR)" $(PYTHON) -m unittest discover -s tests/python/lint -p "test_*.py" -t . -v
+
+test: test-unit test-integration test-lint
 
 test-perf: dirs
 	@set -e; \
