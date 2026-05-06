@@ -1,3 +1,6 @@
 node_modules/
 .next/
 .git/
+state/
+test-results/
+playwright-report/

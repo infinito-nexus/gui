@@ -202,7 +202,16 @@ async function waitForSuccessfulDeployment(page: Page) {
       return finalStatus;
     }
     if (statusText.includes("Failed") || statusText.includes("Canceled")) {
-      throw new Error(`Deployment did not succeed: ${statusText}`);
+      // Dump the live deploy log so failures surface the actual
+      // ansible/runner output rather than an opaque "exit 1".
+      const liveLog = await page
+        .locator("[data-testid='live-deployment-view'], [class*='liveLogScroller']")
+        .first()
+        .innerText()
+        .catch(() => "");
+      throw new Error(
+        `Deployment did not succeed: ${statusText}\n--- Live deploy log ---\n${liveLog}`
+      );
     }
     await page.waitForTimeout(500);
   }
@@ -230,6 +239,23 @@ async function runDashboardDeployment(page: Page) {
   await expect(page.locator("#workspace-switcher-slot > *")).toHaveCount(0);
   await expect(page.getByText("Workspaces")).toHaveCount(0);
 
+  // Expert mode is required up front: the Inventory tab is hidden in
+  // Customer mode, and this test drives a real deploy which needs the
+  // expert-only Hardware/Inventory/Deploy surfaces.
+  const modeToggle = page.getByRole("button", {
+    name: "Toggle customer/expert mode",
+  });
+  await expect(modeToggle).toContainText("Customer");
+  await modeToggle.click();
+  await expect(page.getByText("Enable Expert mode?")).toBeVisible();
+  // The Software tab also has many "Enable" buttons (one per role
+  // card), so scope this click to the dialog by its data-testid.
+  await page
+    .getByTestId("expert-mode-confirm")
+    .getByRole("button", { name: "Enable", exact: true })
+    .click();
+  await expect(modeToggle).toContainText("Expert");
+
   await page.getByRole("tab", { name: "Inventory" }).click();
   const workspaceId = await waitForWorkspaceId(page);
   expect(workspaceId).toMatch(/^[a-z0-9-]+$/);
@@ -247,14 +273,6 @@ async function runDashboardDeployment(page: Page) {
   await expect(roleCard.getByText("Enabled")).toBeVisible();
 
   await page.getByRole("tab", { name: "Hardware" }).click();
-  const modeToggle = page.getByRole("button", {
-    name: "Toggle customer/expert mode",
-  });
-  await expect(modeToggle).toContainText("Customer");
-  await modeToggle.click();
-  await expect(page.getByText("Enable Expert mode?")).toBeVisible();
-  await page.getByRole("button", { name: "Enable", exact: true }).click();
-  await expect(modeToggle).toContainText("Expert");
 
   await page.getByRole("button", { name: "Add", exact: true }).click();
   const serverRow = page.locator(`[data-server-alias="${TARGET_ALIAS}"]`).first();
@@ -367,7 +385,7 @@ async function runDashboardDeployment(page: Page) {
   await page.getByRole("button", { name: "Close", exact: true }).click();
   await expect(page.getByRole("heading", { name: "App credentials" })).toHaveCount(0);
 
-  await page.getByRole("tab", { name: "Setup" }).click();
+  await page.getByRole("tab", { name: "Deploy" }).click();
   const deployRow = page.locator(`[data-server-alias="${TARGET_ALIAS}"]`).first();
   await expect(deployRow).toBeVisible();
   await expect(deployRow.getByRole("checkbox", { name: `Select ${TARGET_ALIAS}` })).toBeEnabled();

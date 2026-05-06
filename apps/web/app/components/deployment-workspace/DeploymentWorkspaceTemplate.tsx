@@ -344,7 +344,14 @@ export default function DeploymentWorkspaceTemplate({
       ) : null}
       {expertModeConfirm.open ? (
         <div onClick={expertModeConfirm.onCancel} className={styles.modeConfirmOverlay}>
-          <div onClick={(event) => event.stopPropagation()} className={styles.modeConfirmCard}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Enable Expert mode?"
+            data-testid="expert-mode-confirm"
+            onClick={(event) => event.stopPropagation()}
+            className={styles.modeConfirmCard}
+          >
             <div className={styles.modeConfirmTitleRow}>
               <i
                 className={`fa-solid fa-triangle-exclamation ${styles.modeConfirmIcon}`}

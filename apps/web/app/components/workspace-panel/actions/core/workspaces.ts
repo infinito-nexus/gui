@@ -158,9 +158,32 @@ export function createWorkspacePanelWorkspaceActions(ctx: any) {
     setWorkspaceLoading(true);
     setWorkspaceError(null);
     try {
+      // Prime the CSRF cookie with a same-origin GET first; the
+      // global fetch monkeypatch usually does this for us, but on a
+      // cold page load the very first POST can fire before the
+      // priming completes, leaving no X-CSRF header on the request.
+      // Fetching the list explicitly here guarantees the cookie is
+      // set before we POST.
+      let csrf = "";
+      if (typeof document !== "undefined") {
+        const readCsrf = () =>
+          (document.cookie.match(/(?:^|;\s*)csrf=([^;]+)/)?.[1] || "").trim();
+        csrf = readCsrf();
+        if (!csrf) {
+          await fetch(`${baseUrl}/api/workspaces`, {
+            cache: "no-store",
+            credentials: "same-origin",
+          }).catch(() => null);
+          csrf = readCsrf();
+        }
+      }
       const res = await fetch(`${baseUrl}/api/workspaces`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrf ? { "X-CSRF": csrf } : {}),
+        },
       });
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}`);
