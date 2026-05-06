@@ -96,6 +96,7 @@
         "~/.ansible",
         "~/.cache/pip",
         "~/.cache/pre-commit",
+        "~/.docker/buildx",
         "~/.npm",
         "~/.venvs"
       ],
