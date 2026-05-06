@@ -386,6 +386,7 @@ export function buildDeploymentWorkspacePanels({
         <UsersTabPanel
           baseUrl={baseUrl}
           workspaceId={workspaceId ?? ""}
+          deviceMode={deviceMode}
         />
       ),
     },

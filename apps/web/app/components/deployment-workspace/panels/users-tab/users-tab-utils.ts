@@ -1,6 +1,7 @@
-import YAML from "yaml";
+import YAML, { Scalar } from "yaml";
 import {
   toYamlUserEntry,
+  USERNAME_PATTERN,
   type WorkspaceUser,
 } from "../../../workspace-panel/users-utils";
 
@@ -30,22 +31,34 @@ export type ColumnKey =
 export type ColumnDef = {
   key: ColumnKey;
   label: string;
+  // Font Awesome icon name (without the "fa-" prefix) shown next to
+  // the column label and reused in the detail modal.
+  icon: string;
   // Whether this column shows by default; users can toggle the rest
   // on via the Columns picker.
   defaultVisible: boolean;
 };
 
 export const COLUMNS: ColumnDef[] = [
-  { key: "username", label: "Username", defaultVisible: true },
-  { key: "firstname", label: "First name", defaultVisible: true },
-  { key: "lastname", label: "Last name", defaultVisible: true },
-  { key: "email", label: "Email", defaultVisible: true },
-  { key: "uid", label: "UID", defaultVisible: false },
-  { key: "gid", label: "GID", defaultVisible: false },
-  { key: "roles", label: "Roles", defaultVisible: false },
-  { key: "description", label: "Description", defaultVisible: false },
-  { key: "reserved", label: "Reserved", defaultVisible: false },
+  { key: "username", label: "Username", icon: "user", defaultVisible: true },
+  { key: "firstname", label: "First name", icon: "id-card", defaultVisible: true },
+  { key: "lastname", label: "Last name", icon: "id-card-clip", defaultVisible: true },
+  { key: "email", label: "Email", icon: "envelope", defaultVisible: false },
+  { key: "uid", label: "UID", icon: "hashtag", defaultVisible: false },
+  { key: "gid", label: "GID", icon: "people-group", defaultVisible: false },
+  { key: "roles", label: "Roles", icon: "user-shield", defaultVisible: false },
+  { key: "description", label: "Description", icon: "align-left", defaultVisible: false },
+  { key: "reserved", label: "Reserved", icon: "server", defaultVisible: false },
 ];
+
+// Customer-mode shows the bare-minimum identity columns and hides
+// every advanced control (filter, columns picker, import/export,
+// per-row detail). The expert toggle re-enables everything.
+export const CUSTOMER_VISIBLE_COLUMNS: ReadonlySet<ColumnKey> = new Set([
+  "username",
+  "firstname",
+  "lastname",
+]);
 
 export const FILTER_FIELDS: Array<keyof WorkspaceUser> = [
   "username",
@@ -157,6 +170,32 @@ export function rowsFingerprint(rows: UserRow[]): string {
   return JSON.stringify(rowsToYamlMap(rows));
 }
 
+// Build the workspace YAML content with vault-encoded passwords
+// emitted as `password: !vault |` block scalars. YAML.stringify
+// alone would quote the multi-line $ANSIBLE_VAULT body inline, which
+// trips the API's plaintext-secret detector — we walk through
+// Document API instead to attach the !vault tag explicitly.
+export function buildUsersYamlContent(
+  doc: Record<string, unknown>,
+  rows: UserRow[],
+): string {
+  const next = { ...doc };
+  next.users = rowsToYamlMap(rows);
+  const docNode = new YAML.Document(next);
+  for (const row of rows) {
+    const username = row.username.trim();
+    if (!username) continue;
+    const pw = row.password ?? "";
+    if (typeof pw === "string" && pw.startsWith("$ANSIBLE_VAULT;")) {
+      const scalar = new Scalar(pw);
+      scalar.tag = "!vault";
+      scalar.type = Scalar.BLOCK_LITERAL;
+      docNode.setIn(["users", username, "password"], scalar);
+    }
+  }
+  return docNode.toString();
+}
+
 export function downloadBlob(filename: string, mime: string, content: string): void {
   if (typeof window === "undefined") return;
   const blob = new Blob([content], { type: mime });
@@ -183,6 +222,83 @@ export function rowMatchesColumnFilters(
     if (!value.includes(q)) return false;
   }
   return true;
+}
+
+// Validation helpers — used by the table cells and detail modal to
+// give instant inline feedback. The hard "blocks save" check still
+// lives in UsersTabPanel.validateRows; these mirror its rules so the
+// red border lights up in real time.
+
+// Mirror the HTML5 email-input pattern (RFC 5322 lite). Rejects
+// commas, double dots, and other characters the previous loose
+// /^[^\s@]+@[^\s@]+\.[^\s@]+$/ accepted (e.g. "kevin@veen.world.,xyz").
+const EMAIL_PATTERN =
+  /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
+
+export function isValidEmail(value: string | undefined | null): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return true;
+  return EMAIL_PATTERN.test(v);
+}
+
+export function isValidUsername(value: string | undefined | null): boolean {
+  const v = (value ?? "").trim();
+  if (!v) return false;
+  return USERNAME_PATTERN.test(v);
+}
+
+export function isUsernameAvailable(
+  rows: UserRow[],
+  candidate: string,
+  currentRow: UserRow,
+): boolean {
+  const target = candidate.trim();
+  if (!target) return true;
+  return !rows.some((r) => r !== currentRow && r.username.trim() === target);
+}
+
+// UID/GID: any non-negative integer is structurally valid; we warn
+// (not block) outside the conventional regular-user range so admins
+// can still set system UIDs deliberately.
+export function isValidUidGid(value: number | undefined | null): boolean {
+  if (value === undefined || value === null) return true;
+  return Number.isInteger(value) && value >= 0;
+}
+
+// Strip every character that isn't a lowercase letter or digit, and
+// downcase capitals on the way through. Used as an onChange filter
+// so the username field can never carry an invalid char even
+// transiently (the validation pattern is /^[a-z0-9]+$/).
+export function sanitizeUsernameInput(raw: string): string {
+  return (raw || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// UID/GID inputs render as text + inputMode=numeric so we can fully
+// own keystroke filtering across browsers. Drop everything that
+// isn't a digit, including signs/decimal points/exponent letters
+// that <input type=number> would otherwise let through.
+export function sanitizeIntegerInput(raw: string): string {
+  return (raw || "").replace(/[^\d]/g, "");
+}
+
+export type PasswordStatus = "unset" | "vault" | "plaintext";
+
+// Categorize what's currently in row.password. The API rejects any
+// plaintext value with key "password" via its plaintext-secret
+// detector — we mirror that here so the modal can warn the user
+// before the autosave fails.
+export function classifyPassword(value: string | undefined | null): PasswordStatus {
+  const v = (value ?? "").trim();
+  if (!v) return "unset";
+  if (v.startsWith("!vault") || v.startsWith("$ANSIBLE_VAULT;") || v.startsWith("{{")) {
+    return "vault";
+  }
+  return "plaintext";
+}
+
+export function isConventionalUidGid(value: number | undefined | null): boolean {
+  if (value === undefined || value === null) return true;
+  return Number.isInteger(value) && value >= 1000 && value <= 60000;
 }
 
 export function formatColumnValue(row: UserRow, key: ColumnKey): string {

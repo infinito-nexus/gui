@@ -790,8 +790,11 @@
 }
 
 .usersTabRowActions {
-  text-align: right;
-  width: 56px;
+  white-space: nowrap;
+}
+
+.usersTabRowActions > * + * {
+  margin-left: 6px;
 }
 
 .usersTabEmpty {
@@ -799,6 +802,18 @@
   text-align: center;
   color: var(--deployer-muted-ink);
   font-style: italic;
+}
+
+/* Always-visible draft row at the bottom of the table; visually
+ * muted so it reads as "draft entry" rather than a saved row. */
+.usersTabDraftRow > td {
+  background: color-mix(in srgb, var(--bs-body-bg) 85%, transparent);
+}
+
+.usersTabDraftRow input::placeholder,
+.usersTabDraftRow input::-webkit-input-placeholder {
+  font-style: italic;
+  opacity: 0.65;
 }
 
 .usersTabEmptyRow {
@@ -811,6 +826,7 @@
 .usersTabSyncBadge {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 11px;
@@ -1231,6 +1247,184 @@
   word-break: break-all;
 }
 
+.usersTabFieldError {
+  font-size: 12px;
+  color: var(--bs-danger-text-emphasis);
+}
+
+.usersTabFieldHint {
+  font-size: 12px;
+  color: var(--bs-warning-text-emphasis);
+}
+
+.formControlInvalid {
+  border-color: var(--bs-danger-border-subtle) !important;
+  background: var(--bs-danger-bg-subtle);
+}
+
+.usersTabRoleChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 4px;
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bs-body-bg) 70%, transparent);
+  min-height: 38px;
+}
+
+.usersTabRoleChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  background: var(--bs-info-bg-subtle, color-mix(in srgb, var(--bs-primary) 18%, transparent));
+  border: 1px solid var(--bs-border-color-translucent);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.usersTabRoleChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--bs-danger-text-emphasis);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0;
+}
+
+.usersTabRoleChipRemove:hover {
+  background: var(--bs-danger-bg-subtle);
+}
+
+.usersTabRoleAdd {
+  display: flex;
+  gap: 6px;
+}
+
+.usersTabRoleAdd > input {
+  flex: 1 1 auto;
+}
+
+/*
+ * Role and Key add buttons render via React portal to escape the
+ * modal card's overflow:auto clipping. The HoverPopover component
+ * sets position/top/left inline; these classes only carry visual
+ * styling (size, padding, border, shadow).
+ */
+.usersTabRoleAddTrigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px dashed var(--bs-border-color-translucent);
+  background: transparent;
+  color: var(--bs-body-color);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.usersTabRoleAddTrigger:hover,
+.usersTabRoleAddTrigger:focus-visible {
+  background: var(--bs-info-bg-subtle, color-mix(in srgb, var(--bs-primary) 18%, transparent));
+}
+
+.usersTabRoleAddPopover {
+  display: flex;
+  min-width: 220px;
+  padding: 6px;
+  gap: 6px;
+  background: var(--deployer-card-bg-soft);
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 8px;
+  box-shadow: var(--deployer-shadow);
+}
+
+.usersTabRoleAddPopover > input {
+  flex: 1 1 auto;
+}
+
+.usersTabKeyAddPopover {
+  display: flex;
+  align-items: center;
+  width: min(520px, 90vw);
+  padding: 6px;
+  background: var(--deployer-card-bg-soft);
+  border: 1px solid var(--bs-border-color-translucent);
+  border-radius: 8px;
+  box-shadow: var(--deployer-shadow);
+  gap: 6px;
+}
+
+.usersTabKeyAddPopover > input[type="text"] {
+  flex: 1 1 auto;
+  font-family: var(--bs-font-monospace, monospace);
+  font-size: 12px;
+}
+
+.usersTabKeysList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usersTabKeyRow {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.usersTabKeyRow > input {
+  flex: 1 1 auto;
+  font-family: var(--bs-font-monospace, monospace);
+  font-size: 12px;
+}
+
+.usersTabKeyEmpty {
+  font-size: 12px;
+  color: var(--deployer-muted-ink);
+  padding: 6px 0;
+}
+
+.usersTabPasswordStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.usersTabPasswordSet {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.usersTabPasswordSet > input {
+  flex: 1 1 180px;
+}
+
+.usersTabFieldHintMuted {
+  font-size: 12px;
+  color: var(--deployer-muted-ink);
+}
+
+.usersTabFieldHintOk {
+  font-size: 12px;
+  color: var(--bs-success-text-emphasis);
+}
+
 .workspaceSegmentItemLabel {
   flex: 1 1 auto;
   text-align: left;
@@ -1390,6 +1584,16 @@
 
 .smallButtonDisabled {
   cursor: not-allowed;
+}
+
+/* Native :disabled state — neutralise hover-able variants (e.g.
+ * smallButtonDanger keeps a red border) and fade so it reads as
+ * non-actionable in any color combination. */
+.smallButton:disabled,
+.smallButton[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: saturate(0.5);
 }
 
 .smallButtonDanger {

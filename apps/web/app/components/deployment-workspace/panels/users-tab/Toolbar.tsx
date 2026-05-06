@@ -10,11 +10,11 @@ type Props = {
   onToggleColumn: (key: ColumnKey) => void;
   filterEnabled: boolean;
   onToggleFilter: () => void;
-  onAddUser: () => void;
   onPickCsv: (event: ChangeEvent<HTMLInputElement>) => void;
   onPickYaml: (event: ChangeEvent<HTMLInputElement>) => void;
   onExportCsv: () => void;
   onExportYaml: () => void;
+  isCustomer?: boolean;
 };
 
 const SYNC_LABEL: Record<SyncState, string> = {
@@ -24,17 +24,24 @@ const SYNC_LABEL: Record<SyncState, string> = {
   error: "Save failed",
 };
 
+const SYNC_ICON: Record<SyncState, string> = {
+  idle: "circle-check",
+  saving: "rotate",
+  saved: "check",
+  error: "triangle-exclamation",
+};
+
 export default function UsersTabToolbar({
   syncState,
   visibleColumns,
   onToggleColumn,
   filterEnabled,
   onToggleFilter,
-  onAddUser,
   onPickCsv,
   onPickYaml,
   onExportCsv,
   onExportYaml,
+  isCustomer = false,
 }: Props) {
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -69,72 +76,74 @@ export default function UsersTabToolbar({
   return (
     <div className={styles.usersTabActions}>
       <span className={styles.usersTabSyncBadge} data-state={syncState}>
+        <i
+          className={`fa-solid fa-${SYNC_ICON[syncState]}${
+            syncState === "saving" ? " fa-spin" : ""
+          }`}
+          aria-hidden="true"
+        />{" "}
         {SYNC_LABEL[syncState]}
       </span>
 
-      <div ref={columnsMenuRef} className={styles.usersTabSplitWrap}>
+      {isCustomer ? null : (
+        <div ref={columnsMenuRef} className={styles.usersTabSplitWrap}>
+          <button
+            type="button"
+            className={`${styles.smallButton} ${styles.smallButtonEnabled}`}
+            onClick={() => {
+              setColumnsMenuOpen((prev) => !prev);
+              setImportMenuOpen(false);
+              setExportMenuOpen(false);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={columnsMenuOpen}
+          >
+            <i className="fa-solid fa-table-columns" aria-hidden="true" />
+            <span>Columns</span>
+            <i
+              className={`fa-solid ${
+                columnsMenuOpen ? "fa-chevron-up" : "fa-chevron-down"
+              }`}
+              aria-hidden="true"
+            />
+          </button>
+          {columnsMenuOpen ? (
+            <div className={styles.usersTabSplitMenu} role="menu">
+              {COLUMNS.map((col) => (
+                <label key={col.key} className={styles.usersTabSplitItem}>
+                  <input
+                    type="checkbox"
+                    checked={visibleColumns.has(col.key)}
+                    onChange={() => onToggleColumn(col.key)}
+                  />
+                  <span>{col.label}</span>
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {isCustomer ? null : (
         <button
           type="button"
-          className={`${styles.smallButton} ${styles.smallButtonEnabled}`}
-          onClick={() => {
-            setColumnsMenuOpen((prev) => !prev);
-            setImportMenuOpen(false);
-            setExportMenuOpen(false);
-          }}
-          aria-haspopup="menu"
-          aria-expanded={columnsMenuOpen}
+          className={`${styles.smallButton} ${styles.smallButtonEnabled} ${
+            filterEnabled ? styles.usersTabFilterButtonActive : ""
+          }`}
+          onClick={onToggleFilter}
+          aria-pressed={filterEnabled}
+          title={
+            filterEnabled
+              ? "Hide column filter inputs"
+              : "Show a search input per visible column"
+          }
         >
-          <i className="fa-solid fa-table-columns" aria-hidden="true" />
-          <span>Columns</span>
-          <i
-            className={`fa-solid ${
-              columnsMenuOpen ? "fa-chevron-up" : "fa-chevron-down"
-            }`}
-            aria-hidden="true"
-          />
+          <i className="fa-solid fa-filter" aria-hidden="true" />
+          <span>Filter</span>
         </button>
-        {columnsMenuOpen ? (
-          <div className={styles.usersTabSplitMenu} role="menu">
-            {COLUMNS.map((col) => (
-              <label key={col.key} className={styles.usersTabSplitItem}>
-                <input
-                  type="checkbox"
-                  checked={visibleColumns.has(col.key)}
-                  onChange={() => onToggleColumn(col.key)}
-                />
-                <span>{col.label}</span>
-              </label>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      )}
 
-      <button
-        type="button"
-        className={`${styles.smallButton} ${styles.smallButtonEnabled} ${
-          filterEnabled ? styles.usersTabFilterButtonActive : ""
-        }`}
-        onClick={onToggleFilter}
-        aria-pressed={filterEnabled}
-        title={
-          filterEnabled
-            ? "Hide column filter inputs"
-            : "Show a search input per visible column"
-        }
-      >
-        <i className="fa-solid fa-filter" aria-hidden="true" />
-        <span>Filter</span>
-      </button>
-
-      <button
-        type="button"
-        className={`${styles.smallButton} ${styles.smallButtonEnabled}`}
-        onClick={onAddUser}
-      >
-        <i className="fa-solid fa-user-plus" aria-hidden="true" />
-        <span>Add user</span>
-      </button>
-
+      {isCustomer ? null : (
       <div ref={importMenuRef} className={styles.usersTabSplitWrap}>
         <button
           type="button"
@@ -183,7 +192,9 @@ export default function UsersTabToolbar({
           </div>
         ) : null}
       </div>
+      )}
 
+      {isCustomer ? null : (
       <div ref={exportMenuRef} className={styles.usersTabSplitWrap}>
         <button
           type="button"
@@ -232,6 +243,7 @@ export default function UsersTabToolbar({
           </div>
         ) : null}
       </div>
+      )}
 
       <input
         ref={csvInputRef}

@@ -9,7 +9,6 @@ import {
   type ChangeEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import YAML from "yaml";
 import styles from "../../deployment/workspace/Main.module.css";
 import { encodePath } from "../../workspace-panel/utils";
 import {
@@ -25,14 +24,15 @@ import UsersTabToolbar from "./users-tab/Toolbar";
 import {
   AUTOSAVE_DEBOUNCE_MS,
   COLUMNS,
+  CUSTOMER_VISIBLE_COLUMNS,
   REMOTE_POLL_MS,
   USERS_GROUP_VARS_PATH,
+  buildUsersYamlContent,
   downloadBlob,
   parseDoc,
   readCookie,
   rowMatchesColumnFilters,
   rowsFingerprint,
-  rowsToYamlMap,
   type ColumnFilters,
   type ColumnKey,
   type SyncState,
@@ -42,11 +42,20 @@ import {
 type Props = {
   baseUrl: string;
   workspaceId: string;
+  deviceMode: "customer" | "expert";
 };
 
 type RowsMode = "auto" | number;
 
-export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Element {
+const URL_COLS_PARAM = "usersCols";
+const URL_FILTER_PREFIX = "usersFilter_";
+
+export default function UsersTabPanel({
+  baseUrl,
+  workspaceId,
+  deviceMode,
+}: Props): JSX.Element {
+  const isCustomer = deviceMode === "customer";
   const [rows, setRows] = useState<UserRow[]>([]);
   const [doc, setDoc] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
@@ -68,6 +77,73 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
   const lastRemoteFingerprintRef = useRef<string>("");
   const localFingerprintRef = useRef<string>("");
 
+  // ---- URL state sync (visible columns + active column filters) ----
+  // Hydrate on mount from ?usersCols=…&usersFilter_<key>=… so a
+  // shared link reproduces the same view. Write back on change via
+  // history.replaceState so the URL stays in sync without navigating.
+  const validKeys = useMemo(() => new Set(COLUMNS.map((c) => c.key)), []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const colsRaw = params.get(URL_COLS_PARAM);
+    if (colsRaw) {
+      const next = colsRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((k): k is ColumnKey => validKeys.has(k as ColumnKey));
+      if (next.length > 0) setVisibleColumns(new Set(next));
+    }
+    const nextFilters: ColumnFilters = {};
+    for (const [k, v] of params) {
+      if (!k.startsWith(URL_FILTER_PREFIX)) continue;
+      const colKey = k.slice(URL_FILTER_PREFIX.length) as ColumnKey;
+      if (validKeys.has(colKey) && v) nextFilters[colKey] = v;
+    }
+    if (Object.keys(nextFilters).length > 0) {
+      setColumnFilters(nextFilters);
+      setFilterEnabled(true);
+    }
+    // Mount-only: re-running on prop changes would clobber user edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const colsArr = COLUMNS.filter((c) => visibleColumns.has(c.key)).map(
+      (c) => c.key,
+    );
+    const defaultArr = COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key);
+    if (
+      colsArr.length === defaultArr.length &&
+      colsArr.every((k, i) => k === defaultArr[i])
+    ) {
+      params.delete(URL_COLS_PARAM);
+    } else {
+      params.set(URL_COLS_PARAM, colsArr.join(","));
+    }
+    for (const c of COLUMNS) {
+      const k = `${URL_FILTER_PREFIX}${c.key}`;
+      const v = (columnFilters[c.key] ?? "").trim();
+      if (v) params.set(k, v);
+      else params.delete(k);
+    }
+    const search = params.toString();
+    const next = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (current !== next) window.history.replaceState(null, "", next);
+  }, [visibleColumns, columnFilters]);
+
+  // The customer-mode view is fixed: only basic identity columns,
+  // no filter row, no per-row detail. Expert mode uses the user's
+  // stored selection. Toggling between modes preserves the expert
+  // selection so it comes back unchanged.
+  const effectiveVisibleColumns = isCustomer
+    ? CUSTOMER_VISIBLE_COLUMNS
+    : visibleColumns;
+  const effectiveFilterEnabled = isCustomer ? false : filterEnabled;
+  const effectiveColumnFilters: ColumnFilters = isCustomer ? {} : columnFilters;
+
   const fileUrl = useMemo(
     () =>
       `${baseUrl}/api/workspaces/${workspaceId}/files/${encodePath(USERS_GROUP_VARS_PATH)}`,
@@ -76,9 +152,7 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
 
   const writeYaml = useCallback(
     async (nextRows: UserRow[]): Promise<void> => {
-      const nextDoc: Record<string, unknown> = { ...doc };
-      nextDoc.users = rowsToYamlMap(nextRows);
-      const content = YAML.stringify(nextDoc);
+      const content = buildUsersYamlContent(doc, nextRows);
       const csrf = readCookie("csrf");
       const headers: Record<string, string> = { "content-type": "application/json" };
       if (csrf) headers["X-CSRF"] = csrf;
@@ -97,7 +171,9 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
         }
         throw new Error(detail || `HTTP ${res.status}`);
       }
-      setDoc(nextDoc);
+      // Reflect the in-memory shape we just persisted; reload happens
+      // on the next remote-poll tick.
+      setDoc((prev) => ({ ...prev }));
       lastRemoteFingerprintRef.current = rowsFingerprint(nextRows);
       localFingerprintRef.current = lastRemoteFingerprintRef.current;
     },
@@ -260,28 +336,22 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
     [detailKey, scheduleSave],
   );
 
-  const addRow = useCallback(() => {
-    setRows((prev) => {
-      const taken = new Set(prev.map((r) => r.username));
-      let n = 1;
-      let username = "user1";
-      while (taken.has(username)) {
-        n += 1;
-        username = `user${n}`;
-      }
-      const next: UserRow[] = [
-        ...prev,
-        {
-          username,
-          firstname: "",
-          lastname: "",
-          isNew: true,
-        },
-      ];
-      scheduleSave(next);
-      return next;
-    });
-  }, [scheduleSave]);
+  // Append a new user. Called from the always-visible draft row in
+  // the table once the user has filled in valid values and pressed
+  // Enter — username is required, the rest is optional.
+  const createUser = useCallback(
+    (user: UserRow) => {
+      setRows((prev) => {
+        const next: UserRow[] = [
+          ...prev,
+          { ...user, isNew: true },
+        ];
+        scheduleSave(next);
+        return next;
+      });
+    },
+    [scheduleSave],
+  );
 
   const validateRows = useCallback((): string | null => {
     const seen = new Set<string>();
@@ -307,8 +377,8 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
   // AND-clause. Resets to page 1 whenever the filter set changes so
   // the user doesn't end up on an empty page after narrowing.
   const filteredRows = useMemo(
-    () => rows.filter((row) => rowMatchesColumnFilters(row, columnFilters)),
-    [rows, columnFilters],
+    () => rows.filter((row) => rowMatchesColumnFilters(row, effectiveColumnFilters)),
+    [rows, effectiveColumnFilters],
   );
   const pageSize = rowsMode === "auto" ? autoPageSize : rowsMode;
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -328,7 +398,7 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
   );
 
   const exportYaml = useCallback(() => {
-    const yaml = YAML.stringify({ users: rowsToYamlMap(rows) });
+    const yaml = buildUsersYamlContent({}, rows);
     downloadBlob(`workspace-users-${workspaceId}.yml`, "application/x-yaml", yaml);
   }, [rows, workspaceId]);
 
@@ -417,11 +487,11 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
               return !prev;
             });
           }}
-          onAddUser={addRow}
           onPickCsv={onPick("csv")}
           onPickYaml={onPick("yaml")}
           onExportCsv={exportCsv}
           onExportYaml={exportYaml}
+          isCustomer={isCustomer}
         />
       </div>
 
@@ -445,18 +515,21 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
       <div ref={tableWrapRef} className={styles.usersTabTableWrap}>
         <UsersTabTable
           rows={pagedRows}
-          visibleColumns={visibleColumns}
-          filterEnabled={filterEnabled}
-          columnFilters={columnFilters}
+          visibleColumns={effectiveVisibleColumns}
+          filterEnabled={effectiveFilterEnabled}
+          columnFilters={effectiveColumnFilters}
           onColumnFilterChange={(key, value) =>
             setColumnFilters((prev) => ({ ...prev, [key]: value }))
           }
           onUpdateRow={(row, patch) => updateRowByUsername(row.username, patch)}
           onRemoveRow={(row) => removeRowByUsername(row.username)}
           onOpenDetails={(row) => setDetailKey(row.username)}
+          onCreateUser={createUser}
           loading={loading}
           totalCount={rows.length}
           rowRef={firstRowRef}
+          isCustomer={isCustomer}
+          allRows={rows}
         />
       </div>
 
@@ -480,8 +553,24 @@ export default function UsersTabPanel({ baseUrl, workspaceId }: Props): JSX.Elem
         ? createPortal(
             <UserDetailModal
               row={detailRow}
+              rows={rows}
+              baseUrl={baseUrl}
+              workspaceId={workspaceId}
               onClose={() => setDetailKey(null)}
-              onChange={(patch) => updateRowByUsername(detailRow.username, patch)}
+              onChange={(patch) => {
+                // If the username is being renamed, point detailKey at
+                // the new value before the row update propagates;
+                // otherwise the next render's `rows.find(r.username
+                // === detailKey)` would miss and the modal would
+                // unmount mid-edit.
+                if (
+                  patch.username !== undefined &&
+                  patch.username !== detailRow.username
+                ) {
+                  setDetailKey(patch.username);
+                }
+                updateRowByUsername(detailRow.username, patch);
+              }}
             />,
             document.body,
           )
